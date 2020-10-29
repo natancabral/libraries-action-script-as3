@@ -4,7 +4,11 @@
 
 ## Libraries NC
 
+> en: 10 years of AS codes (pt: *10 anos de código ActionsScript*)
+
 **The Adobe® AIR® technology enables developers to create and package cross platform games/apps for major platforms like iOS, Android, Windows and Mac OS.**
+
+> AS3 looks syntactically almost like Java. It also has OO (Object-oriented) structure, organization for packages, classes, methods and fields. A small comparison is highlighted in the picture below – declaring variables and methods. Those two languages are so alike that it takes only few days to get to know what the main differences are.
 
 [Adobe AIR](https://en.wikipedia.org/wiki/Adobe_AIR) provides a single set of APIs to build cross-platform desktop/mobile applications and games. [ActionScript 3](https://en.wikipedia.org/wiki/ActionScript) is the programming language for AIR. Powerful native functionality such as file system, SQLite, sensors are included by default. To add missing functionality, you can build ANEs (Air Native Extensions) coded in the native language (eg VC++ for Windows, Java for Android, Swift/Objective-C for iOS). To build mobile apps/games with GPU-rendered graphics, use the [Starling](https://gamua.com/starling/) framework and optionally the [Feathers UI](https://feathersui.com/). Adobe AIR is very popular in the mobile gaming space.
 
