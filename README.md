@@ -1,13 +1,10 @@
-> :warning: **If you are using mobile browser**: Be very careful here!
+[<img src="https://raw.githubusercontent.com/natancabral/libraries-action-script-as3/main/adobe-air.png" align="right" width="150">](https://www.adobe.com/products/air.html)
 
-! This is an info message.
-!v This is a success message.
-!! Consider this a warning.
-!x This is an error message.
+# ActionScript 3 [![Awesome](https://raw.githubusercontent.com/natancabral/libraries-action-script-as3/main/badge-awesome.svg)](https://github.com/natancabral/libraries-action-script-as3)
 
-[<img src="https://rawgit.com/hgupta9/awesome-actionscript3/master/AS3_AIR.png" align="right" width="150">](https://www.adobe.com/products/air.html)
+## Libraries NC
 
-# Libraries NC ActionScript 3 [![Awesome](https://raw.githubusercontent.com/natancabral/libraries-action-script-as3/main/badge-awesome.svg)](https://github.com/natancabral/libraries-action-script-as3)
+**The Adobe® AIR® technology enables developers to create and package cross platform games/apps for major platforms like iOS, Android, Windows and Mac OS.**
 
 > Awesome libraries and components for ActionScript 3 and Adobe AIR.
 
