@@ -39,7 +39,8 @@ package com.example
             super();
             var txtHello: TextField = new TextField();
             txtHello.text = "Hello World";
-            addParent3(txtHello);
+            txtHello.x = txtHello.y = 100;
+            this.addElement(txtHello);
         }
         /**
         *  public set | get
