@@ -20,11 +20,17 @@
 ```as
 package com.example
 {
+    /*
+    * Imports
+    */
     import flash.text.TextField;
     import flash.display.Sprite;
 
     public class Greeter extends Sprite
     {
+        /*
+        * Variables
+        */
         public var variableNumber:Number; //type Number
         public var fullName:String; //type String
         
@@ -36,10 +42,10 @@ package com.example
             addParent3(txtHello);
         }
         /**
-          public set | get
-          call:
-          Greeter.myNumber = 123; //input
-          print Greeter.myNumber; //output
+        *  public set | get
+        *  call:
+        *  Greeter.myNumber = 123; //input
+        *  print Greeter.myNumber; //output
         **/
         public set function myNumber(n:Number)
         {
@@ -50,9 +56,9 @@ package com.example
             return variableNumber;
         }
         /**
-          static public
-          call:
-          Greeter.myFullName()
+        *  static public
+        *  call:
+        *  Greeter.myFullName()
         **/
         static public function myFullName():String
         {
