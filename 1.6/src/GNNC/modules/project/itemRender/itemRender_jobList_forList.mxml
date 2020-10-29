@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				width="100%" height="30" 
+				
+				creationComplete="{__start()}" 
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				doubleClickEnabled="true" 
+				
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.gnncDate;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			private function __start():void
+			{
+			}
+			
+			private function __selectClient():void
+			{
+			}
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __dateFinal():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._dateFinalAuto,data));
+			}
+
+			private function __dateCanceled():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._dateCanceledAuto,data));
+			}
+
+			private function str(s:String):String
+			{
+				return s.substr(0,1).toUpperCase()+s.substr(1).toLowerCase();
+			}
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret" />
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<!--- CONTROL -->
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha="0.2" visible="{data.NO_CONTROL==1?false:data.CONTROL==0?true:false}">
+		<s:fill>
+			<s:SolidColor color="0x007eff"/>
+		</s:fill>
+	</s:Rect>
+	
+	<!--- FINAL -->
+	<elements:elementBarGray left="0" top="0" right="0" bottom="0" visible="{gnncDate.__isValid(data.DATE_CANCELED)?true:gnncDate.__isValid(data.DATE_FINAL)?true:false}" radiusX="3">
+		<elements:fill>
+			<s:SolidColor color="{gnncDate.__isValid(data.DATE_CANCELED)?0xcc0033:gnncDate.__isValid(data.DATE_FINAL)?0x009900:0xFFFFFF}" alpha=".3"/>
+		</elements:fill>
+	</elements:elementBarGray>
+
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha=".8" includeIn="hoveredAndShowsCaret,hovered" radiusX="3">
+		<s:fill>
+			<s:SolidColor color="0xDDDDDD"/>
+		</s:fill>
+	</s:Rect>
+
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<elements:elementHDropShadow width="100%" height="5" alpha=".8" includeIn="selected,selectedAndShowsCaret" />
+	<elements:elementHLine width="100%" bottom="0" alpha=".2"/>
+	
+	<s:HGroup left="0" right="0" top="1" bottom="2" gap="1" verticalAlign="middle" paddingLeft="4" paddingRight="4" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF">
+		
+		<s:Image id="ICON_OK" 
+				 source="{gnncDate.__isValid(data.DATE_CANCELED)?gnncEmbedBlackWhite.check_16_red_ok:gnncDate.__isValid(data.DATE_FINAL)?gnncEmbedBlackWhite.check_16_green_ok:gnncEmbedBlackWhite.check_16_bw}" width="16" height="16" 
+				 toolTip="{gnncDate.__isValid(data.DATE_CANCELED)?'Cancelado em: '+gnncDate.__date2Legend(data.DATE_CANCELED,null,true,true):
+				 gnncDate.__isValid(data.DATE_FINAL)?'Finalizado em: '+gnncDate.__date2Legend(data.DATE_FINAL,null,true,true):'Não Finalizado'}" />
+		
+		<s:Image source="{gnncDate.__isNull(data.DATE_FINAL)?gnncEmbedBlackWhite.check_16_green:gnncEmbedBlackWhite.check_16_green_ok}" toolTip="{gnncDate.__isNull(data.DATE_FINAL)?'Finalizar...':'Finalizado!'}" click="{__dateFinal()}" buttonMode="true" includeIn="selectedAndShowsCaret,selected"/>
+		<s:Image source="{gnncDate.__isNull(data.DATE_CANCELED)?gnncEmbedBlackWhite.check_16_red:gnncEmbedBlackWhite.check_16_red_ok}" toolTip="{gnncDate.__isNull(data.DATE_FINAL)?'Cancelar..':'Cancelado!'}" click="{__dateCanceled()}" buttonMode="true" includeIn="selectedAndShowsCaret,selected"/>
+		
+		<!-- NIVEL DE PRIORIDADE -->
+		<s:Image source="{data.ACTIVE==0?gnncEmbedBlackWhite.bw_project_job_16:data.ACTIVE==1?gnncEmbedBlackWhite.bw_urgent_16:data.ACTIVE==2?gnncEmbedBlackWhite.bw_alert_error_16:gnncEmbedBlackWhite.bw_fire_16}" width="16" height="16" 
+				 toolTip="{!data.ACTIVE?'Normal':data.ACTIVE==1?'Urgente':data.ACTIVE==2?'Alerta de Erro':'Fire!'}" />
+
+		<s:Label text="{str(data.TITLE)}" width="100%" verticalCenter="1" maxDisplayedLines="1" showTruncationTip="true" paddingLeft="5" paddingRight="5" fontWeight="normal" fontSize="11" />
+		
+		<s:Label text="{gnncDate.__DATE_LEFT(true,data.DATE_END,data.DATE_FINAL)}" 
+				 toolTip="{gnncDate.__DATE_LEFT_TEXT(0,data.DATE_FINAL,data.DATE_START,data.DATE_END)}" 
+				 color="{gnncDate.__DATE_LEFT_COLOR(0,data.DATE_FINAL,data.DATE_START,data.DATE_END)}"
+				 fontSize="12" fontWeight="bold" maxDisplayedLines="1" showTruncationTip="true" verticalAlign="middle" textAlign="center"
+				 width="30" paddingTop="1" paddingRight="4"
+				 />
+		
+		<!--s:Image source="{gnncEmbedBlackWhite.bw_calendar_16}" 	toolTip="Data Iniciar"/-->
+		<s:Label text="{gnncDate.__date2Legend(( gnncDate.__isValid(data.DATE_START) ? data.DATE_START : data.DATE ) ,null,true,false,'',true)}" toolTip="Data Iniciar" 
+				 width="65" verticalCenter="1" maxDisplayedLines="1" showTruncationTip="true" paddingLeft="5" paddingRight="2" fontWeight="bold" fontSize="10" />
+
+		<s:Label text="{data.hasOwnProperty('NAME_CLIENT')?gnncData.__firstLetterUpperCase(data.NAME_CLIENT):''}" width="{data.hasOwnProperty('NAME_CLIENT')?100:1}" fontSize="10" showTruncationTip="true" maxDisplayedLines="1" paddingTop="1" buttonMode="true" click="{__selectClient()}" paddingRight="5"/>
+		
+		<!--s:Image source="{gnncEmbedImage.TIMELINE_10_OK}" 		toolTip="{'Data de cadastro:\n'+gnncDate.__date2Legend(data.DATE,null,true,true)}"/>
+		<s:Rect width="3"/>
+		<s:Image source="{gnncEmbedImage.TIMELINE_10_START}" 	toolTip="{'Data início:\n'+gnncDate.__date2Legend(data.DATE_START,null,true,true)}"/>
+		<s:Rect width="3"/>
+		<s:Image source="{gnncEmbedImage.TIMELINE_10_END}" 		toolTip="{'Data fim:\n'+gnncDate.__date2Legend(data.DATE_END,null,true,true)}"/>
+		<s:Rect width="3"/-->
+		
+		<!--s:Image source="{gnncEmbedImage.USER_16_BW}" width="16" height="16" toolTip="Usuário Responsável: -" />
+		<s:Image source="{gnncEmbedImage.STAR_16_BW}" width="16" height="16" toolTip="Favorito" />
+		<s:Image source="{!data.ROWS_COMMENT?gnncEmbedImage.COMMENT_16_BW:gnncEmbedImage.COMMENT_16}" width="16" height="16" toolTip="{'Comentários:'+data.ROWS_COMMENT}" />
+		<s:Image id="iconAttach_" source="{!data.ROWS_ATTACH?gnncEmbedImage.ATTACH_16_BW:gnncEmbedImage.ATTACH_16}" width="16" height="16" toolTip="{'Arquivos:'+data.ROWS_ATTACH}" /-->
+
+		<s:Image source="{gnncEmbedImage.DESCRIPTION_16}" toolTip="{data.MESSAGE.toString().length>200?data.MESSAGE.toString().substr(0,200)+'...':data.MESSAGE}" alpha="{data.MESSAGE ? 1 : .2}" />
+		<s:Rect width="3"/>
+
+		<s:Button icon="{gnncEmbedBlackWhite.bw_view_16}" width="22" height="22" cornerRadius="1" skinClass="GNNC.skin.button.skin_buttonLink" click="{__mDC()}" />
+		
+	</s:HGroup>
+	
+</s:ItemRenderer>

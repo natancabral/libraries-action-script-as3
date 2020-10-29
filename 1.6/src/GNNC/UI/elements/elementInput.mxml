@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="100" height="25"
+		 >
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			
+			public function get _TEXT():String{ 									return inputText.text; }
+			
+			public function get label():String{ 									return inputText.text; }
+			public function set label(value_:String):void{ 							inputText.text = value_; }
+
+			public function set _RADIUS(value_:uint):void{ 							retangle.radiusX = value_; retangle.radiusY = value_; }
+			public function set _TEXT(value_:String):void{ 							inputText.text = value_; }
+			public function set _SIZE(value_:uint):void{ 							inputText.setStyle('fontSize',value_); }
+			public function set _TEXTCENTER(value_:Boolean):void{ 					inputText.setStyle('textAlign',value_?'center':'left'); }
+			public function set _COLOR(value_:uint):void{ 							inputText.setStyle('color',value_); }
+			public function set _BOLD(value_:Boolean):void{ 						inputText.setStyle('fontWeight',value_?'bold':'normal'); }
+			public function set _EDITABLE(value_:Boolean):void{ 					inputText.editable = value_; }
+			public function set _SELECTABLE(value_:Boolean):void{ 					inputText.selectable = value_; }
+			public function set _MAXCHARS(value_:uint):void{ 						inputText.maxChars = value_; }
+			public function set _RESTRICT(value_:String):void{ 						inputText.restrict = value_; }
+			public function set _PROMPT(value_:String):void{ 						inputText.prompt = value_; }
+			//public function set _PADDING(valueLeft_:uint,valueRight_:uint):void{ 	inputText.left = valueLeft_; inputText.right = valueRight_; }
+			
+		]]>
+	</fx:Script>
+
+	<s:Rect id="retangle" left="0" right="0" top="0" bottom="0" radiusX="10" radiusY="10" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x000000" alpha=".2" />
+				<s:GradientEntry color="0x444444" alpha=".2" />
+			</s:LinearGradient>
+		</s:fill>
+		<s:stroke>
+			<s:LinearGradientStroke weight="1" rotation="89">
+				<s:GradientEntry color="0x2b384a" alpha=".9" />
+				<s:GradientEntry color="0xEEEEEE" alpha=".7" />
+			</s:LinearGradientStroke>
+		</s:stroke>
+	</s:Rect>
+
+	<s:TextInput id="inputText" text="" left="4" right="4" verticalCenter="0" borderVisible="false" contentBackgroundAlpha="0" paddingBottom="2" paddingLeft="3" paddingRight="2" paddingTop="2" focusAlpha="0" restrict="[0-9][a-z][A-Z][\_\-,.!():][áãâÁÃÂ][éêÉÊ][íÍ][õôóÕÔÓ][úÚ][çÇ][ ]" />
+
+</s:Group>

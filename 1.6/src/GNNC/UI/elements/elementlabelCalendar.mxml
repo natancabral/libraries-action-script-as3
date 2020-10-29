@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:HGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 height="25" 
+		 >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			
+			public function set textUp(text_:String)				:void{ textLabelUp_.text = text_ 	};
+			public function get textUp()							:String{ return textLabelUp_.text	};
+
+			public function set _colorUp(number_:uint)				:void{ textLabelUp_.setStyle('color',number_) 	 		};
+			public function get _colorUp()							:uint{ return uint(textLabelUp_.getStyle('color')) 		};
+			
+			public function set _fontSizeUp(number_:uint)			:void{ textLabelUp_.setStyle('fontSize',number_) 		};
+			public function get _fontSizeUp()						:uint{ return uint(textLabelUp_.getStyle('fontSize'))	};
+			
+			public function set _paddingTopUp(v:uint)				:void{ textLabelUp_.setStyle('paddingTop',v) 		};
+			
+
+			//---------------------------------------------------------------------------------------------------------------------------------------------------//
+			//---------------------------------------------------------------------------------------------------------------------------------------------------//
+			//---------------------------------------------------------------------------------------------------------------------------------------------------//
+			//---------------------------------------------------------------------------------------------------------------------------------------------------//
+
+			public function set text(text_:String)					:void{ textLabel_.text = text_ 			};
+			public function get text()								:String{ return textLabel_.text			};
+			
+			public function set _toolTip(text_:String)				:void{ textLabel_.toolTip = text_ 		};
+			public function get _toolTip()							:String{ return textLabel_.toolTip		};
+
+			public function set _label(text_:String)				:void{ textLabel_.text = text_ 			};
+			public function get _label()							:String{ return textLabel_.text			};
+
+			public function set _color(number_:uint)				:void{ textLabel_.setStyle('color',number_) 	 		  };
+			public function get _color()							:uint{ return uint(textLabel_.getStyle('color')) 		  };
+
+			public function set _fontSize(number_:uint)				:void{ textLabel_.setStyle('fontSize',number_) 			  };
+			public function get _fontSize()							:uint{ return uint(textLabel_.getStyle('fontSize')) 	  };
+
+			public function set _fontWeight(value_:String)			:void{ textLabel_.setStyle('fontWeight',value_) 	  	  };
+			public function get _fontWeight()						:String{ return String(textLabel_.getStyle('fontWeight')) };
+
+			public function set _colorBackground(number_:uint)		:void{ background_.color = number_ 			};
+			public function get _colorBackground()					:uint{ return uint(background_.color) 		};
+
+			public function set _colorBackgroundAlpha(number_:Number):void{ background_.alpha = number_ 		};
+			public function get _colorBackgroundAlpha()				:Number{ return Number(background_.alpha) 	};
+
+			public function set _paddingTop(number_:uint)			:void{ this.paddingTop     = number_; 		};
+			public function set _paddingRight(number_:uint)			:void{ this.paddingRight   = number_; 		};
+			public function set _paddingBottom(number_:uint)		:void{ this.paddingBottom  = number_; 		};
+			public function set _paddingLeft(number_:uint)			:void{ this.paddingLeft    = number_; 		};
+
+			public function set _paddingTopText(number_:uint)		:void{ textLabel_.setStyle('paddingTop',number_);    };
+			public function set _paddingRightText(number_:uint)		:void{ textLabel_.setStyle('paddingRight',number_);  };
+			public function set _paddingBottomText(number_:uint)	:void{ textLabel_.setStyle('paddingBottom',number_); };
+			public function set _paddingLeftText(number_:uint)		:void{ textLabel_.setStyle('paddingLeft',number_); 	 };
+
+		]]> 
+	</fx:Script>
+	<s:Group width="100%" height="100%">
+		<s:Rect left="0" top="0" right="0" bottom="0" radiusX="4" radiusY="4" >
+			<s:fill>
+				<s:SolidColor id="background_" color="0xAAAAAA" />
+			</s:fill>
+		</s:Rect>
+		<s:Label id="textLabelUp_" text="" fontSize="8" fontWeight="bold" width="100%" textAlign="center" verticalAlign="top" maxDisplayedLines="1" showTruncationTip="true" paddingRight="1" paddingLeft="1" paddingTop="5" color="0xbbbbbb" />
+		<s:Label id="textLabel_" text="" fontSize="11" fontWeight="bold" width="100%" verticalAlign="middle" height="100%" maxDisplayedLines="1" showTruncationTip="true" paddingRight="1" paddingLeft="1" paddingTop="2" color="0xFFFFFF" />
+	</s:Group>
+</s:HGroup>

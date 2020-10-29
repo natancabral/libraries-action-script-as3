@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="700" height="400" 
+		  creationComplete="{__start()}"
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.sqlTables.table_settings;
+			
+			import mx.collections.ArrayCollection;
+			import mx.rpc.events.ResultEvent;
+			
+			[Bindable]  private var _gnncGlobal:gnncGlobalStatic 	= new gnncGlobalStatic(true);
+						private var _SETTING:gnncAMFPhp 			= new gnncAMFPhp();
+			
+			private var _idSetting:uint = 0;
+			
+			private const _method:ArrayCollection = new ArrayCollection([
+				{label:'Selecionar',	data:0},
+				{label:'Novo',			data:1},
+				{label:'Atualizar',		data:2},
+				{label:'Deletar',		data:3}
+			])
+			
+			private function __start():void
+			{
+				NAME_.setFocus();
+
+				if(!gnncGlobalStatic._userAdmin){
+					new gnncAlert().__alert('Somente administradores.');
+					__close();
+					return;
+				}
+
+				__settingRefresh();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __EXEC():void
+			{
+				if(NAME_.text.length < 3 && VALUE_.text.length < 3)
+				{
+					new gnncAlert().__alert('Parâmetros e Valores devem conter mais de 3 caractéres.');
+					return;
+				}
+				
+				if(METHOD_.selectedIndex > -1)
+					switch(METHOD_.selectedItem.data)
+					{
+						case 1: __INSERT(); break;
+						case 2: __UPDATE(); break;
+						case 3: __DELETE(); break;
+					}
+				else
+					new gnncAlert().__alert('Selecione um método.');
+				
+				return;
+			}
+			
+			private function __settingSelected():void
+			{
+				if(SETTINGS_.selectedIndex < 0)
+					return;
+				
+				_idSetting		= SETTINGS_.selectedItem.ID;
+				NAME_.text 		= SETTINGS_.selectedItem.NAME;
+				VALUE_.text 	= SETTINGS_.selectedItem.VALUE;
+				DESC_.text 		= SETTINGS_.selectedItem.DESCRIPTION;
+				
+				//Exec
+				METHOD_.selectedIndex  	= 2;
+				SETT_.selectedIndex		= -1;
+			}
+
+			private function __settingSelectedArray():void
+			{
+				if(SETT_.selectedIndex < 0)
+					return;
+
+				//set news values in inputs
+				NAME_.text		= SETT_.selectedItem.data;
+				DESC_.text		= SETT_.selectedItem.label;
+				VALUE_.text		= '';
+
+				//clear selected data
+				_idSetting				= 0;
+				SETTINGS_.selectedIndex = -1;
+				
+				//Exec
+				METHOD_.selectedIndex  = 1;
+			}
+			
+			private function __settingRefresh():void
+			{
+				btnExe_.enabled = false;
+				loading_.text = 'Atualizando...';
+				SETTINGS_.dataProvider = new ArrayCollection();
+				
+				var _sql:String = new gnncSql().__SELECT(new table_settings(),false,['ID','NAME','VALUE','DESCRIPTION']);
+				_gnncGlobal._SETTINGS.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(event:*):void
+				{
+					SETTINGS_.dataProvider = _gnncGlobal._SETTINGS.DATA_ARR;
+					btnExe_.enabled = true;
+					loading_.text = '';
+				}
+
+				function __fFault(event:*):void
+				{
+					btnExe_.enabled = true;
+					loading_.text = '';
+				}
+
+			}
+
+			protected function __fResultGlobal(event:*):void
+			{
+				__settingRefresh();
+				METHOD_.selectedIndex = 0;
+				SETTINGS_.enabled = true;
+				_idSetting = 0;
+			}
+
+			protected function __fFaultGlobal(event:*):void
+			{
+				SETTINGS_.enabled = true;
+			}
+
+			private function __INSERT():void
+			{
+				SETTINGS_.enabled = false;
+
+				var _table:table_settings 	= new table_settings();
+				_table.NAME 				= NAME_.text;
+				_table.VALUE 				= VALUE_.text;
+				_table.DESCRIPTION 			= DESC_.text;
+				
+				var _sql:String = new gnncSql().__INSERT(_table,false,false,true);
+				
+				_SETTING.__sql(_sql,'Parâmetros adicionado com sucesso.','',__fResultGlobal,__fFaultGlobal);
+			}
+			
+			private function __UPDATE():void
+			{
+				SETTINGS_.enabled = false;
+
+				var _table:table_settings 	= new table_settings();
+				_table.NAME 				= NAME_.text;
+				_table.VALUE 				= VALUE_.text;
+				_table.DESCRIPTION 			= DESC_.text;
+				
+				var _sql:String = new gnncSql().__UPDATE(_table,new table_settings(_idSetting),true);
+				_SETTING.__sql(_sql,'Parâmetros atualizado com sucesso.','',__fResultGlobal,__fFaultGlobal);
+			}
+			
+			private function __DELETE():void
+			{
+				if(!_idSetting || SETTINGS_.selectedIndex < 0)
+				{
+					new gnncAlert().__alert('Selecione novamente na lista o parâmetro que deseja remover.');
+					return;
+				}
+
+				SETTINGS_.enabled = false;
+
+				var _sql:String = new gnncSql().__DELETE(new table_settings(),[_idSetting],true);
+				_SETTING.__sql(_sql,'Parâmetros removido com sucesso.','',__fResultGlobal,__fFaultGlobal);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:Rect width="100%" height="100%" >
+		<s:fill>
+			<s:SolidColor color="0xFAFAFA"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:HGroup left="20" top="20" right="20" bottom="20" gap="20" >
+		<s:VGroup width="100%" gap="5">
+			<s:Label text="Configurações Avançadas" fontSize="12" fontWeight="bold" verticalAlign="middle" paddingBottom="10" />
+			<s:DropDownList id="SETT_" dataProvider="{gnncGlobalArrays._SETTINGS}" width="100%" height="25" change="{__settingSelectedArray()}" prompt="Selecione..."/>
+			<s:HGroup width="100%" gap="2">
+				<s:Label text="Parâmetro:" width="100%" />
+				<s:Rect width="25" />
+				<s:Label text="Valor:" width="100%" />
+			</s:HGroup>
+			<s:HGroup width="100%" height="25" gap="2">
+				<s:TextInput id="NAME_" width="100%" text="" height="25"/>
+				<s:Label text="=" width="25" textAlign="center" height="25" verticalAlign="middle" />
+				<s:TextInput id="VALUE_" width="100%" text="" height="25" />
+			</s:HGroup>
+			<s:Label text="Descrição:" />
+			<s:TextArea id="DESC_" width="100%" text="" height="60" />
+			<s:Label text="Método:" />
+			<s:HGroup width="100%" height="25" gap="2">
+				<s:DropDownList id="METHOD_" dataProvider="{_method}" width="100%" prompt="Selecione" />
+				<s:Button id="btnExe_" label="Executar" click="{__EXEC()}" />
+			</s:HGroup>
+			<s:Label text="Este parâmetro será permanentemente excluído." height="25" width="100%" color="0xCC0000" fontSize="11" fontWeight="bold" visible="{(METHOD_.selectedIndex==3)?true:false}" verticalAlign="middle" />
+			<s:Rect height="10" />
+			<s:HGroup width="100%" gap="1">
+				<s:Button label="Fechar" click="{__close()}" fontWeight="bold" height="25" />
+				<s:Button label="Atualizar" click="{__settingRefresh()}" height="25" />
+				<s:Label id="loading_" text="" verticalAlign="middle" height="25" paddingLeft="10"/>
+			</s:HGroup>
+		</s:VGroup>
+		<s:VGroup width="350" height="100%" gap="0">
+			<s:DataGrid id="SETTINGS_" dataProvider="{_gnncGlobal._SETTINGS.DATA_ARR}" width="350" height="100%" gridClick="{__settingSelected()}" mouseUp="{__settingSelected()}" keyUp="{__settingSelected()}" showDataTips="true" >
+				<s:columns>
+					<s:ArrayList>
+						<s:GridColumn dataField="NAME" headerText="Nome" width="125" />
+						<s:GridColumn dataField="VALUE" headerText="Valor" />
+					</s:ArrayList>
+				</s:columns>
+			</s:DataGrid>
+		</s:VGroup>
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

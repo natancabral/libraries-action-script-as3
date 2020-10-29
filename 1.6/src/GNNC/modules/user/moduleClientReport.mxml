@@ -1,0 +1,260 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="100%" height="100%" 
+		  
+		  creationComplete="{__start()}" 
+		 
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  enabled="false"
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.file.gnncFilePdf;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.gnncEmbedExtension;
+			import GNNC.gnncEmbedImage;
+			
+			import mx.events.CalendarLayoutChangeEvent;
+			import mx.events.DateChooserEvent;
+			
+			//[Bindable] private var _gnncGlobal:gnncGlobalStatic = new gnncGlobalStatic(true);
+			
+			private var _gnncFilePdf:gnncFilePdf = new gnncFilePdf();
+			
+			private function __start():void
+			{
+				YEAR_.value 					= new Date().fullYear;
+				MONTH_.selectedIndex 			= new Date().month;
+				CALENDAR_.addEventListener		(CalendarLayoutChangeEvent.CHANGE,__selectedDate);
+				CALENDAR_.addEventListener		(DateChooserEvent.SCROLL,__selectedDate);
+				__selectedDate			();
+				
+				//new gnncDataBindable().__monitoring(_gnncGlobal,'_loading',__disableReport);
+			}
+			
+			private function __disableReport(e:*):void
+			{
+				//panelCenter_.enabled = !gnncGlobalStatic.loading;
+			}
+			
+			private function __selectedDateAndChangeName():void
+			{
+				DAY_TXT_.text					= String(gnncDate.__date2String(CALENDAR_.selectedDate,false)).substr(8,2);
+				MONTH_TXT_.text					= String(gnncGlobalArrays._MONTH.getItemAt(CALENDAR_.selectedDate.month).NICK_NAME).toUpperCase();
+				YEAR_TXT_.text					= String(CALENDAR_.selectedDate.fullYear).substr(2,2);
+			}
+			
+			private function __selectedDate(e:*=null):void
+			{
+				//Se modar de mês joga o dia para 1o
+				if(
+					MONTH_.selectedIndex != CALENDAR_.displayedMonth || 
+					YEAR_.value != CALENDAR_.displayedYear
+				)
+				{
+					CALENDAR_.selectedDate.fullYear	= CALENDAR_.displayedYear;
+					CALENDAR_.selectedDate.month= CALENDAR_.displayedMonth;
+					CALENDAR_.selectedDate.date = CALENDAR_.selectedDate.date;
+					CALENDAR_.selectedDate 		= CALENDAR_.selectedDate;
+				}
+
+				YEAR_.value 					= CALENDAR_.selectedDate.fullYear;
+				MONTH_.selectedIndex			= CALENDAR_.selectedDate.month;
+				__selectedDateAndChangeName()
+			}
+
+			private function __selectedToday():void
+			{
+				CALENDAR_.selectedDate			= new Date();
+				__selectedDate();
+			}
+			
+			private function __selectedMonth():void
+			{
+				CALENDAR_.selectedDate.month 	= MONTH_.selectedIndex;
+				CALENDAR_.selectedDate 			= CALENDAR_.selectedDate;
+				__selectedDateAndChangeName()
+			}
+
+			private function __selectedYear():void
+			{
+				CALENDAR_.selectedDate.fullYear = YEAR_.value;
+				CALENDAR_.selectedDate 			= CALENDAR_.selectedDate;
+				__selectedDateAndChangeName()
+			}
+
+			private function __reportAddToday():void
+			{
+				//new gnncFileReport_financial_addToday().__create(null,CALENDAR_.selectedDate);			
+			}
+
+			private function __reportTodayInMonth():void
+			{
+				//new gnncFileReport_financial_today().__create(null,CALENDAR_.selectedDate)
+			}
+
+			private function __reportMonth():void
+			{
+				//new gnncFileReport_financial_month().__create(null,CALENDAR_.selectedDate)
+			}
+
+			private function __reportSafeBalance():void
+			{
+				//new gnncFileReport_financial_safeBalance().__create(null,CALENDAR_.selectedDate)
+			}
+
+			private function __reportAllClient():void
+			{
+				//new gnncFileReport_financial_clients().__create(null,CALENDAR_.selectedDate);
+			}
+
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Style>
+		
+		.AC 
+		{
+			skin: ClassReference("GNNC.skin.accordion.skin_accordion_header");
+		}
+
+		.dateChooserHeaderStyles 
+		{
+			/*color: #FFFFFF;*/
+			font-size: 12;
+			fontSize: 12;
+		}
+
+	</fx:Style>
+
+	<elements:elementBarStatus width="201" top="0" bottom="0"/>
+	
+	<s:VGroup top="0" bottom="0" width="201" gap="0" >
+		<s:HGroup width="100%" height="80" gap="1" horizontalAlign="center" verticalAlign="middle" paddingRight="5" paddingLeft="5">
+			<elements:elementLabelFont id="DAY_TXT_" 	text="" fontSize="48" textAlign="center" paddingTop="6" color="0x648ec3" />
+			<elements:elementLabelFont id="MONTH_TXT_" 	text="" fontSize="48" textAlign="center" paddingTop="6" />
+			<elements:elementLabelFont id="YEAR_TXT_" 	text="" fontSize="48" textAlign="center" paddingTop="6" color="0x999999" />
+		</s:HGroup>
+		<s:Group width="201" height="185" >
+			<mx:DateChooser id="CALENDAR_" width="180" height="180" fontSize="11" horizontalCenter="0" 
+							selectedDate="{new Date()}" showToday="false" borderColor="0xAAAAAA"
+							change="{__selectedDate()}" firstDayOfWeek="0" yearNavigationEnabled="true" />
+		</s:Group>
+		<s:HGroup width="100%" height="30" gap="1" horizontalAlign="center" paddingRight="12" paddingLeft="12">
+			<s:Button icon="{gnncEmbedImage.CALENDAR_TODAY_16}" width="25" height="25" click="{__selectedToday()}" toolTip="Hoje" />
+			<s:DropDownList id="MONTH_" width="100%" height="25" dataProvider="{gnncGlobalArrays._MONTH}" change="{__selectedMonth()}" fontWeight="bold" fontSize="11"/>
+			<s:NumericStepper id="YEAR_" width="60" height="25" minimum="1980" maximum="2050" fontSize="11" fontWeight="bold" change="{__selectedYear()}" />
+		</s:HGroup>
+	</s:VGroup>
+
+	<s:VGroup left="202" right="0" top="0" bottom="0" gap="0">
+		<s:Group width="100%" height="30">
+			<elements:elementBarGray />
+			<!--s:HGroup height="25" left="3" top="3" right="3" gap="1" verticalAlign="middle">
+				<s:Image source="{gnncEmbedImage.SAFE_16}" toolTip="Lançamentos"/>
+				<elements:elementLabelDropShadow text="LANÇAMENTO" fontWeight="normal" fontSize="11" paddingLeft="5" paddingRight="5"/>
+				<elements:elementInputSearch id="SEARCH_SAFE_" _FILTER="true" width="200" />
+				<s:Rect width="100%"/>
+			</s:HGroup-->
+			<s:HGroup height="30" left="0" top="0" right="0" bottom="0" gap="1" verticalAlign="middle">
+				<s:TabBar dataProvider="{panelCenter_}" height="30" skinClass="GNNC.skin.tabBar.skin_tabBar_forMenu"/>
+				<s:Rect width="100%"/>
+				<!-- s:Image source="{gnncEmbedImage.REFRESH_16}" visible="{_gnncGlobal._loading}" />
+				<s:Label text="Aguarde..." paddingRight="8" paddingLeft="8" fontWeight="bold" visible="{_gnncGlobal._loading}" click="{panelCenter_.enabled = true}"/ -->
+			</s:HGroup>
+		</s:Group>
+		<mx:ViewStack id="panelCenter_" width="100%" height="100%">
+			<s:NavigatorContent label="BÁSICO" width="100%" height="100%">
+				<s:Scroller width="100%" height="100%">
+					<s:Group width="100%" height="100%">
+						<s:layout>
+							<!--s:TileLayout horizontalGap="20" verticalGap="20" paddingBottom="20" paddingLeft="20" paddingRight="20" paddingTop="20"/-->
+							<s:VerticalLayout gap="10" paddingBottom="20" paddingLeft="20" paddingRight="20" paddingTop="20" />
+						</s:layout>
+						<s:Group width="100%" height="50">
+							<elements:elementLabelFont text="CADASTROS" fontSize="18" left="40"/>
+							<s:Label text="Lista dos cadastros realizados separados por períodos." top="20" bottom="0" left="40" right="100" showTruncationTip="true" />
+							<elements:elementHLine bottom="0"/>
+							<s:HGroup gap="1" right="0">
+								<s:Button label="Diário" height="25" click="{__reportTodayInMonth()}" icon="{gnncEmbedExtension.PDF_16}" />
+								<s:Button label="Semanal" height="25" click="{__reportTodayInMonth()}" icon="{gnncEmbedExtension.PDF_16}" />
+								<s:Button label="Mensal" height="25" click="{__reportTodayInMonth()}" icon="{gnncEmbedExtension.PDF_16}" />
+								<s:Button label="Anual" height="25" click="{__reportTodayInMonth()}" icon="{gnncEmbedExtension.PDF_16}" />
+							</s:HGroup>
+							<s:Image source="{gnncEmbedImage.CALENDAR_TODAY_32}"/>
+						</s:Group>
+						<s:Group width="100%" height="50">
+							<elements:elementLabelFont text="TOTAL DE CADASTROS" fontSize="18" left="40"/>
+							<s:Label text="Relatório das quantidades de cadastros realizados. Selecione uma data." top="20" bottom="0" left="40" right="100" showTruncationTip="true" />
+							<s:HGroup gap="1" right="0">
+								<s:Button label="Mês Atual" height="25" click="{__reportTodayInMonth()}" icon="{gnncEmbedExtension.PDF_16}" />
+								<s:Button label="Ano Atual" height="25" click="{__reportTodayInMonth()}" icon="{gnncEmbedExtension.PDF_16}" />
+							</s:HGroup>
+							<elements:elementHLine bottom="0"/>
+							<s:Image source="{gnncEmbedImage.ADD_32}"/>
+						</s:Group>
+						<s:Group width="100%" height="50">
+							<s:Image source="{gnncEmbedImage.CLIENT_32}"/>
+							<elements:elementLabelFont text="TODOS OS CLIENTES" fontSize="18" left="40"/>
+							<s:Label text="Lista de todos os cadastros" top="20" bottom="0" left="40" right="100" showTruncationTip="true"/>
+							<s:Button label="Gerar" height="25" click="{}" icon="{gnncEmbedExtension.PDF_16}" right="0"/>
+							<elements:elementHLine bottom="0"/>
+						</s:Group>
+						
+						<s:Group width="100%" height="50">
+							<s:Image source="{gnncEmbedImage.CLIENT_32}"/>
+							<elements:elementLabelFont text="INDICAÇÕES" fontSize="18" left="40"/>
+							<s:Label text="Lista dos indicadores e a quantidade de indicações." top="20" bottom="0" left="40" right="100" showTruncationTip="true"/>
+							<s:Button label="Gerar" height="25" click="{}" icon="{gnncEmbedExtension.PDF_16}" right="0"/>
+							<elements:elementHLine bottom="0"/>
+						</s:Group>
+						<s:Group width="100%" height="50">
+							<s:Image source="{gnncEmbedImage.DEPARTAMENT_32}"/>
+							<elements:elementLabelFont text="DEPARTAMENTOS" fontSize="18" left="40"/>
+							<s:Label text="Cadastros de clientes por departamentos." height="50" top="20" bottom="0" left="40" right="100" showTruncationTip="true"/>
+							<s:HGroup gap="1" right="0">
+								<s:Button label="Gerar" height="25" click="{}" icon="{gnncEmbedExtension.PDF_16}" />
+							</s:HGroup>
+							<elements:elementHLine bottom="0"/>
+						</s:Group>
+						<s:Group width="100%" height="50">
+							<s:Image source="{gnncEmbedImage.GROUP_32}"/>
+							<elements:elementLabelFont text="GRUPO" fontSize="18" left="40"/>
+							<s:Label text="Cadastros de clientes por grupos." top="20" bottom="0" left="40" right="100" showTruncationTip="true"/>
+							<s:Button label="Gerar" height="25" click="{__reportSafeBalance()}" icon="{gnncEmbedExtension.PDF_16}" right="0" />
+							<elements:elementHLine bottom="0"/>
+						</s:Group>
+						<s:Group width="100%" height="50">
+							<s:Image source="{gnncEmbedImage.CATEGORY_32}"/>
+							<elements:elementLabelFont text="CATEGORIA" fontSize="18" left="40"/>
+							<s:Label text="Cadastros de clientes categorizados." height="50" top="20" bottom="0" left="40" right="100" showTruncationTip="true"/>
+							<s:HGroup gap="1" right="0">
+								<s:Button label="Gerar" height="25" click="{}" icon="{gnncEmbedExtension.PDF_16}" />
+							</s:HGroup>
+							<elements:elementHLine bottom="0"/>
+						</s:Group>
+					</s:Group>
+				</s:Scroller>
+			</s:NavigatorContent>
+		</mx:ViewStack>
+		<s:Group width="100%" height="30">
+			<elements:elementBarGray />
+			<s:HGroup height="25" left="3" top="3" right="3" fontWeight="bold" gap="1" verticalAlign="middle">
+			</s:HGroup>
+		</s:Group>
+	</s:VGroup>
+	
+	<elements:elementVLine left="201" top="0" bottom="0" />
+	<elements:elementHDropShadow left="201" top="29" alpha=".5"/>
+	
+</s:Module>

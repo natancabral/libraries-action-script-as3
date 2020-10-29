@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%">
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			public function set _COLOR(value_:uint):void{ stroke.color = value_; }
+			public function set color(value_:uint):void{ stroke.color = value_; }
+		]]>
+	</fx:Script>
+	<s:Line width="100%" verticalCenter="0">
+		<s:stroke>
+			<s:SolidColorStroke id="stroke" weight="1" color="0xDDDDDD" />
+		</s:stroke>
+	</s:Line>
+</s:Group>

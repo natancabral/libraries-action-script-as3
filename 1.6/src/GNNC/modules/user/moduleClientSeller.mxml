@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="100%" height="100%" xmlns:select="GNNC.elements.component.select.*"
+		  >
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.modules.user.formNew.newFinancialSellerCommission;
+			import GNNC.sqlTables.table_financial_seller;
+			import GNNC.sqlTables.table_financial_seller_commission;
+			
+			private var _connSeller:gnncAMFPhp 				= new gnncAMFPhp(); 
+			private var _connSellerCommission:gnncAMFPhp 	= new gnncAMFPhp(); 
+			private var _connServices:gnncAMFPhp 			= new gnncAMFPhp(); 
+			private var _connExec:gnncAMFPhp 				= new gnncAMFPhp(); 
+			
+			private function __newSeller():void
+			{
+				if(sellerCommission_.selectedIndex < 0 || !client_.value)
+				{
+					new gnncAlert().__alert("Profissional/vendedor e comissão são obrigatórios.");
+					return;
+				}
+				
+				var _table:table_financial_seller 		= new table_financial_seller();
+				
+				//_table.ID
+				_table.ID_CLIENT_PROFESSIONAL 			= client_.value;
+				_table.ID_FINANCIAL_SELLER_COMMISSION 	= sellerCommission_.selectedItem.ID;
+				
+				var _sql:String = new gnncSql().__INSERT(_table,false,true,true);
+				
+				_connExec.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*=null):void
+				{
+				}
+				
+				function __fFault(e:*=null):void
+				{
+				}
+				
+			}
+
+			private function __delSeller():void
+			{
+				if(seller_.selectedIndex < 0)
+				{
+					//new gnncAlert().__alert("Profissional/vendedor e comissão são obrigatórios.");
+					return;
+				}
+				
+				seller_.enabled = false;
+				
+				var _sql:String = new gnncSql().__DELETE(new table_financial_seller(),[seller_.selectedItem.ID],true);
+				
+				_connExec.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*=null):void
+				{
+					seller_.enabled = true;
+					seller_.dataProvider.removeItemAt(seller_.selectedIndex);
+				}
+				
+				function __fFault(e:*=null):void
+				{
+					seller_.enabled = true;
+				}
+				
+			}
+
+			private function __newSellerCommission():void
+			{
+				var _page:newFinancialSellerCommission = new newFinancialSellerCommission();
+				
+				new gnncPopUp().__creation(_page);
+				
+				/*
+				var _table:table_financial_seller_commission = new table_financial_seller_commission();
+				
+				//_table.ID						= 0;
+				//ID_FINANCIAL_GROUP:uint		= 0; // OFF //por valores que entram no plano de contas
+				//ID_FINANCIAL_CATEGORY:uint	= 0; // OFF //por valores que entram em categoryas
+				
+				_table.VALUE_AT					= 0; //comissão de valores de...
+				_table.VALUE_TO					= 0; //comissão de valores até...
+				
+				_table.COMMISSION_VALUE			= 20; //comissão paga, de valor fixo
+				_table.COMMISSION_PERCENT		= 10.0; //comissao paga, de porcentagem sobre o valor vendido
+				
+				_table.DISCOUNT_VALUE			= 0; //desconto dado no máximo em valor
+				_table.DISCOUNT_PERCENT			= 0; //desconto dado no máximo em porcentagem
+				
+				//DATE_START:String				= ''; // OFF //comissão valida DE
+				//DATE_END:String				= ''; // OFF //comissão valida ATE
+				
+				//public var LEVEL:uint			= 0; // OFF //criar uma nova tabela de regras para este
+				
+				var _sql:String = new gnncSql().__INSERT(_table,false,true,true);
+				
+				_connExec.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*=null):void
+				{
+				}
+				
+				function __fFault(e:*=null):void
+				{
+				}*/
+			}
+
+			private function __delSellerCommission():void
+			{
+				if(sellerCommission_.selectedIndex < 0)
+				{
+					//new gnncAlert().__alert("Profissional/vendedor e comissão são obrigatórios.");
+					return;
+				}
+				
+				sellerCommission_.enabled = false;
+				
+				var _sql:String = new gnncSql().__DELETE(new table_financial_seller_commission(),[sellerCommission_.selectedItem.ID],true);
+				
+				_connExec.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*=null):void
+				{
+					sellerCommission_.enabled = true;
+					sellerCommission_.dataProvider.removeItemAt(sellerCommission_.selectedIndex);
+				}
+				
+				function __fFault(e:*=null):void
+				{
+					sellerCommission_.enabled = true;
+				}
+				
+			}
+
+			private function __listSeller():void
+			{
+				var _sql:String = " select s.*,( select NAME from dbd_client where ID = s.ID_CLIENT_PROFESSIONAL ) as NAME_CLIENT_PROFESSIONAL from dbd_financial_seller s where s.ID > 0 ";
+				
+				_connSeller.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*=null):void
+				{
+					seller_.dataProvider = _connSeller.DATA_ARR;
+				}
+				
+				function __fFault(e:*=null):void
+				{
+				}
+
+			}
+			
+			private function __listSellerCommission():void
+			{
+				var _sql:String = " select * from  dbd_financial_seller_commission where ID > 0 ";
+				
+				_connSellerCommission.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*=null):void
+				{
+					sellerCommission_.dataProvider = _connSellerCommission.DATA_ARR;
+				}
+				
+				function __fFault(e:*=null):void
+				{
+				}
+				
+			}
+
+			private function __listServices():void
+			{
+				var _sql:String = " select NAME,VALUE,RETURN_PERCENT,PAY_COMMISSION_PERCENT,PAY_COMMISSION_VALUE,CODE_ORIGINAL,CODE from dbd_product where ID > 0 order by NAME ASC limit 0,50";
+				
+				_connServices.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*=null):void
+				{
+					services_.dataProvider = _connServices.DATA_ARR;
+				}
+				
+				function __fFault(e:*=null):void
+				{
+				}
+				
+			}
+
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:VGroup width="100%" height="100%" fontSize="10" enabled="false">
+		<s:VGroup width="100%" height="100%" gap="1">
+			<select:conSelect_CLIENT id="client_" width="400"/>
+			<s:HGroup gap="1" width="100%">
+				<s:Button label="Cadastrar" click="{__newSeller()}" height="25" />
+				<s:Button label="Listagem"  click="{__listSeller()}" height="25" />
+				<s:Button label="Deletar"  click="{__delSeller()}" height="25" />
+			</s:HGroup>
+			<s:DataGrid id="seller_" width="100%" height="100%" />
+		</s:VGroup>
+		<s:VGroup width="100%" height="100%" gap="1">
+			<s:HGroup gap="1" width="100%">
+				<s:Button label="Cadastrar" click="{__newSellerCommission()}" height="25" />
+				<s:Button label="Listagem"  click="{__listSellerCommission()}" height="25" />
+				<s:Button label="Deletar"  click="{__delSellerCommission()}" height="25" />
+			</s:HGroup>
+			<s:DataGrid id="sellerCommission_" width="100%" height="100%" />
+		</s:VGroup>
+		<s:VGroup width="100%" height="100%" gap="1">
+			<s:HGroup gap="1" width="100%">
+				<s:Button label="Listagem"  click="{__listServices()}" height="25" />
+			</s:HGroup>
+			<s:DataGrid id="services_" width="100%" height="100%" />
+		</s:VGroup>
+	</s:VGroup>
+</s:Module>

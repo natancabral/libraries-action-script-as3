@@ -1,0 +1,1125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="850" height="550" 
+		  
+		  xmlns:gnncLoading="GNNC.UI.gnncLoading.*" 
+		  xmlns:list="GNNC.elements.component.list.*" 
+		  xmlns:select="GNNC.elements.component.select.*"
+		  xmlns:stage="GNNC.elements.stage.*"
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:gnncDateButton="GNNC.UI.gnncDateButton.*" 
+		  xmlns:components="GNNC.UI.components.*" 
+		  
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.bitmap.gnncBitmap;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalLog;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.permission.gnncPermission;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_;
+			import GNNC.sqlTables.table_attach;
+			import GNNC.sqlTables.table_comment;
+			import GNNC.sqlTables.table_job;
+			import GNNC.time.gnncTime;
+			
+			import mx.binding.utils.ChangeWatcher;
+			import mx.collections.ArrayCollection;
+			import mx.core.UIComponent;
+			
+			import spark.primitives.BitmapImage;
+			
+			public 	var _tableJob:table_job = new table_job();
+			public 	const _MIX:String = 'JOB';
+			
+			private var _connJob:gnncAMFPhp		= new gnncAMFPhp();
+			private var _connExec:gnncAMFPhp	= new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp 	= new gnncPopUp();
+			
+			private var _tableJobChange:table_job = new table_job();
+			
+			public var haveAttachFiles:Boolean = false;
+			public var haveComments:Boolean = false;
+			public var haveClientTeam:Boolean = false;
+			
+			public var _change:Boolean = false;
+			public var _changeActive:Boolean = false;
+			public var _changePublic:Boolean = false;
+			public var _changeFinal:Boolean = false;
+			public var _changeText:Boolean = false;
+			public var _changeKanban:Boolean = false;
+			public var _changeTeam:Boolean = false;
+			public var _changeDate:Boolean = false;
+			
+			private const colorLine:uint = 0x9900cc;
+			private const kanBanColor_0:uint = 0x0099ff;
+			private const kanBanColor_1:uint = 0x079284;
+			private const kanBanColor_2:uint = 0x660066;
+			private const kanBanColor_3:uint = 0x650147;
+			private const kanBanColor_4:uint = 0x009900;
+			
+			private const active_0:uint = 0xffffff;
+			private const active_1:uint = 0xffcc00;
+			private const active_2:uint = 0xff8000;
+			private const active_3:uint = 0xfe0146;
+			
+			public function __start():void
+			{
+				/*addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void{
+						if(gnncKeyboard.__CONTROL_ENTER(event)) 
+							__close();
+					}
+				);*/
+				
+				btnDateStart_.eventChange = __editDate;
+				btnDateEnd_.eventChange = __editDate;
+
+				__setValues();
+				__check();
+			}
+			
+			private function __setValues():void
+			{
+				title_.text = titleOnly_.text = gnncData.__trimText(_tableJob.TITLE);
+				message_.text = _tableJob.MESSAGE;
+				
+				if(_tableJob.MESSAGE==''){
+					panelTitle_.selectedIndex = 1;
+				}
+				
+				//dateStart_.text = gnncDate.__date2Legend(_tableJob.DATE_START);
+				//dateEnd_.text = gnncDate.__date2Legend(_tableJob.DATE_END);R
+				//dateFinal_.text = gnncDate.__date2Legend(_tableJob.DATE_FINAL);
+				
+				if(gnncDate.__isValid(_tableJob.DATE_START)){
+					btnDateStart_.selectedDate = gnncDate.__string2Date(_tableJob.DATE_START);
+					//dataStart_.enabled = true;
+				}
+				if(gnncDate.__isValid(_tableJob.DATE_END)){
+					btnDateEnd_.selectedDate = gnncDate.__string2Date(_tableJob.DATE_END);
+					//dataEnd_.enabled = true;
+				}
+				if(gnncDate.__isValid(_tableJob.DATE_FINAL)){
+					setButtonFinal(false,false);
+					//btnDateFinal_.selected = true;
+				}
+				if(gnncDate.__isValid(_tableJob.DATE_CANCELED)){
+					setButtonCancel(false,false);
+					//btnDateCanceled_.selected = true;
+				}
+				
+				kanban_._label = getKanban(_tableJob,false)+'';
+				kanban_._colorBackground = uint(getKanban(_tableJob,true));
+				
+				__setActive(null,_tableJob.ACTIVE,false);
+				__setPublic(null,_tableJob.PUBLIC,false);
+				__setKanban(null,_tableJob.KANBAN,false);
+				
+				setButtonFinal();
+				setButtonCancel();
+				
+				if(_tableJob.TITLE.length < 3){
+					//_gnncPopUp.__loading('Recolhendo dados...');
+					title_.text = titleOnly_.text = 'Carregando...';
+					panelCenter_.enabled = false;
+					buttomBar_.enabled = false;
+					commentDiscussion_.enabled = false;
+					attachListNew_.enabled = false;
+				}
+				
+				if(gnncGlobalStatic._userClient==true){
+					publicGroup_.enabled = false;
+				}
+				
+				setAttachIcon();
+				setCommentsIcon();
+				setClientTeamIcon();
+			}
+			
+			public function setAttachIcon():void 
+			{
+				if(haveAttachFiles==true){
+					btnAttach.setStyle('icon',gnncBitmapMerge([gnncEmbedBlackWhite.bw_download_32_v2,gnncEmbedBlackWhite.badge_32_up_bigDot],32,32));
+				}else{
+					btnAttach.setStyle('icon',gnncEmbedBlackWhite.bw_download_32_v2);
+				}
+			}
+			
+			public function setCommentsIcon():void 
+			{
+			}
+			
+			public function setClientTeamIcon():void 
+			{
+				if(haveClientTeam==true){
+					btnTeam.setStyle('icon',gnncBitmapMerge([gnncEmbedBlackWhite.bw_client_32_team,gnncEmbedBlackWhite.badge_32_up_bigDot],32,32));
+				}else{
+					btnTeam.setStyle('icon',gnncEmbedBlackWhite.bw_client_32_team);
+				}
+			}
+			
+			
+			public static function gnncBitmapMerge(images:Array,w:uint,h:uint):Object 
+			{
+				var iconClass:Class = null;
+				var bmapd:BitmapData = new BitmapData(w,h,true,0xffffff);
+				
+				for(var i:uint=0;i<images.length;i++){
+					iconClass = Class(images[i]);
+					bmapd.draw(new iconClass().bitmapData,null,null,null,new Rectangle(0,0,w,h));
+				}
+				
+				return new Bitmap(bmapd);
+			}
+			private function __check():void
+			{
+				if(_tableJob != null){
+					if(Number(_tableJob.ID)>0){
+						var columns:Array 		= ['*',
+							'(select c.NAME from dbd_client  c where c.ID = dbd_job.ID_CLIENT_INSERT ) NAME_CLIENT_INSERT',
+							'(select c.NAME from dbd_client  c where c.ID = dbd_job.ID_CLIENT ) NAME_CLIENT',
+							'(select c.NAME from dbd_project c where c.ID = dbd_job.ID_PROJECT) NAME_PROJECT',
+							'(select c.NAME from dbd_step    c where c.ID = dbd_job.ID_STEP   ) NAME_STEP'
+						];
+						//_gnncPopUp.__loading	('Recolhendo dados...');
+						var _sql:String 		= new gnncSql().__SELECT(new table_job(_tableJob.ID),false,columns);
+						_connJob.__sql				(_sql,'','',__fResultEdit,__fFaultEdit);
+					}else{
+						new gnncAlert().__alert('As informações deste Job não foram encontradas.');
+						__close();
+					}
+				} else {
+					_tableJob = new table_job();
+					new gnncAlert().__alert('Não foi possível carregar as informações. Tente novamente.');
+					__close();
+				}
+			}
+			
+			protected function __fFaultEdit(event:*):void
+			{
+				panelCenter_.enabled = true;
+				buttomBar_.enabled = true;
+				commentDiscussion_.enabled = true;
+				attachListNew_.enabled = true;
+				
+				_gnncPopUp.__close();
+				new gnncAlert().__alert('Não foi possível carregar as informações. Tente novamente.');
+				__close();
+			}
+			
+			protected function __fResultEdit(event:*):void
+			{
+				if(_connJob.DATA_ROWS==0)
+				{
+					new gnncAlert().__alert('O identificador não foi encontrado. Tente novamente.');
+					__close();
+					return;
+				}
+				
+				var _obj:Object					= _connJob.DATA_ARR.getItemAt(0);
+				
+				kanban_._label = getKanban(_tableJob,false)+'';
+				kanban_._colorBackground = uint(getKanban(_tableJob,true));
+				
+				_tableJob.ID 					= _obj.ID;
+				_tableJob.ID_KEY                = _obj.ID_KEY ? _obj.ID_KEY : gnncDataRand.__key();
+				
+				_tableJob.ID_CLIENT_INSERT		= _obj.ID_CLIENT_INSERT;
+				_tableJob.ID_CLIENT 			= _obj.ID_CLIENT;
+				_tableJob.ID_PROJECT 			= _obj.ID_PROJECT;
+				_tableJob.ID_STEP 				= _obj.ID_STEP;
+				_tableJob.ID_USER 				= _obj.ID_USER;
+				
+				_tableJob.IDS_CLIENT_TEAM 		= _obj.IDS_CLIENT_TEAM;
+				//idsClientTeamList_.selectedCheckIds(_obj.IDS_CLIENT_TEAM);
+				//idsClientTeam_.text  			= String(_obj.IDS_CLIENT_TEAM);
+				
+				_tableJob.MESSAGE = _obj.MESSAGE;
+				_tableJob.TITLE = gnncData.__trimText(_obj.TITLE);
+				
+				title_.text = titleOnly_.text = _obj.TITLE;
+				message_.text 					= _obj.MESSAGE;
+				
+				if(_obj.MESSAGE!=''){
+					panelTitle_.selectedIndex = 0;
+				}
+				
+				nameClientInsert_.text          = gnncData.__firstLetterUpperCase(_obj.NAME_CLIENT_INSERT);
+				clienName_.text					= gnncData.__firstLetterUpperCase(_obj.NAME_CLIENT);
+				projectName_.text				= gnncData.__firstLetterUpperCase(_obj.NAME_PROJECT);
+				stepName_.text					= uint(_obj.ID_STEP )== 0 ? 'Padrão' : gnncData.__firstLetterUpperCase(_obj.NAME_STEP);
+				jobName_.text                   = _obj.ID;
+				
+				_tableJob.ORDER_ITEM 			= _obj.ORDER_ITEM;
+				
+				dateStart_.text	 				= gnncDate.__relativeDateFromNow(_obj.DATE_START,true);
+				dateEnd_.text 					= gnncDate.__relativeDateFromNow(_obj.DATE_END,true);
+				date_.text						= gnncDate.__relativeDateFromNow(_obj.DATE,true);
+				dateFinal_.text					= gnncDate.__relativeDateFromNow(_obj.DATE_FINAL,true);
+				
+				_tableJob.DATE_FINAL 			= _obj.DATE_FINAL;
+				_tableJob.DATE_CANCELED			= _obj.DATE_CANCELED;
+				
+				if(gnncDate.__isValid(_tableJob.DATE_START)){
+					btnDateStart_.selectedDate = gnncDate.__string2Date(_tableJob.DATE_START);
+					btnDateStart_.enabled = true;
+				}
+				if(gnncDate.__isValid(_tableJob.DATE_END)){
+					btnDateEnd_.selectedDate = gnncDate.__string2Date(_tableJob.DATE_END);
+					btnDateEnd_.enabled = true;
+				}
+				if(gnncDate.__isValid(_tableJob.DATE_FINAL)){
+					btnDateFinal_.selected = true;
+					setButtonFinal();
+				}
+				if(gnncDate.__isValid(_tableJob.DATE_CANCELED)){
+					btnDateCanceled_.selected = true;
+					setButtonCancel();
+				}
+				
+				//iconDateFinal_.source			= String(_obj.DATE_FINAL).substr(0,4)=='0000' ? null : gnncEmbedBlackWhite.check_32_green_ok;
+				
+				//DEPARTAMENT_.value 				= _obj.ID_DEPARTAMENT;
+				//GROUP_.value 					= _obj.ID_GROUP;
+				//CATEGORY_.value					= _obj.ID_CATEGORY;
+				
+				_tableJob.VISIBLE 				= _obj.VISIBLE;
+				_tableJob.CONTROL				= _obj.CONTROL;
+				
+				_tableJob.ACTIVE				= _obj.ACTIVE;
+				_tableJob.PUBLIC				= _obj.PUBLIC;
+				_tableJob.KANBAN				= _obj.KANBAN;
+				
+				__setActive(null,_tableJob.ACTIVE,false);
+				__setPublic(null,_obj.PUBLIC,false);
+				__setKanban(null,_obj.KANBAN,false);
+				
+				btnDateFinal_.selected = gnncDate.__isValid(_tableJob.DATE_FINAL);
+				
+				__config();
+				setButtonFinal();
+				setButtonCancel();
+				
+				activeGroup_.enabled = true;
+				publicGroup_.enabled = !gnncGlobalStatic._userClient;
+				kanbanGroup_.enabled = true;
+				
+				panelCenter_.enabled = true;
+				buttomBar_.enabled = true;
+				commentDiscussion_.enabled = true;
+				attachListNew_.enabled = true;
+			}
+			
+			private function __close():void
+			{
+				if( _changeActive || _changeFinal || _changePublic || _changeText || _changeKanban || _changeTeam || _changeDate )
+					__update(true);
+				else
+					_gnncPopUp.__close(this);
+				
+				//_gnncPopUp.__close();
+				stopAll();
+			}
+
+			public function stopAll():void
+			{
+				var t:gnncTime = new gnncTime();
+				t.__start(500,function():void{
+					_connExec.__destroy();
+					_connJob.__destroy();
+					attachListNew_.stopAll();
+					commentDiscussion_.stopAll();
+					//stopAllMovieClips();
+					t.__stop();
+					_gnncPopUp.__close();
+					_gnncPopUp.__close(this);
+				});
+			}
+			
+			private function setButtonCancel(update:Boolean=false,enabledButton:Boolean=true):void
+			{
+				if(_tableJob.ID==0 && _tableJob.ID_KEY=='')
+					return;
+				
+				var f:Boolean = !btnDateCanceled_.selected;
+				
+				if(update)
+					_changeFinal = true;
+				
+				btnDateCanceled_.setStyle('icon', f ? gnncEmbedBlackWhite.check_16_bw : gnncEmbedBlackWhite.check_16_bw_ok );
+				btnDateCanceled_.label    = f ? 'Cancelar' : 'Cancelado';//'Remover cancelamento' ;
+				btnDateCanceled_.selected = f ? false : true ;
+				btnDateCanceled_.enabled  = enabledButton;
+				
+				if(update){
+					btnDateFinal_.selected = false;
+					setButtonFinal(false,true);
+				}
+			}
+			
+			private function setButtonFinal(update:Boolean=false,enabledButton:Boolean=true):void
+			{
+				if(_tableJob.ID==0 && _tableJob.ID_KEY=='')
+					return;
+				
+				var f:Boolean = !btnDateFinal_.selected;
+				
+				if(update)
+					_changeFinal = true;
+				
+				btnDateFinal_.setStyle('icon', f ? gnncEmbedBlackWhite.check_16_green : gnncEmbedBlackWhite.check_16_green_ok );
+				btnDateFinal_.label    = f ? 'Finalizar' : 'Finalizado';//;'Remover finalização' ;
+				btnDateFinal_.selected = f ? false : true ;
+				btnDateFinal_.enabled = enabledButton;
+				
+				if(update){
+					btnDateCanceled_.selected = false;
+					setButtonCancel(false,true);
+				}
+			}
+			
+			private function __update(close_:Boolean):void
+			{
+				if(gnncGlobalStatic._userClient == true && _tableJob.ID_CLIENT_INSERT != gnncGlobalStatic._userIdClient){
+					gnncPermission.__alert();
+					
+					if(close_){
+						_gnncPopUp.__close(this);
+						stopAll();
+					}
+					
+					return;
+				}
+				
+				if(gnncDate.__isValid(_tableJob.DATE_FINAL) && _changeFinal == false){
+					gnncPermission.__notify('Job Finalizado','Não é possível alterar um Job finalizado neste recurso.');
+					_gnncPopUp.__close(this);
+					stopAll();
+					return;
+				}
+
+				var mm:String = message_.text;
+				
+				mm = gnncData.__replace(mm,'´','\"');
+				mm = gnncData.__replace(mm,'`','\"');
+				mm = gnncData.__replace(mm,'"','\"');
+				mm = gnncData.__replace(mm,"'",'\"');
+				mm = gnncData.__replace(mm,'\\','\\\\');
+				mm = gnncData.__replace(mm,'  ',' ');
+				mm = gnncData.__replace(mm,'  ',' ');
+				
+				var up:Array = new Array();
+				
+				if(_changeActive == true)
+					up.push(" ACTIVE = '"+_tableJobChange.ACTIVE+"' ");
+				
+				if(_changePublic == true)
+					up.push(" PUBLIC = '"+_tableJobChange.PUBLIC+"' ");
+				
+				if(_changeText == true)
+					up.push(" MESSAGE = '"+mm+"' ");
+				
+				if(_changeTeam == true)
+					up.push(" IDS_CLIENT_TEAM = '"+_tableJobChange.IDS_CLIENT_TEAM+"' ");
+				
+				if(_changeFinal == true){
+					up.push(" DATE_FINAL = "+(btnDateFinal_.selected?'NOW()':"'0000-00-00'")+" ");
+					up.push(" DATE_CANCELED = "+(btnDateCanceled_.selected?'NOW()':"'0000-00-00'")+" ");
+				}
+
+				if(_changeDate == true){
+					up.push(" DATE_START = '"+btnDateStart_.selectedDateString+"' ");
+					up.push(" DATE_END = '"+btnDateEnd_.selectedDateString+"' ");
+				}
+
+				if(_changeKanban == true)
+					up.push(" KANBAN = '"+(_tableJobChange.KANBAN)+"' ");
+				
+				_gnncPopUp.__loading("Salvando...");
+				_connExec.__sql(" update dbd_job set "+up.join(', ')+" where ID = '"+_tableJob.ID+"' ",'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{
+					_gnncPopUp.__close();
+					_change = true;
+					
+					_changeActive = false;
+					_changePublic = false;
+					_changeFinal  = false;
+					_changeText   = false;
+					_changeKanban = false;
+					_changeTeam   = false;
+					_changeDate   = false;
+					
+					if(close_)
+						__close();
+				}
+				
+				function __fFault(e:*):void
+				{
+					_gnncPopUp.__close();
+				}
+				
+			}
+			
+			private function __config():void
+			{
+				__configAttach();
+				__configCommentDiscussion();
+				__configTeam();
+			}
+
+			private function __configAttach():void
+			{
+				//attach
+				var tAtt:table_attach 	= new table_attach();
+				tAtt.ID_MIX 			= _tableJob.ID;
+				tAtt.MIX				= 'JOB';//_tableJob.MIX;
+				
+				attachListNew_._tableClass = tAtt;
+				attachListNew_.itemRenderIndex = 1;
+				attachListNew_.__layoutTile(130,100,2,2,[0]);
+				//attachListNew_.__layoutVertical(100,1);
+				attachListNew_._changeEvent = function(e:*=null):void{ 
+					haveAttachFiles = attachListNew_._length == 0 ? false : true ; 
+					if(haveAttachFiles==false)
+						return;
+					setAttachIcon(); 
+				}; 
+				attachListNew_.__select();
+			}
+			
+			private function __configCommentDiscussion():void
+			{
+				var c:table_comment = new table_comment();
+				c.ID_CLIENT = _tableJob.ID_CLIENT;
+				c.ID_PROJECT = _tableJob.ID_PROJECT;
+				c.ID_JOB = _tableJob.ID;
+				commentDiscussion_._tableComment = c;
+				commentDiscussion_.getList = true;
+				commentDiscussion_.eventResult = function(e:*=null):void{ 
+					haveComments = commentDiscussion_.listDiscussionGlobal_.dataProvider.length == 0 ? false : true ; 
+					if(haveComments==false)
+						return;
+					setCommentsIcon(); 
+				};
+			}
+			
+			private function __configTeam():void
+			{
+				if(gnncGlobalStatic._userClient==true)
+					return;
+				//idsClientTeamList_._changeEvent = __configTeamCheck;
+				idsClientTeamList_._sqlConsult = "" +
+					" select " +
+					" l.ID,l.ID_CLIENT,l.ID_GROUP,l.USER,l.USER_EMAIL,l.IS_ADMIN,l.IS_CLIENT,l.ACTIVE," +
+					" 0 as SELECTED," +
+					" c.NAME as NAME_CLIENT," +
+					" g.NAME as NAME_GROUP," +
+					" coalesce(( select a.FILE_LINK from dbd_attach a WHERE a.MIX = 'CLIENT_PHOTO' and a.ID_MIX = l.ID_CLIENT AND (a.EXTENSION = 'jpg' or a.EXTENSION = 'jpeg' or a.EXTENSION = 'png' or a.EXTENSION = 'gif') ORDER BY a.ORDER_ITEM asc,a.ID desc LIMIT 1	),'') ATTACH_CLIENT" +
+					" from dbd_project_team p " +
+					" left join dbd_login l on (p.ID_CLIENT_TEAM = l.ID_CLIENT) " +
+					" left join dbd_client c on (c.ID = l.ID_CLIENT) " +
+					" left join dbd_group g on (g.ID = l.ID_GROUP) " +
+					" where l.ACTIVE > 0 AND p.ID_CLIENT = "+_tableJob.ID_CLIENT+" " +
+					" group by l.ID " +
+					" order by NAME_CLIENT asc, l.USER asc " ;
+				
+				idsClientTeamList_.__select(false,fResultTeam,fFaultTeam);
+			}
+			
+			private function __configTeamCheck(e:*=null):void
+			{
+				if(idsClientTeamList_._length==0)
+					return;
+				
+				//idsClientTeamList_.dataProvider = new gnncDataArrayCollection().__sort(idsClientTeamList_.dataProviderArrayC,'SELECTED',true,true);
+				
+				var s:String = String(idsClientTeamList_.selectedCheckIdsList().join(','));
+				//gnncGlobalLog.__add('__configTeamCheck:'+s);
+				if( s != String(_tableJob.IDS_CLIENT_TEAM)){
+					_changeTeam = true;
+					_tableJobChange.IDS_CLIENT_TEAM = s;
+					//gnncGlobalLog.__add('_tableJob.IDS_CLIENT_TEAM:'+_tableJob.IDS_CLIENT_TEAM);
+					//gnncGlobalLog.__add('_tableJobChange.IDS_CLIENT_TEAM:'+_tableJobChange.IDS_CLIENT_TEAM);
+				}else{
+					_changeTeam = false;
+				}
+			}
+			
+			private function fResultTeam(e:*=null):void
+			{
+				//gnncGlobalLog.__add('fResultTeam:'+_tableJob.IDS_CLIENT_TEAM);
+				callLater(function():void{
+					
+					//gnncGlobalLog.__add('[0]_tableJob.IDS_CLIENT_TEAM:'+_tableJob.IDS_CLIENT_TEAM);
+					//gnncGlobalLog.__add('[0]_tableJobChange.IDS_CLIENT_TEAM:'+_tableJobChange.IDS_CLIENT_TEAM);
+					
+					idsClientTeamList_.selectedCheckIds(_tableJob.IDS_CLIENT_TEAM);
+					callLater(function():void{
+					__configTeamCheck();
+					});
+				});
+				
+				haveClientTeam = _tableJob.IDS_CLIENT_TEAM == '' ? false : true ;
+				if(haveClientTeam==false)
+					return;
+				setClientTeamIcon(); 
+			}
+			
+			private var maxTryTeam:uint = 0;
+			private function fFaultTeam(e:*=null):void
+			{
+				if(maxTryTeam>3)
+					return;
+				__configTeam();
+				maxTryTeam++;
+			}
+			
+			private function __setActive(e:MouseEvent=null,v:uint=0,setChange:Boolean=true):void
+			{
+				var text_:String 	= '';
+				ACTIVE_3_.selected 	= false;
+				ACTIVE_2_.selected 	= false;
+				ACTIVE_1_.selected 	= false;
+				ACTIVE_0_.selected 	= false;
+				
+				switch(v)
+				{
+					case 3: text_ = 'Ultra!'; 		break;
+					case 2: text_ = 'Alerta Erro'; 	break;
+					case 1: text_ = 'Urgente'; 		break;
+					case 0: text_ = 'Normal'; 		break;
+				}
+				
+				if(e==null)
+					this['ACTIVE_'+v+'_'].selected = true;
+				else if(e.hasOwnProperty('currentTarget')==true)
+					e.currentTarget.selected = true;
+				
+				iconActive_.source = this['ACTIVE_'+v+'_'].getStyle('icon');
+				_tableJobChange.ACTIVE = v;
+				_changeActive = setChange;
+			}
+			
+			private function __setPublic(e:MouseEvent=null,v:Object=0,setChange:Boolean=true):void
+			{
+				PUBLIC_0_.selected = false;
+				PUBLIC_1_.selected = false;
+				PUBLIC_2_.selected = false;
+				
+				if(e==null)
+					this['PUBLIC_'+v+'_'].selected = true;
+				else if(e.hasOwnProperty('currentTarget')==true)
+					e.currentTarget.selected = true;
+				
+				iconPublic_.source = this['PUBLIC_'+v+'_'].getStyle('icon');
+				_tableJobChange.PUBLIC = uint(v);
+				_changePublic = setChange;
+			}
+			
+			private function __setKanban(e:MouseEvent=null,v:Object=0,setChange:Boolean=true):void
+			{
+				var s:String = '';
+				var n:uint = 0;
+				
+				KANBAN_0_.selected = false;
+				KANBAN_1_.selected = false;
+				KANBAN_2_.selected = false;
+				KANBAN_3_.selected = false;
+				KANBAN_4_.selected = false;
+				KANBAN_5_.selected = false;
+				
+				var nam:String = '';
+				var bgColor:uint = 0;
+				var fontColor:uint = 0;
+
+				switch(v){
+					case 'TODO': 
+					case 1: 
+						n = 1;
+						s = 'TODO';
+						nam = 'A fazer';
+						bgColor = kanBanColor_0;
+						fontColor = 0xffffff;
+						break;
+					case 'PLAN': 
+					case 2: 
+						n = 2;
+						s = 'PLAN';
+						nam = 'Planejar';
+						bgColor = kanBanColor_1;
+						fontColor = 0xffffff;
+						break;
+					case 'INPROGR': 
+					case 3: 
+						n = 3;
+						s = 'INPROGR';
+						nam = 'Em progresso';
+						bgColor = kanBanColor_2;
+						fontColor = 0xffffff;
+						break;
+					case 'REVIEW': 
+					case 4: 
+						n = 4;
+						s = 'REVIEW';
+						nam = 'Revisar';
+						bgColor = kanBanColor_3;
+						fontColor = 0xffffff;
+						break;
+					case 'DONE': 
+					case 5: 
+						n = 5;
+						s = 'DONE';
+						nam = 'Feito';
+						bgColor = kanBanColor_4;
+						fontColor = 0xffffff;
+						break;
+					default:
+						n = 0;
+						s = '';
+						nam = 'Normal';
+						bgColor = 0xffffff;
+						fontColor = 0x777777;
+						v = 0;
+						break;
+				}
+				
+				kanban_._colorBackground = bgColor;
+				kanban_._color = fontColor;
+				kanban_._label = nam;
+				
+				if(e==null)
+					this['KANBAN_'+n+'_'].selected = true;
+				else if(e.hasOwnProperty('currentTarget')==true)
+					e.currentTarget.selected = true;
+				
+				_tableJobChange.KANBAN = s;
+				_changeKanban = setChange;
+			}
+			
+			public function openNewAttach():void
+			{
+				//__config();
+				attachListNew_.__fNew(null,fRemove);
+				function fRemove():void{
+					__configAttach();
+				}
+			}
+			
+			public function __editText():void
+			{
+				panelTitle_.selectedIndex = 0;
+				message_.editable = allowEdition_.selected;
+				message_.setFocus();
+			}
+			
+
+			public function __editTextKeyBoard():void
+			{
+				if(String(message_.text) != String(_tableJob.MESSAGE))
+					_changeText = true;
+			}
+
+			public function __editDate(e:*=null):void
+			{
+				if(gnncDate.__isValid(_tableJob.DATE_START) && btnDateStart_.selectedDate != null){
+					if(String(_tableJob.DATE_START).substr(0,10)!=String(btnDateStart_.selectedDateString).substr(0,10))
+						_changeDate = true;
+				}
+				
+				if(gnncDate.__isValid(_tableJob.DATE_END) && btnDateEnd_.selectedDate != null){
+					if(String(_tableJob.DATE_END).substr(0,10)!=String(btnDateEnd_.selectedDateString).substr(0,10))
+						_changeDate = true;
+				}
+				
+				if(btnDateStart_.selectedDate == null || btnDateEnd_.selectedDate == null )
+					return;
+				
+				if(btnDateEnd_.selectedDate.getTime() < btnDateStart_.selectedDate.getTime())
+					btnDateEnd_.selectedDate = btnDateStart_.selectedDate;
+			}
+			
+			public function __editDetails():void
+			{
+				barDetails_.selectedIndex = allowEdition_.selected ? 1 : 0 ;
+			}
+			
+			private function getKanbanColor(i:uint=0):uint{
+				var o:Object = new Object();
+				o.KANBAN = i;
+				return uint(getKanban(o,true));
+			}
+			
+			private function getKanban(data_:Object,getColor:Boolean):Object
+			{
+				if(!data_.hasOwnProperty('KANBAN'))
+					return getColor?0xffffff:'Normal';
+				
+				var nam:String = 'Normal';
+				var bgColor:uint = 0xffffff;
+				var fontColor:uint = 0x777777;
+				
+				switch(data_.KANBAN){
+					case 'TODO': 
+					case 1: 
+						nam = 'A fazer';
+						bgColor = kanBanColor_0;
+						fontColor = 0xffffff;
+						break;
+					case 'PLAN': 
+					case 2: 
+						nam = 'Planejar';
+						bgColor = kanBanColor_1;
+						fontColor = 0xffffff;
+						break;
+					case 'INPROGR': 
+					case 3: 
+						nam = 'Em progresso';
+						bgColor = kanBanColor_2;
+						fontColor = 0xffffff;
+						break;
+					case 'REVIEW': 
+					case 4: 
+						nam = 'Revisar';
+						bgColor = kanBanColor_3;
+						fontColor = 0xffffff;
+						break;
+					case 'DONE': 
+					case 5: 
+						nam = 'Feito';
+						bgColor = kanBanColor_4;
+						fontColor = 0xffffff;
+						break;
+					default:
+						nam = 'Normal';
+						bgColor = 0xffffff;
+						fontColor = 0x777777;
+						break;
+				}
+				
+				kanban_._colorBackground = bgColor;
+				kanban_._color = fontColor;
+				
+				return getColor?bgColor:nam;
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Fade id="fadeEffects_" duration="300" />
+	</fx:Declarations>
+	
+	<elements:elementStageBox />
+	<s:HGroup left="1" top="1" right="1" bottom="40" gap="0">
+		
+		<s:Group left="0" width="66" height="100%">
+			<elements:elementBarStatus width="66" height="100%" alpha=".5"/>
+			<s:VGroup width="66" height="100%" gap="1">
+				
+				<s:Button id="btnJob" width="100%" height="60"  click="{}" rollOver="{panelCenter_.selectedIndex=0}" 
+						  icon="{gnncEmbedBlackWhite.bw_project_job_32}"  
+						  skinClass="GNNC.skin.button.skin_buttonLink"/>
+				<s:Button id="btnAttach" width="100%" height="60" click="{openNewAttach()}" rollOver="{panelCenter_.selectedIndex=2}" 
+						  icon="{gnncEmbedBlackWhite.bw_download_32_v2}" 
+						  skinClass="GNNC.skin.button.skin_buttonLink"/>
+				<s:Button id="btnTeam" width="100%" height="60"  click="{}" rollOver="{panelCenter_.selectedIndex=3}" 
+						  icon="{gnncEmbedBlackWhite.bw_client_32_team}" 
+						  skinClass="GNNC.skin.button.skin_buttonLink"/>
+				<s:Button id="btnInfo" width="100%" height="60"  click="{}" rollOver="{panelCenter_.selectedIndex=4}" 
+						  icon="{gnncEmbedBlackWhite.bw_info_32}" 
+						  skinClass="GNNC.skin.button.skin_buttonLink"/>
+				
+			</s:VGroup>
+			<elements:elementVLine right="0" _COLOR="0xdddddd" alpha=".7"/>
+		</s:Group>
+		<s:VGroup width="100%" height="100%" padding="15">
+			<mx:ViewStack id="panelCenter_" width="100%" height="100%" selectedIndex="0">
+				<s:NavigatorContent creationPolicy="all" >
+					<s:layout>
+						<s:HorizontalLayout gap="1"/>
+					</s:layout>
+					
+					<s:VGroup width="300" height="100%" gap="1">
+						<elements:elementLabelBackgroudColor width="100%" height="30" verticalAlign="middle" _paddingLeftText="10"
+															 _label="Discussão" _colorBackground="0xffffff" _color="0x777777"
+															 />
+						<s:Rect height="7"/>
+						<components:componentProjectCommentJonAndDiscussion id="commentDiscussion_" 
+																			getDiscussion="false" 
+																			getDiscussionAndComments="false"
+																			allowOnlyReply="false"
+																			width="100%" height="100%"/>
+					</s:VGroup>
+
+					<s:Rect width="10"/>
+					
+					<s:VGroup width="100%" height="100%" gap="1">
+						
+						<elements:elementLabelBackgroudColor id="kanban_" width="100%" height="30" verticalAlign="middle" _paddingLeftText="10"
+															 _label="Normal" _colorBackground="0xffffff" _color="0x777777"
+															 toolTip="Kanban"
+															 />
+						<!-- Job (tarefa) -->
+						
+						<s:VGroup width="100%" height="100%" gap="1" padding="15" paddingTop="30">
+							
+							<mx:ViewStack id="panelTitle_" width="100%" height="100%" selectedIndex="0">
+								<s:NavigatorContent creationPolicy="all">
+									<s:layout>
+										<s:VerticalLayout gap="1" padding="0"/>
+									</s:layout>
+									<s:HGroup width="100%" minHeight="15" gap="5" verticalAlign="middle">
+										<s:Label id="title_" width="100%" minHeight="15" fontSize="16" fontWeight="normal" color="0x00000" maxDisplayedLines="3" showTruncationTip="true" verticalAlign="bottom"
+												 paddingLeft="5"/>
+									</s:HGroup>
+									
+									<elements:elementHLine height="20" _COLOR="0xeeeeee"/>
+									
+									<s:TextArea id="message_" fontSize="12" width="100%" height="100%" borderVisible="false" editable="false" contentBackgroundAlpha="0" heightInLines="18"
+												prompt="Nenhuma descrição" 
+												keyUp="{__editTextKeyBoard()}" 
+												mouseUp="{__editTextKeyBoard()}" 
+												rightMouseUp="{__editTextKeyBoard()}" 
+												focusOut="{__editTextKeyBoard()}"
+												/>
+								</s:NavigatorContent>
+								<s:NavigatorContent creationPolicy="all">
+									<s:layout>
+										<s:VerticalLayout gap="1" padding="0" paddingBottom="30"/>
+									</s:layout>
+									<s:Label id="titleOnly_" width="100%" height="100%" minHeight="15" fontSize="20" fontWeight="normal" color="0x00000" maxDisplayedLines="10" showTruncationTip="false" 
+											 paddingLeft="5" verticalAlign="middle"/>
+								</s:NavigatorContent>
+							</mx:ViewStack>
+							<!-- s:HGroup gap="1" width="100%">
+								<s:TextInput id="idsClientTeam_" color="0x999999"
+											 fontSize="12" width="100%" height="100%" borderVisible="false" editable="false" contentBackgroundAlpha="0" focusAlpha="0"
+											 restrict="[0-9]\," selectable="true"
+											 />
+							</s:HGroup -->
+							
+						</s:VGroup>
+						
+						
+						<s:HGroup width="100%" gap="3">
+							
+							<mx:ViewStack id="barDetails_" width="100%" height="30">
+								<s:NavigatorContent width="100%" height="30" creationPolicy="all">
+									<s:layout>
+										<s:HorizontalLayout gap="5" verticalAlign="middle"/>
+									</s:layout>
+									
+									<s:Image id="iconActive_" source="{gnncEmbedBlackWhite.bw_project_job_16}"/>
+									<s:Image id="iconPublic_" source="{gnncEmbedBlackWhite.bw_global_16}"/>
+									
+									<!-- elements:elementLabelBackgroudColor id="labelKanban_" _color="0xFFFFFF"
+									_paddingLeftText="7"
+									_colorBackground="{0xdddddd}"
+									_label="{'Normal'}"
+									_colorBackgroundAlpha="1"
+									_fontSize="10"
+									width="70"
+									height="22"
+									verticalAlign="middle"
+									/ -->	
+								</s:NavigatorContent>
+								<s:NavigatorContent width="100%" height="30" creationPolicy="all">
+									<s:layout>
+										<s:HorizontalLayout gap="3" verticalAlign="middle"/>
+									</s:layout>
+									
+									<s:HGroup gap="-1" id="activeGroup_" enabled="false" >
+										<s:ToggleButton id="ACTIVE_0_" icon="{gnncEmbedBlackWhite.bw_project_job_16}" 	height="30" width="30" label="Normal" 	click="{__setActive(event,0)}" />
+										<s:ToggleButton id="ACTIVE_1_" icon="{gnncEmbedBlackWhite.bw_urgent_16}" 		height="30" width="30" label="Urgente" 	click="{__setActive(event,1)}" />
+										<s:ToggleButton id="ACTIVE_2_" icon="{gnncEmbedBlackWhite.bw_alert_error_16}" 	height="30" width="30" label="Erro" 	click="{__setActive(event,2)}" />
+										<s:ToggleButton id="ACTIVE_3_" icon="{gnncEmbedBlackWhite.bw_fire_16}" 			height="30" width="30" label="Fire!" 	click="{__setActive(event,3)}" />
+									</s:HGroup>
+									
+									<s:HGroup  gap="-1"  id="publicGroup_" enabled="false">
+										<s:ToggleButton id="PUBLIC_0_" width="30" height="30" label="Somento Eu" click="{__setPublic(event,0)}" icon="{gnncEmbedBlackWhite.bw_lock_16}"/>
+										<s:ToggleButton id="PUBLIC_2_" width="30" height="30" label="Equipe Interna" click="{__setPublic(event,2)}" icon="{gnncEmbedBlackWhite.bw_client_16_team}"/>
+										<s:ToggleButton id="PUBLIC_1_" width="30" height="30" label="Público / Cliente" click="{__setPublic(event,1)}" icon="{gnncEmbedBlackWhite.bw_global_16}"/>
+									</s:HGroup>
+									
+									<s:HGroup  gap="-1"  id="kanbanGroup_" fontWeight="bold" enabled="false">
+										<s:ToggleButton id="KANBAN_0_" label="N" height="30" width="30" toolTip="Normal" click="{__setKanban(event,0)}" />
+										<s:ToggleButton id="KANBAN_1_" label="F" height="30" width="30" toolTip="A fazer" click="{__setKanban(event,1)}" color="{getKanbanColor(1)}" />
+										<s:ToggleButton id="KANBAN_2_" label="P" height="30" width="30" toolTip="Planejar" click="{__setKanban(event,2)}" color="{getKanbanColor(2)}" />
+										<s:ToggleButton id="KANBAN_3_" label="E" height="30" width="30" toolTip="Em progresso" click="{__setKanban(event,3)}" color="{getKanbanColor(3)}" />
+										<s:ToggleButton id="KANBAN_4_" label="R" height="30" width="30" toolTip="Revisar" click="{__setKanban(event,4)}" color="{getKanbanColor(4)}" />
+										<s:ToggleButton id="KANBAN_5_" label="F" height="30" width="30" toolTip="Feito" click="{__setKanban(event,5)}" color="{getKanbanColor(5)}" />
+									</s:HGroup>
+									
+								</s:NavigatorContent>
+							</mx:ViewStack>
+							
+							<s:Rect width="100%"/>
+							
+							<s:ToggleButton id="allowEdition_" label="Permitir Edição" click="{__editText();__editDetails()}" icon="{gnncEmbedBlackWhite.bw_edit_16}"
+											selected="false" width="30" height="30" />
+							
+						</s:HGroup>
+					</s:VGroup>
+					
+					
+				</s:NavigatorContent>
+				<s:NavigatorContent creationPolicy="all" >
+					
+					
+					
+				</s:NavigatorContent>
+				<s:NavigatorContent creationPolicy="all" >
+					
+					<s:VGroup width="100%" height="100%" gap="1">
+						<elements:elementLabelBackgroudColor width="100%" height="30" verticalAlign="middle" _paddingLeftText="10"
+															 _label="Arquivos" _colorBackground="0xffffff" _color="0x777777"
+															 />
+						
+						<s:Rect height="7"/>
+
+						<list:conList_attach id="attachListNew_" width="100%" height="100%" _backgroundColor="0xFFFFFF" _backgroundAlpha="0" _scrollToEndInList="true"
+											 />
+						<s:HGroup width="100%" height="30" gap="1">
+							<s:Rect width="100%"/>
+							<s:Button height="30" icon="{gnncEmbedBlackWhite.bw_attach_16_new}" fontWeight="bold" label="Enviar arquivo" click="{openNewAttach()}"/>
+						</s:HGroup>
+					</s:VGroup>
+					
+					
+				</s:NavigatorContent>
+				<s:NavigatorContent creationPolicy="all" >
+					
+					<s:layout>
+						<s:VerticalLayout gap="1" />
+					</s:layout>
+					
+					<elements:elementLabelBackgroudColor width="100%" height="30" verticalAlign="middle" _paddingLeftText="10"
+														 _label="Equipe" _colorBackground="0xffffff" _color="0x777777"
+														 />
+					<s:Rect height="15"/>
+					
+					<!-- gnncComboCheck:ComboCheck dataProvider="{gnncGlobalArrays._COUNTRY}" width="100%" height="30"
+					labelField="label"
+					/ -->
+					
+					<list:conList_clientTeam id="idsClientTeamList_" _autoLoad="false" height="100%" width="100%" _backgroundAlpha="0"
+											 click="{__configTeamCheck()}"
+											 />
+					
+				</s:NavigatorContent>
+				<s:NavigatorContent creationPolicy="all" >
+					
+					<s:VGroup width="100%" gap="1" >
+						
+						<elements:elementLabelBackgroudColor width="100%" height="30" verticalAlign="middle" _paddingLeftText="10"
+															 _label="Info" _colorBackground="0xffffff" _color="0x777777"
+															 />
+						
+						<s:Rect height="15"/>
+						
+						<s:HGroup width="100%" gap="5" padding="15" paddingTop="15" >
+							<s:VGroup width="25">
+								<s:Image source="{gnncEmbedBlackWhite.bw_client_16}" width="10" height="10"  toolTip="Cliente"/>
+								<s:Image source="{gnncEmbedBlackWhite.bw_project_16}" width="10" height="10" toolTip="Projeto"/>
+								<s:Image source="{gnncEmbedBlackWhite.bw_project_step_16}" width="10" height="10" toolTip="Etapa" />
+								<s:Image source="{gnncEmbedBlackWhite.bw_project_job_16}" width="10" height="10" toolTip="Job" />
+							</s:VGroup>
+							<s:VGroup width="70" color="0x999999">
+								<s:Label text="Cliente" 		maxDisplayedLines="1" showTruncationTip="false" fontWeight="bold" width="60" height="10" />
+								<s:Label text="Projeto" 		maxDisplayedLines="1" showTruncationTip="false" fontWeight="bold" width="60" height="10" />
+								<s:Label text="Fase" 		    maxDisplayedLines="1" showTruncationTip="false" fontWeight="bold" width="60" height="10" />
+								<s:Label text="Id" 		        maxDisplayedLines="1" showTruncationTip="false" fontWeight="bold" width="60" height="10" />
+							</s:VGroup>
+							<s:VGroup width="100%">
+								<s:Label id="clienName_" 	text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" fontWeight="bold" height="10"  />
+								<s:Label id="projectName_" 	text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" fontWeight="bold" height="10"  />
+								<s:Label id="stepName_" 	text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" fontWeight="bold" height="10"  />
+								<s:Label id="jobName_" 	text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" fontWeight="bold" height="10"  />
+							</s:VGroup>					
+						</s:HGroup>
+						
+						<elements:elementHLine height="25" _COLOR="0xdddddd"/>
+						
+						<s:HGroup width="100%" gap="5" padding="15">
+							<s:VGroup width="25">
+								<s:Image source="{gnncEmbedBlackWhite.bw_calendar_16}" 				width="10" height="10"  />
+								<s:Image source="{gnncEmbedBlackWhite.bw_calendar_16_time_start}" 	width="10" height="10" />
+								<s:Image source="{gnncEmbedBlackWhite.bw_calendar_32_time_end}" 	width="10" height="10" />
+								<s:Image source="{gnncEmbedBlackWhite.check_16_green_ok}" 			width="10" height="10" />
+							</s:VGroup>
+							<s:VGroup width="70" color="0x999999">
+								<s:Label text="Cadastro" 	maxDisplayedLines="1" showTruncationTip="false" fontWeight="bold" width="56" height="10" />
+								<s:Label text="Início" 		maxDisplayedLines="1" showTruncationTip="false" fontWeight="bold" width="56" height="10" />
+								<s:Label text="Término" 	maxDisplayedLines="1" showTruncationTip="false" fontWeight="bold" width="56" height="10" />
+								<s:Label text="Finalizado" 	maxDisplayedLines="1" showTruncationTip="false" fontWeight="bold" width="56" height="10" />
+							</s:VGroup>
+							<s:VGroup width="100%">
+								<s:Label id="date_" 		text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" height="10" />
+								<s:Label id="dateStart_" 	text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" height="10" />
+								<s:Label id="dateEnd_" 		text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" height="10" />
+								<s:Label id="dateFinal_" 	text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" height="10" />
+							</s:VGroup>					
+						</s:HGroup>
+						
+						<elements:elementHLine height="25" _COLOR="0xdddddd"/>
+						
+						
+						<s:HGroup width="100%" gap="5" padding="15" >
+							<s:Label text="Por: " maxDisplayedLines="1" height="10" fontWeight="bold" paddingLeft="5" paddingRight="5"/>
+							<s:Label id="nameClientInsert_" text="" maxDisplayedLines="1" showTruncationTip="true" width="100%" height="10" />
+						</s:HGroup>
+						
+						
+						
+					</s:VGroup>
+					
+				</s:NavigatorContent>
+				
+			</mx:ViewStack>
+			
+		</s:VGroup>
+		
+		<!-- s:HGroup paddingLeft="15" paddingTop="15" paddingRight="15" paddingBottom="50" width="100%" height="100%" gap="5">
+		</s:HGroup -->
+		
+	</s:HGroup>
+	
+	<s:HGroup id="buttomBar_" width="100%" height="39" gap="1" verticalAlign="middle" paddingLeft="5" paddingRight="5" bottom="0"
+			  >
+		
+		<gnncDateButton:gnncDateButton id="btnDateStart_" width="110" height="30" enabled="false"/>
+		<gnncDateButton:gnncDateButton id="btnDateEnd_" width="110" height="30" enabled="false"/>
+		
+		<s:Rect width="100%" />
+		<s:ToggleButton id="btnDateCanceled_" icon="{gnncEmbedBlackWhite.check_16_bw}" 
+						label="{'Cancelar'}" height="30" enabled="false"
+						selected="false" click="{setButtonCancel(true)}" fontWeight="bold" />
+		<s:ToggleButton id="btnDateFinal_" icon="{gnncEmbedBlackWhite.check_16_green}" 
+						label="{'Finalizar'}" height="30" enabled="false"
+						selected="false" click="{setButtonFinal(true)}" fontWeight="bold" />
+		
+		<s:Button height="30" icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink"
+				  rollOver="{panelCenter_.selectedIndex=0}"
+				  />	
+	</s:HGroup>
+	
+	
+</s:Module>

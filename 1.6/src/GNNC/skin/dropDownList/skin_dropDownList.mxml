@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SparkSkin xmlns:fx="http://ns.adobe.com/mxml/2009" xmlns:s="library://ns.adobe.com/flex/spark" 
+			 xmlns:fb="http://ns.adobe.com/flashbuilder/2009" alpha.disabled=".5"> 
+	
+	<fx:Metadata>
+		<![CDATA[ 
+		/** 
+		* @copy spark.skins.spark.ApplicationSkin#hostComponent
+		*/
+		[HostComponent("spark.components.DropDownList")]
+		]]>
+	</fx:Metadata> 
+	<fx:Style>
+		.DG 
+		{
+			/*selection-color: #444444;*/
+		}
+	</fx:Style>
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="open" />
+		<s:State name="disabled" />
+	</s:states>
+	
+	<s:PopUpAnchor id="popUp"  displayPopUp.normal="false" displayPopUp.open="true" includeIn="open"
+				   left="0" right="0" top="0" bottom="0" itemDestructionPolicy="auto"
+				   popUpPosition="below" popUpWidthMatchesAnchorWidth="true" >
+		<!--- 
+		This includes borders, background colors, scrollers, and filters.
+		@copy spark.components.supportClasses.DropDownListBase#dropDown
+		-->
+		<s:Group id="dropDown" maxHeight="350" minHeight="22" >
+			
+			<s:RectangularDropShadow id="dropShadow" blurX="10" blurY="10" alpha=".5" distance="0" 
+									 color="0x000000" left="0" top="0" right="0" bottom="0"/>
+
+			<!--- @private -->
+			
+			<!--- @private -->
+			
+			<!-- fill -->
+			<!--- Defines the appearance of drop-down list's background fill. -->
+			<!--s:Rect id="background" left="0" right="0" top="1" bottom="0" radiusX="3" radiusY="3" >
+				<s:fill>
+					< ! - - -  
+					The color of the drop down's background fill.
+					The default color is 0xFFFFFF.
+					-  - >
+					<s:SolidColor id="bgFill" color="0xEEEEEE" alpha="0.95" />
+				</s:fill>
+			</s:Rect -->
+			
+			<s:Rect left="0" top="0" right="0" bottom="0" radiusX="2" radiusY="2" >
+				<s:fill>
+					<s:LinearGradient rotation="90">
+						<s:GradientEntry color="0xf8f8f8" />
+						<s:GradientEntry color="0xf6f6f6" />
+					</s:LinearGradient>
+				</s:fill>
+				<s:stroke>
+					<s:SolidColorStroke color="0xBBBBBB" weight="1"/>
+				</s:stroke>
+			</s:Rect>
+			
+			<!--- @private -->
+			<s:Scroller id="scroller" left="3" top="4" right="3" bottom="3" hasFocusableChildren="false" minViewportInset="0" 
+						skinClass="GNNC.skin.scroller.skin_scroller" horizontalScrollPolicy="off">
+				<!--- @copy spark.components.SkinnableDataContainer#dataGroup
+				itemRenderer="spark.skins.spark.DefaultItemRenderer"
+				-->
+				<s:DataGroup id="dataGroup" itemRenderer="GNNC.skin.dropDownList.itemRender.itemRender_hierarchy_forList" fontSize="11" fontWeight="normal" alternatingItemColors="[]" lineHeight="20" paragraphSpaceBefore="6" paragraphStartIndent="6" styleName="DG" >
+					<s:layout>
+						<s:VerticalLayout gap="1" horizontalAlign="contentJustify" />
+					</s:layout>
+				</s:DataGroup> 
+			</s:Scroller>
+			
+			<!-- s:TextInput right="0" top="0" height="20" width="20" contentBackgroundColor="0xEEEEEE" alpha=".5"/ --> 
+			
+		</s:Group>
+	</s:PopUpAnchor>
+		
+
+	
+	<!---  The default skin is DropDownListButtonSkin. 
+	@copy spark.components.supportClasses.DropDownListBase#openButton
+	@see spark.skins.spark.DropDownListButtonSkin
+	skinClass="spark.skins.spark.DropDownListButtonSkin"  -->
+	
+	<s:Button id="openButton" left="0" right="0" top="0" bottom="0" focusEnabled="false" 
+			  cornerRadius="4"
+			  />  <!-- color="0xFFFFFF"  -->
+	
+	<!--s:Rect left="1" right="1" top="1" bottom="1" radiusX="4" >
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF" alpha=".5" alpha.open=".3"/>
+		</s:fill>
+	</s:Rect-->
+	
+	<!--s:BitmapImage source="{gNial.EMBEDS.IMAGE.NEXT_16}" verticalCenter="0" right="7" rotation="90" width="8" height="8" /-->
+	
+	<!--s:Rect width="15" height="15" verticalCenter="0" right="5" radiusX="2" radiusY="2">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0xFFFFFF" />
+				<s:GradientEntry color="0xEEEEEE" />
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	<s:RectangularDropShadow width="15" height="15" verticalCenter="0" right="5" distance="0" blurX="3" blurY="3" /-->
+	
+	<!--- seta -->
+	<s:Path verticalCenter="1" right="6" data="M 3.5 7.0 L 0.0 0.0 L 7.0 0.0 L 3.5 7.0" scaleX="1" scaleY=".8">
+		<s:fill>
+			<s:SolidColor color="0x555555" color.open="0x000000" />
+		</s:fill>
+	</s:Path>
+	
+	<!--- @copy spark.components.DropDownList#labelDisplay -->
+	<s:Label id="labelDisplay" left="5" right="15" top="2" bottom="2" color="0x222222"
+			 maxDisplayedLines="1" mouseChildren="false" mouseEnabled="false" verticalAlign="middle"
+			 verticalCenter="1" 
+			 width.disabled="75"
+			 width.open="75" 
+			 />
+	<!-- color.open="0xFFFFFF" -->
+
+	<s:BitmapImage id="bitmapIcon" source="{hostComponent.selectedItem.hasEventListener('icon')?hostComponent.selectedItem.icon:null}" width="16" height="16" left="5" verticalCenter="0"/>
+
+</s:SparkSkin>

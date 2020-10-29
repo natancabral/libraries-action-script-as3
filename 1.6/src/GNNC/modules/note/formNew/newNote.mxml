@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	width="450" height="350"
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:select="GNNC.elements.component.select.*" 
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*" 
+	xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_note;
+			
+			[Bindable] public  var _MIX:String = 'NOTE';
+
+			public var _tableNote:table_note = new table_note();
+			public var _change:Boolean = false;
+
+			private var _conNote:gnncAMFPhp = new gnncAMFPhp(); //job
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__CONTROL_ENTER(event)) __save();
+					}
+				);
+
+				__checkEdit();
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void 
+			{ 
+				MESSAGE_.setFocus();
+			}
+			
+			private function __checkEdit():void
+			{
+				if(_tableNote != null)
+				{
+					if(_tableNote.ID)
+					{
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						var _SQL:String 		= new gnncSql().__SELECT(new table_note(_tableNote.ID));
+						_conNote.__sql			(_SQL,'','',__fResult,__fFault);
+					}
+				} 
+				else 
+				{
+					_tableNote = new table_note();
+				}
+			}
+
+			protected function __fFault(e:*):void
+			{
+				_gnncPopUp.__close();
+			}
+			
+			protected function __fResult(e:*):void
+			{
+				if(!_conNote.DATA_ROWS)
+					return;
+				
+				var _object:Object 			= _conNote.DATA_ARR.getItemAt(0);
+				
+				_tableNote.ID				= _object.ID;
+				_tableNote.ID_CLIENT		= _object.ID_CLIENT;
+				
+				TITLE_.text					= _object.TITLE;
+				MESSAGE_.text				= _object.MESSAGE;
+				_tableNote.ORDER_ITEM		= _object.ORDER_ITEM;
+				
+				_tableNote.ID_DEPARTAMENT	= _object.ID_DEPARTAMENT;
+				_tableNote.ID_GROUP		= _object.ID_GROUP;
+				_tableNote.ID_CATEGORY		= _object.ID_CATEGORY;
+				
+				_tableNote.DATE_FINAL		= _object.DATE_FINAL;
+				_tableNote.DATE_CANCELED	= _object.DATE_CANCELED;
+
+				_tableNote.ACTIVE			= _object.ACTIVE;
+				_tableNote.VISIBLE			= _object.VISIBLE;
+				_tableNote.CONTROL			= _object.CONTROL;
+				
+				_gnncPopUp.__close();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __save():void
+			{
+				if(!MESSAGE_.text && !TITLE_.text)
+				{
+					new gnncAlert().__alert('O título e a nota são campos obrigatórios.');
+					return
+				}
+				
+				_gnncPopUp.__loading();
+				
+				gnncData.__scapeText([],[TITLE_,MESSAGE_]);
+				
+				var _object:table_note 		= new table_note();
+				
+				_object.ID					= _tableNote.ID; 
+				_object.ID_CLIENT			= _tableNote.ID_CLIENT;
+
+				_object.TITLE				= TITLE_.text; 
+				_object.MESSAGE				= MESSAGE_.text; //Description in List
+
+				_object.ID_DEPARTAMENT		= _tableNote.ID_DEPARTAMENT;
+				_object.ID_GROUP			= _tableNote.ID_GROUP;
+				_object.ID_CATEGORY			= _tableNote.ID_CATEGORY;
+				
+				_object.ORDER_ITEM			= _tableNote.ORDER_ITEM;
+
+				_object.ACTIVE				= _tableNote.ACTIVE;
+				_object.CONTROL				= _tableNote.CONTROL;
+				_object.VISIBLE				= _tableNote.VISIBLE;
+
+				var _sql:String 			= new gnncSql().__INSERT(_object,false,true,true);
+				
+				_conNote.__sql	(_sql,'','',__fResult,__fFault);
+
+				function __fResult(event:*):void
+				{
+					_change 			= true;
+					_gnncPopUp.__close	();
+					__close				();
+				}
+				
+				function __fFault(event:*):void
+				{
+					_gnncPopUp.__close();
+				}
+
+				
+			}
+			
+			
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+
+	<elements:elementStageBoxPopUp />
+	
+	<!--s:HGroup gap="2" verticalAlign="middle" height="40" left="10" top="10" right="10">
+		<s:Image id="ICON_" source="{gnncEmbedImage.NOTE_32}" /> 
+		<elements:elementLabelFont id="titlePopUp_" text="NOTA" fontSize="24" fontWeight="normal" height="32" paddingLeft="10" />
+	</s:HGroup-->
+	
+	<mx:ViewStack id="panelCenter_" top="10" left="10" right="10" bottom="42">
+		<s:NavigatorContent label="" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1"/>
+			</s:layout>
+
+			<s:Group width="100%" height="100%">
+				<s:TextArea id="MESSAGE_" width="100%" height="100%" fontSize="12" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="15" borderVisible="false" focusAlpha="0"/>
+				<s:Rect left="0" top="0" right="0" height="5" radiusX="0" radiusY="0">	
+					<s:fill>
+						<s:LinearGradient rotation="83">
+							<s:GradientEntry color="0xffd547" />
+							<s:GradientEntry color="0xffd547" />
+						</s:LinearGradient>
+					</s:fill>
+				</s:Rect>	
+			</s:Group>
+			
+			<s:TextInput id="TITLE_" width="100%" height="30" fontSize="15" paddingLeft="5" prompt="Nota" text="Nota" fontWeight="bold" contentBackgroundAlpha=".5" focusAlpha="0" />
+			
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup width="100%" height="34" gap="2" verticalAlign="middle" paddingLeft="4" paddingRight="4" bottom="0" >
+		<s:Rect width="100%" />
+		<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" label="Cadastrar" click="{__save()}" fontWeight="bold" />
+		<s:Button icon="{gnncEmbedImage.CLOSE_16}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" />	
+	</s:HGroup>
+	
+	<s:Button top="10" right="10" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

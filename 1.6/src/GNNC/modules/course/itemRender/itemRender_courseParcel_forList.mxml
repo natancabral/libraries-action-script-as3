@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				
+				autoDrawBackground="false" 
+				height="25" width="100%" 
+				
+				mouseDown="{__mDown()}"
+
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:elements="GNNC.UI.elements.*" xmlns:gnncDateField4="GNNC.UI.gnncDateField4.*"
+
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncBook.book.limited;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.date.gnncDate;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			private function __dispatche(send_:String):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(send_,data));
+			}
+			
+			private function __fView(event:Event):void
+			{
+				__dispatche(gnncEventGeneral._view);
+			}
+			
+			private function __fAccess(event:Event):void
+			{
+				__dispatche(gnncEventGeneral._update); //ACESSO
+			}
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+			}
+			
+			private function __start():void
+			{
+			}
+			
+		]]>
+	</fx:Script>
+
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+
+	<elements:elementBarStatus left="0" top="0" right="0" bottom="0" alpha=".1"/>
+
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha=".2"  includeIn="hoveredAndShowsCaret,hovered">
+		<s:fill>
+			<s:SolidColor color="0xDDDDDD"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret">
+		<s:fill>
+			<s:LinearGradient rotation="90"> 
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:HGroup gap="1" left="0" top="0" right="0" bottom="0" paddingLeft="5" paddingRight="5" verticalAlign="middle" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF">
+
+		<elements:elementLabelBackgroudColor width="24" height="20" _label="{gnncDataNumber.__setZero(itemIndex+1)}" 
+				   _colorBackground="{gnncDate.__isValid(data.DATE_CANCELED)?0xcc0033:gnncDate.__isValid(data.DATE_FINAL)?0x009900:int(data.ROWS_PARCEL_PAY)!=0?0x3366ff:int(data.DATE_ALERT)>=0?0xff9900:0x888888}" 
+				   _colorBackgroundAlpha="1" 
+				   _color="0xFFFFFF" textAlign="center" toolTip="{'Mensalidade, Id, '+data.ID}" />
+		<s:Rect width="4"/>
+
+		<!--
+		<gnncDateField4:gnncDateField4 id="DATE_END_" 
+									   right="0" 
+									   width="20" 
+									   height="20" 
+									   fontSize="9" 
+									   color="0x000000" 
+									   formatString="DD/MM/YYYY" 
+									   restrict="[0-9]\\\/\.\," 
+									   autoShowDropDown="false" 
+									   yearNavigationEnabled="true" 
+									   showErrorTip="false" 
+									   showErrorSkin="false" 
+									   firstDayOfWeek="0" 
+									   focusAlpha="0" 
+									   
+									   editable="false" 
+									   selectedDate="{gnncDate.__string2Date(data.DATE_END)/*__changeDate(data)*/}" 
+									   change="{__changeDate(data)}" 
+									   toolTip="Data: Vencimento"
+									   /> 
+		
+		<s:Label text="{gnncDate.__date2Legend(data.DATE_END,null,true,false,'-')}" fontSize="11" fontWeight="bold" color="0x3785e2" textDecoration="underline" buttonMode="true" 
+				 width="75" maxDisplayedLines="1" showTruncationTip="true" paddingLeft="5" click="{DATE_END_.open()}" toolTip="Data: Vencimento" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" />
+		<s:Rect width="4"/>
+		-->
+
+
+		<!--s:Image source="{String(data.DATE_START).substr(0,10)!='0000-00-00'?gnncEmbedImage.HOUR_16:gnncEmbedImage.HOUR_16_BW}" toolTip="{String(data.DATE_START).substr(0,10)!='0000-00-00'?'Programado para '+gnncDate.__date2Legend(data.DATE_START)+'. Vencimento em: '+gnncDate.__date2Legend(data.DATE_END):'Vencimento em: '+gnncDate.__date2Legend(data.DATE_END)}" alpha="{String(data.DATE_START).substr(0,10)!='0000-00-00'?1:.3}" /-->
+		<s:Label text="{gnncDate.__date2Legend(data.DATE_END,null,true,false,'-')}" fontSize="11" fontWeight="normal" width="75" maxDisplayedLines="1" showTruncationTip="true" paddingLeft="6" toolTip="Vencimento" />
+
+		<!--s:Label text="Parcela: " fontWeight="bold" fontSize="11" paddingLeft="3" /-->
+		<s:Label text="{data.VALUE_IN?gnncDataNumber.__safeReal(data.VALUE_IN,2):''}"  width="80" maxDisplayedLines="1" showTruncationTip="true" color="0x009900" color.selected="0x33ff00" color.selectedAndShowsCaret="0x33ff00" paddingLeft="5" fontWeight="bold" toolTip="{'Receber: '+gnncDataNumber.__safeReal(data.VALUE_IN,2)}"/>
+
+		<s:Label text="Anexado(s): " fontWeight="normal" fontSize="11" paddingLeft="3" toolTip="Lançamento(s) financeiro(s) anexado(s)" />
+		<s:Label text="{Number(data.VALUE_IN_PAY)>0?gnncDataNumber.__safeReal(Number(data.VALUE_IN_PAY),2):''}" width="80" maxDisplayedLines="1" showTruncationTip="true" color="0x3366ff" color.selected="0x33ffff" color.selectedAndShowsCaret="0x33ffff" paddingLeft="5" fontWeight="bold" />
+		
+		<s:Image source="{uint(data.ROWS_PARCEL_PAY)==0?gnncEmbedBlackWhite.check_16_bw:String(data.DATE_CANCELED).substr(0,10)!='0000-00-00'?gnncEmbedBlackWhite.check_16_red_ok:String(data.DATE_FINAL).substr(0,10)!='0000-00-00'?gnncEmbedBlackWhite.check_16_green_ok:Number(data.VALUE_IN_PAY)>0?gnncEmbedBlackWhite.check_16_blue_ok:gnncEmbedBlackWhite.check_16_bw_ok}"  />
+		<s:Label text="{'('+data.ROWS_PARCEL_PAY+')'}" fontWeight="bold" fontSize="11" paddingLeft="3" paddingRight="5" toolTip="Pagamento(s) Anexado(s)" alpha="{data.ROWS_PARCEL_PAY==0?.1:1}" />
+
+		<!--s:Image source="{gnncEmbedImage.SAFE_16}" toolTip="Pagemento(s) Anexado(s)" /-->
+
+		<s:Image source="{gnncEmbedBlackWhite.bw_client_16}" toolTip="{'Cliente, Id: '+data.ID_CLIENT}" visible="{String(data.NAME_STUDENT)!=''?true:false}"/>
+		<s:Rect width="3"/>
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME_STUDENT)}" fontSize="11" fontWeight="bold" width="100%" maxDisplayedLines="1" showTruncationTip="true" paddingLeft="3" paddingRight="5" visible="{String(data.NAME_STUDENT)!=''?true:false}" />
+
+		<s:Image source="{gnncEmbedBlackWhite.bw_course_16}" toolTip="{'Turma, Id: '+data.ID_PROJECT}" visible="{String(data.NAME_PROJECT)!=''?true:false}" />
+		<s:Rect width="3"/>
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME_PROJECT,true,true)}" fontSize="11" fontWeight="normal" width="100%" maxDisplayedLines="1" showTruncationTip="true" paddingLeft="3" paddingRight="5" visible="{String(data.NAME_PROJECT)!=''?true:false}" />
+
+		<!-- s:Rect width="100%"/ -->
+		
+		<elements:elementLabelBackgroudColor 
+			_label="{gnncDate.__isValid(data.DATE_CANCELED)?'Cancelada':gnncDate.__isValid(data.DATE_FINAL)?'Baixada / Paga':int(data.ROWS_PARCEL_PAY)!=0?'Pagamento(s) Anexado(s)':int(data.DATE_ALERT)>=0?'Vencida':'Mensalidade'}" 
+			_colorBackground="{gnncDate.__isValid(data.DATE_CANCELED)?0xcc0033:gnncDate.__isValid(data.DATE_FINAL)?0x009900:int(data.ROWS_PARCEL_PAY)!=0?0x3366ff:int(data.DATE_ALERT)>=0?0xff9900:0xAAAAAA}" _colorBackgroundAlpha=".8" height="18" />
+		<!--component:con_labelBackgroudColor _label="Vencida" 					_colorBackground="0xff9900" _colorBackgroundAlpha=".8" height="18" /-->
+
+		<!--s:Rect width="2"/>
+		<s:Button icon="{gnncEmbedImage.VIEW_16}" width="23" height="25" toolTip="Visualizar Cadastro" click="{__fView(null)}" /-->
+	</s:HGroup>
+
+	<elements:elementHLine bottom="0" height="1" alpha=".4" />
+	
+</s:ItemRenderer>

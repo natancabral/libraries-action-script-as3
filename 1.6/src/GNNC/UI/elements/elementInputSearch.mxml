@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="100" height="25" 
+		 
+		 creationComplete="{__start()}" xmlns:icon="GNNC.UI.elements.icon.*" 
+		 
+		 >
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.core.FlexGlobals;
+			
+			[Event(name="SEARCH", type="flash.events.Event")]
+
+			[Embed(source='image/filter-16.png')] static public const FILTER:Class; 
+			[Embed(source='image/refresh-16.png')] static public const REFRESH:Class; 
+			
+			[Bindable] private var _app:Object = FlexGlobals.topLevelApplication; 
+
+			public var _FUNCTION_Event_:Function  									= null;
+			public var _FILTER:Boolean 												= false;
+
+			public function set _changeEvent(v:Function):void 
+			{
+				if(v == null) return;
+				addEventListener("SEARCH",v);
+				if(height==30){
+					retangle.radiusX = retangle.radiusY = 22;
+					buttonSearch.right = 7;
+				}
+			}
+
+			public function get text():String{ 										return inputText.text; }
+			public function set text(value_:String):void{ 							inputText.text = value_; }
+
+			/** GET **/
+			public function get _TEXT():String{ 									return inputText.text; }
+			/** SET **/
+			public function set _RADIUS(value_:uint):void{ 							retangle.radiusX = value_; retangle.radiusY = value_; }
+			public function set _TEXT(value_:String):void{ 							inputText.text = value_; }
+			public function set _SIZE(value_:uint):void{ 							inputText.setStyle('fontSize',value_); }
+			public function set _TEXTCENTER(value_:Boolean):void{ 					inputText.setStyle('textAlign',value_?'center':'left'); }
+			public function set _COLOR(value_:uint):void{ 							inputText.setStyle('color',value_); }
+			public function set _BOLD(value_:Boolean):void{ 						inputText.setStyle('fontWeight',value_?'bold':'normal'); }
+			public function set _EDITABLE(value_:Boolean):void{ 					inputText.editable = value_; }
+			public function set _SELECTABLE(value_:Boolean):void{ 					inputText.selectable = value_; }
+			public function set _MAXCHARS(value_:uint):void{ 						inputText.maxChars = value_; }
+			public function set _RESTRICT(value_:String):void{ 						inputText.restrict = value_; }
+			public function set _PROMPT(value_:String):void{ 						inputText.prompt = value_; }
+			//public function set _PADDING(valueLeft_:uint,valueRight_:uint):void{ 	inputText.left = valueLeft_; inputText.right = valueRight_; }
+			
+			private function __start():void
+			{
+				__HIDE_BUTTON_SEARCH();
+
+				//if(_app.hasOwnProperty('_START'))
+
+				if(_FILTER)
+					removeElement(buttonSearch);
+					removeElement((_FILTER)?iconSearch:iconFilter);
+
+				if(_FUNCTION_Event_!=null)
+					addEventListener("SEARCH",_FUNCTION_Event_);
+
+				inputText.prompt = (_FILTER)?'Filtrar por...':'Pesquisar...';
+			}
+
+			private function __ACTION_KEY(event:KeyboardEvent):void
+			{
+				if(!_FILTER)
+				{
+					if(event.charCode == Keyboard.ENTER)
+						dispatchEvent(new Event("SEARCH"));
+				}
+				else
+				{
+					dispatchEvent(new Event("SEARCH"));
+				}
+			}
+
+			private function __ACTION_CLICK(event:MouseEvent):void
+			{
+				dispatchEvent(new Event("SEARCH"));
+			}
+			
+			private function __HIDE_BUTTON_SEARCH():void
+			{
+				//buttonSearch.visible = Boolean(inputText.text);
+			}
+			
+		]]>
+	</fx:Script>
+
+	<s:Rect id="retangle" left="0" right="0" top="1" bottom="1" radiusX="10" radiusY="10" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x000000" alpha=".2" />
+				<s:GradientEntry color="0x333333" alpha=".2" />
+			</s:LinearGradient>
+		</s:fill>
+		<s:stroke>
+			<s:LinearGradientStroke weight="1" rotation="89">
+				<s:GradientEntry color="0x777777" alpha=".6" />
+				<s:GradientEntry color="0xCCCCCC" alpha=".6" />
+			</s:LinearGradientStroke>
+		</s:stroke>
+	</s:Rect>
+	
+	<s:TextInput id="inputText" fontSize="11" text="" left="4" right="17" verticalCenter="0" borderVisible="false" contentBackgroundAlpha="0" paddingBottom="2" paddingLeft="3" paddingRight="2" paddingTop="2" focusAlpha="0" restrict="[0-9][a-z][A-Z][\-,.!():][áãâÁÃÂ][éêÉÊ][íÍ][õôóÕÔÓ][úÚ][çÇ][ ]" keyUp="{__ACTION_KEY(event); __HIDE_BUTTON_SEARCH()}" color="0xFFFFFF" />
+	<s:Button id="buttonSearch" right="1" height="20" width="20" verticalCenter="-1" skinClass="spark.skins.spark.DefaultButtonSkin" cornerRadius="10" 
+			  chromeColor="0x555555" click="{__ACTION_CLICK(event)}" keyUp="{__ACTION_KEY(event)}" alpha=".5" visible="{!_app._START._gnncGlobal._loading}"/> 
+	<icon:icon_search id="iconSearch" right="5" verticalCenter="-1" _COLOR="0xFFFFFF" scaleX=".7" scaleY=".7" visible="{!_app._START._gnncGlobal._loading}"/>
+	<s:Image id="iconFilter"  source="{FILTER}"  verticalCenter="0" right="5" visible="{!_app._START._gnncGlobal._loading}" />
+	<!-- s:Image id="iconRefresh" source="{REFRESH}" verticalCenter="0" right="5" visible="{_app._START._gnncGlobal._loading}" / -->
+
+</s:Group>

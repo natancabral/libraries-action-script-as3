@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx			= "http://ns.adobe.com/mxml/2009" 
+	xmlns:s				= "library://ns.adobe.com/flex/spark" 
+	xmlns:mx			= "library://ns.adobe.com/flex/mx" 
+	width				= "100%" 
+	height				= "100%" 
+	creationComplete	= "__start()" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.file.gnncFileCookie;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.securityService.gnncSecurityService;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.others.gnncViewStackCommand;
+			import GNNC.time.gnncTime;
+			
+			import mx.core.FlexGlobals;
+			import mx.graphics.SolidColorStroke;
+			
+			[Embed(source='image/setting-16.png')]
+			static public const setting_16:Class;
+			
+			[Embed(source='image/access-16.png')]
+			static public const access_16:Class;
+			
+			private var _backUpAfterData:Array 		= new Array(); 
+			private var _time:gnncTime				= new gnncTime();
+			private var E:gnncSecurityService 		= new gnncSecurityService();
+
+			private function __start():void
+			{
+				__backUpAfter(true);
+				__appName();
+				__resizeBox();
+				__cookieValues();
+				__setFocus();
+				
+				new gnncPopUp(parentApplication).__toFront(this);
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __appName():void
+			{
+				appNameAndVersion_.text = gnncGlobalStatic._programName+' '+gnncGlobalStatic._programVersion;
+			}
+			
+			private function __resizeBox():void
+			{
+				if(FlexGlobals.topLevelApplication.width <= 440)
+				{
+					inputs_.removeElement	(logo_); 
+					LOGIN.width 			= 230;
+				}
+				else
+				{
+					logo_.source 			= gnncGlobalStatic._programIcon128;
+					logo_.toolTip 			= appNameAndVersion_.text;
+				}
+			}
+			
+			private function __cookieValues(save_:Boolean=false,saveMessage_:Boolean=false):void
+			{
+				if(save_)
+				{
+					gnncFileCookie.__set('LOGIN','DATABASE'	,dataBase_.text			);
+					gnncFileCookie.__set('LOGIN','USER'		,user_.text				);
+					gnncFileCookie.__set('LOGIN','SERVER'	,server_.selectedIndex	);
+					
+					if(saveMessage_)
+						__alert("O cliente e usuário\nforam salvos.",'voltar',0);
+				}
+				else
+				{
+					dataBase_.text 			= gnncFileCookie.__get('LOGIN','DATABASE'	)?	gnncFileCookie.__get		('LOGIN','DATABASE').toString()	:'gnnc';
+					user_.text 				= gnncFileCookie.__get('LOGIN','USER'		)?	gnncFileCookie.__get		('LOGIN','USER').toString()		:'';
+					server_.selectedIndex 	= gnncFileCookie.__get('LOGIN','SERVER'		)?	uint(gnncFileCookie.__get	('LOGIN','SERVER'))				:0;
+				}
+			}
+			
+			private function __setFocus(e:*=null):void
+			{
+				!user_.text ? user_.setFocus() : passW_.setFocus() ;
+			}
+
+			private function __alert(string_:String,btnLabel_:String='voltar',seconds_:uint=2):void
+			{
+				var i:uint = seconds_;
+				_time.__stop();
+				_time.__start(1000,__btnBackEnable,seconds_);
+
+				alert_.text = string_;
+
+				btnBack_.enabled = false;
+				btnBack_.label = i > 0 ? i + ' ' + btnLabel_ : btnLabel_ ;
+
+				panelCenter_.selectedIndex = 2;
+				
+				function __btnBackEnable(e:*=null):void
+				{
+					if(i>1)
+					{
+						i--;
+						btnBack_.label = i + ' ' + btnLabel_;
+					}
+					else
+					{
+						_time.__stop();
+						btnBack_.enabled = true;
+						btnBack_.label = btnLabel_;
+						
+						btnBack_.setFocus();
+						btnBack_.setFocus();
+					}
+				}
+			}
+			
+			private function __accessUserLogin():void
+			{
+				//IMPORTANT
+				//Change for FILE PHP LOGIN!!!!! gnncUserLogin.php
+				//IMPORTANT
+				
+				var D:String = gnncData.__trimText(dataBase_.text);
+				var U:String = gnncData.__trimText(user_.text);
+				var P:String = gnncData.__trimText(passW_.text);
+				var S:String = server_.selectedItem.server;
+				var H:String = server_.selectedItem.http;
+				var O:String = server_.selectedItem.domain;
+				
+				if(!P || !U){
+					__alert("Insira um usuário\ne uma senha.");
+					return;
+				}
+				
+				__alert('Acessando...','cancelar login',2);
+				
+				gnncGlobalStatic._dataBase		= D;
+				gnncGlobalStatic._serverName	= S;
+				gnncGlobalStatic._httpHost		= H;
+				gnncGlobalStatic._httpDomain    = O;
+				
+				E = new gnncSecurityService(U,P,__fResult,__fFault);
+				
+				logo_.setFocus();
+				
+				function __fResult(event:*=null):void
+				{
+					gnncGlobalStatic.__reload	();
+					__close						();
+					
+				}
+				
+				function __fFault(event:*=null):void
+				{
+					
+					if(E._error){
+						__alert("Falha na conexão.\nTente novamente.");
+						__backUpAfter(false);
+						return;
+					}else if(!E._authenticated){
+						__alert("Usuário e senha\nestão incorretos.");
+						__backUpAfter(false);
+						return;
+					}else if(!E._permissionAccess){
+						__alert("Você não tem permissão para\nacessar este aplicativo.",'acessar novamente');
+						__backUpAfter(false);
+						return;
+					}
+
+					__alert('Ocorreu algum erro.');
+				}
+				
+			}
+			
+			private function __backUpAfter(set_:Boolean=true):void
+			{
+				if(set_ && gnncGlobalStatic._dataBase)
+				{
+					_backUpAfterData = [gnncGlobalStatic._dataBase,gnncGlobalStatic._serverName,gnncGlobalStatic._httpHost,gnncGlobalStatic._httpDomain];
+				}
+				
+				if(!set_)
+				{
+					gnncGlobalStatic._dataBase		= _backUpAfterData[0];
+					gnncGlobalStatic._serverName	= _backUpAfterData[1];
+					gnncGlobalStatic._httpHost		= _backUpAfterData[2];
+					gnncGlobalStatic._httpDomain	= _backUpAfterData[3];
+				}
+			}
+			
+			private function __goBackToLogin():void
+			{
+				__backUpAfter(false);
+				
+				E.__cancel();
+				
+				panelCenter_.selectedIndex = 0; 
+
+				passW_.setFocus();
+				passW_.setFocus();
+			}
+			
+			private function __try():void
+			{
+				return;
+				var ts:String = "" + 
+					" http " + gnncGlobalStatic._httpHost +  
+					" dataBase " + gnncGlobalStatic._dataBase + 
+					" server " + gnncGlobalStatic._serverName +
+				    " domain " + gnncGlobalStatic._httpDomain;
+				new gnncAlert().__alert(ts);
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Fade id="fadeEffect_" duration="700" />
+	</fx:Declarations>
+	
+	<s:Group id="LOGIN" width="380" height="138">
+		
+		<!-- s:Rect width="100%" height="100%" radiusX="3" radiusY="3" >
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0xEEEEEE" />
+					<s:GradientEntry color="0xDEDEDE" />
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+		<s:RectangularDropShadow distance="1" brRadius="4" blRadius="4" tlRadius="4" trRadius="4" blurX="5" blurY="5" width="100%" height="100%"/-->
+
+		<s:Rect left="0" top="0" right="0" bottom="0" radiusX="2" radiusY="2" >
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0xf8f8f8" />
+					<s:GradientEntry color="0xf6f6f6" />
+				</s:LinearGradient>
+			</s:fill>
+			<s:stroke>
+				<s:SolidColorStroke color="0xBBBBBB" weight="1"/>
+			</s:stroke>
+		</s:Rect>
+
+		<s:HGroup id="inputs_" top="5" left="5" right="14" bottom="5" gap="2" verticalAlign="middle">
+			<s:Image id="logo_" source="{null}" width="128" click="{__try()}" />
+			<mx:ViewStack id="panelCenter_" width="100%" height="100%" >
+				<s:NavigatorContent width="100%" height="100%" creationPolicy="all" showEffect="{fadeEffect_}">
+					<s:layout>
+						<s:HorizontalLayout gap="2" verticalAlign="middle" />
+					</s:layout>
+					<s:VGroup width="75" paddingLeft="15" fontSize="10" gap="4">
+						<s:Label text="CLIENTE" 	height="25" verticalAlign="middle" />
+						<s:Label text="USUÁRIO" 	height="25" verticalAlign="middle" />
+						<s:Label text="SENHA" 		height="25" verticalAlign="middle" />
+						<s:Label text="{String(server_.selectedItem.label).toUpperCase()}" height="25" verticalAlign="middle" color="0xBBBBBB" />
+					</s:VGroup>
+					<s:VGroup width="100%" gap="4" >
+						<s:TextInput id="dataBase_" text="gnnc" fontSize="14" fontWeight="bold" width="100%" height="25" keyDown="{if(gnncKeyboard.__ENTER(event)) user_.setFocus()}" restrict="[A-Z][a-z][0-9][_.-]" enabled="false" paddingLeft="0" borderVisible="false" contentBackgroundAlpha="0" focusAlpha=".2" borderColor="0xAAAAAA" />
+						<s:TextInput id="user_" text="" width="100%" height="25" keyDown="{if(gnncKeyboard.__ENTER(event)) passW_.setFocus()}" restrict="[A-Z][a-z][0-9][_.-]" paddingLeft="5" focusAlpha=".2" borderColor="0xAAAAAA" />
+						<s:TextInput id="passW_" width="100%" height="25" displayAsPassword="true" enter="{__accessUserLogin()}" paddingLeft="5" restrict="[A-Z][a-z][0-9][_.-]" focusAlpha=".2" borderColor="0xAAAAAA"/>
+						<s:HGroup width="100%" gap="2">
+							<s:Button id="btnSend_" label="entrar" width="100%" height="25" cornerRadius="3" focusAlpha=".2" click="{__accessUserLogin()}" keyDown="{if(gnncKeyboard.__ENTER(event))__accessUserLogin()}" />
+							<s:Button icon="{setting_16}" width="25" height="25" tabEnabled="false" tabFocusEnabled="false" label="configurações..." click="{gnncViewStackCommand.__next(panelCenter_)}" focusAlpha=".2" />
+						</s:HGroup>
+					</s:VGroup>
+				</s:NavigatorContent>
+				<s:NavigatorContent width="100%" height="100%" creationPolicy="all" showEffect="{fadeEffect_}">
+					<s:layout>
+						<s:HorizontalLayout gap="2" verticalAlign="middle" />
+					</s:layout>
+					<s:VGroup width="75" paddingLeft="15" fontSize="10" gap="4">
+						<s:Label text="SENHA" 	height="25" verticalAlign="middle" />
+						<s:Label text="SERVIDOR" 	height="25" verticalAlign="middle" />
+						<s:Label text="OPÇÕES" 	height="25" verticalAlign="middle" />
+						<s:Label text="" 	height="25" verticalAlign="middle" />
+					</s:VGroup>
+					<s:VGroup width="100%" gap="4" >
+						<s:Button icon="{null}" width="100%" height="25" tabEnabled="false" tabFocusEnabled="false" label="esqueci minha senha" enabled="false" />
+						<s:DropDownList id="server_" width="100%" height="25" dataProvider="{gnncGlobalArrays._HTTPHOST}" labelField="label" keyDown="{if(gnncKeyboard.__ENTER(event)) btnSend_.setFocus()}" cornerRadius="3" change="(__cookieValues(true))" enabled="false" />
+						<s:HGroup width="100%" gap="2">
+							<s:ToggleButton icon="{access_16}" selected="true" width="25" height="25" tabEnabled="false" tabFocusEnabled="false" toolTip="desbloquear campos" click="{dataBase_.enabled = !dataBase_.enabled; server_.enabled = !server_.enabled}" />
+							<s:Button icon="{null}" width="100%" height="25" tabEnabled="false" tabFocusEnabled="false" label="salvar dados" click="{__cookieValues(true,true)}" />
+						</s:HGroup>
+						<s:HGroup width="100%" gap="2">
+							<s:Label id="appNameAndVersion_" text="..." width="100%" height="25" verticalAlign="middle" color="0xBBBBBB" />
+							<s:Button icon="{null}" height="25" tabEnabled="false" tabFocusEnabled="false" label="voltar" click="{gnncViewStackCommand.__prev(panelCenter_)}" />
+						</s:HGroup>
+					</s:VGroup>
+				</s:NavigatorContent>
+				<s:NavigatorContent width="100%" height="100%" creationPolicy="all" showEffect="{fadeEffect_}">
+					<s:Label id="alert_" fontSize="13" fontWeight="bold" paddingLeft="15" paddingRight="15" horizontalCenter="0" verticalCenter="0" maxDisplayedLines="3" color="0x000000" click="{__goBackToLogin()}"/>
+					<s:Button id="btnBack_" height="25" label="voltar" click="{__goBackToLogin()}" keyDown="{if(gnncKeyboard.__ENTER(event)) __goBackToLogin()}" bottom="10" right="0"  />
+				</s:NavigatorContent>
+			</mx:ViewStack>
+		</s:HGroup>
+		
+	</s:Group>
+	
+</s:Module>

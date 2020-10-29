@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				xmlns:stage="GNNC.elements.stage.*"
+				xmlns:gnncImage="GNNC.UI.gnncImage.*" 
+				xmlns:GNNC="GNNC.*" 
+				xmlns:elements="GNNC.UI.elements.*"
+				
+				creationComplete="{start()}"
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				
+				autoDrawBackground="false" 
+				doubleClickEnabled="true" 
+				width="100%" maxHeight="500"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedExtension;
+			import GNNC.gnncEmbedImage;
+			import GNNC.sqlTables.table_comment;
+			
+			import mx.collections.ArrayCollection;
+			import mx.graphics.SolidColor;
+			import mx.graphics.SolidColorStroke;
+			
+			private function start():void{
+			}
+
+			private function selectClientTeam(e:*=null):void
+			{
+				__selectIndex();
+				
+				if(e==null && data.hasOwnProperty('SELECTED')==true){
+					var s:Boolean = data.SELECTED==0?true:false;
+					if(s==true)
+						Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._selectItem,data));
+					else
+						Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._clear,data));
+					return;
+				}
+				
+				if(e.currentTarget.selected==true)
+					Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._selectItem,data));
+				else
+					Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._clear,data));
+			}
+
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __view(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._view,data));
+			}
+			
+			//answer/reply/return
+			private function __answer(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._new,data));
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._view,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __delete():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._delete,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			protected function __location(data_:Object):Object
+			{
+				if(String(data_.ATTACH_CLIENT).length>5)
+					return gnncGlobalStatic._httpHost+'ATTACH/'+String(gnncGlobalStatic._dataBase).toUpperCase()+'/thumbnailCrop/'+data_.ATTACH_CLIENT;
+				else
+					return null;
+			}
+			
+			private function getSizeAttach(data:Object,defaultValue:uint):uint
+			{
+				return String(data.ATTACH_LINKS).length>10?16:defaultValue;
+			}
+			
+			private function getVisibleAttach(data:Object,defaultValue:Boolean):Boolean
+			{
+				return String(data.ATTACH_LINKS).length>10?true:defaultValue;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<!-- s:Rect left="0" top="0" right="0" bottom="0" radiusX="4" radiusY="4" visible="{data.hasOwnProperty('SELECTED')==false?false:uint(data.SELECTED)==1?true:false}" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect -->
+	
+	<s:Rect left="0" top="0" right="0" bottom="1" radiusX="4" radiusY="4" visible="{data.hasOwnProperty('SELECTED')==false?false:uint(data.SELECTED)==1?true:false}" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0xeaeaea"/>
+				<s:GradientEntry color="0xe7e7e7"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+
+	<elements:elementHLine _COLOR="0xcccccc" left="3" right="3" bottom="0" excludeFrom="selected,selectedAndShowsCaret"
+						   visible="{data.hasOwnProperty('SELECTED')==false?true:uint(data.SELECTED)==1?false:true}"
+						   alpha=".3"
+						   />
+	
+	<s:HGroup left="0" top="0" right="0" bottom="0" gap="8" padding="7" paddingLeft="5" paddingRight="5"
+			  color="0x555555" lineHeight="12" wordSpacing="1" verticalAlign="middle" 
+			  >
+		
+		<s:Group width="32" height="32" alpha="1" click="selectClientTeam(null)" >
+			<s:Rect width="100%" height="100%" fill="{new SolidColor(0xeeeeee)}" radiusX="4" radiusY="4" />
+			<s:Label text="{data.NAME_CLIENT?String(data.NAME_CLIENT).substr(0,2).toUpperCase():''}" width="32" height="32" textAlign="center" verticalAlign="middle"/>
+			<gnncImage:gnncImageCD width="32" height="32" data="{data}" property="ATTACH_CLIENT"/>
+		</s:Group>
+		
+		<s:VGroup width="100%" height="100%" gap="-3" paddingLeft="7">
+			<s:VGroup width="100%" height="100%" gap="0">
+				<s:HGroup width="100%" gap="5" paddingTop="4" verticalAlign="middle" paddingBottom="6">
+					<s:Label text="{data.NAME_CLIENT?gnncData.__firstLetterUpperCase(data.NAME_CLIENT):'Nome não encontrado'}" 
+							 showTruncationTip="true" maxDisplayedLines="1" fontSize="11" fontWeight="bold"
+							 width="100%"
+							 verticalAlign="middle"
+							 color="0x222222"
+							 />
+					<!--
+					color="{data.hasOwnProperty('SELECTED')==false?0x111111:uint(data.SELECTED)==1?0xffffff:0x111111}"
+					-->
+					<s:Label text="{data.ID}" fontSize="8" color="0xeeeeee"/>
+				</s:HGroup>
+				<s:Label text="{data.USER?String('@'+data.USER).toLowerCase():'Usuário não encontrado'}" width="100%" fontSize="10" 
+						 paddingBottom="0" paddingLeft="0" paddingTop="0"
+						 maxDisplayedLines="1" showTruncationTip="false"
+						 />
+				<!--
+				color="{data.hasOwnProperty('SELECTED')==false?0x111111:uint(data.SELECTED)==1?0xffffff:0x111111}"
+				-->
+			</s:VGroup>
+		</s:VGroup>
+		
+		<s:CheckBox click="selectClientTeam(event)" selected="{data.hasOwnProperty('SELECTED')==false?false:uint(data.SELECTED)==1?true:false}"
+					enabled="{data.hasOwnProperty('SELECTED')==false?false:true}"
+					/>
+		
+	</s:HGroup>
+	
+	<elements:elementLabelBackgroudColor right="50" verticalCenter="0" _label="selecionado" 
+										 _paddingLeftText="8" _paddingRightText="8"
+										 _color="0xffffff" _colorBackground="0x2170cf" 
+										 visible="{data.hasOwnProperty('SELECTED')==false?false:uint(data.SELECTED)==1?true:false}"
+										 />
+
+</s:ItemRenderer>

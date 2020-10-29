@@ -1,0 +1,327 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="450" height="380" 
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:gnncDateField4="GNNC.UI.gnncDateField4.*" 
+		  xmlns:select="GNNC.elements.component.select.*"
+		  >
+	<fx:Declarations>
+		<s:CurrencyFormatter id="safe_" 
+							 currencySymbol="R$ " 
+							 useCurrencySymbol="true"
+							 negativeCurrencyFormat="2"
+							 positiveCurrencyFormat="0"
+							 decimalSeparator=","
+							 groupingSeparator="."
+							 errorText="Erro no valor!"/>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_financial;
+			import GNNC.sqlTables.table_financial_seller_commission;
+			
+			//[Bindable] private var _gnncGlobal:gnncGlobalStatic 	= new gnncGlobalStatic(true);
+			private var _connSellerCommission:gnncAMFPhp			= new gnncAMFPhp();
+			
+			public var _tableFinancialSellerCommission:table_financial_seller_commission = new table_financial_seller_commission();
+			public var _change:Boolean 								= false;
+			
+			private var _gnncPopUp:gnncPopUp 						= new gnncPopUp();
+			
+			private function __start():void
+			{	
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+						//if(gnncKeyboard.__CONTROL_ENTER(event)) __save();
+					}
+				);
+				
+				callLater(__firstInput);
+				__check();
+			}
+			
+			public function __firstInput():void 
+			{ 
+				NAME_.text = gnncDataRand.__enrollment(20);
+				NAME_.setFocus();
+			}
+			
+			private function __check():void
+			{
+				if(_tableFinancialSellerCommission != null)
+				{
+					if(_tableFinancialSellerCommission.ID)
+					{
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var _sql:String = new gnncSql().__SELECT(new table_financial_seller_commission(_tableFinancialSellerCommission.ID));
+						_connSellerCommission.__sql(_sql,'','',__fResultCheck,__fFaultCheck);
+					}
+					else
+					{
+					}
+				} 
+				else 
+				{
+					_tableFinancialSellerCommission = new table_financial_seller_commission();
+				}
+			}
+			
+			protected function __fFaultCheck(e:*):void
+			{
+				_gnncPopUp.__close(); 
+				__close();
+			}
+			
+			protected function __fResultCheck(e:*):void
+			{
+				_gnncPopUp.__close(); 
+				
+				if(!_connSellerCommission.DATA_ROWS)
+				{
+					new gnncAlert().__alert('Registro não encontrado.');
+					__close();
+					return;
+				}
+				
+				btnSave_.label = 'Salvar Edição';
+				btnSave_.setStyle('icon',gnncEmbedImage.EDIT_16);
+				
+				var _obj:Object						= _connSellerCommission.DATA_ARR.getItemAt(0);
+				
+				_tableFinancialSellerCommission.ID	= _obj.ID;
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __save():void
+			{
+				if(!NAME_.text || percentShow_.text == 'NaN' || valueShow_.text == safe_.errorText)
+				{
+					new gnncAlert()..__alert('Verifique se os valores estão corretos.');
+					return;
+				}
+				
+				_gnncPopUp.__loading();
+				
+				var _table:table_financial_seller_commission = new table_financial_seller_commission();
+
+				_table.ID						= _tableFinancialSellerCommission.ID;
+				//ID_FINANCIAL_GROUP:uint		= 0; // OFF //por valores que entram no plano de contas
+				//ID_FINANCIAL_CATEGORY:uint	= 0; // OFF //por valores que entram em categoryas
+
+				_table.NAME						= gnncData.__scapeString(NAME_.text);
+
+				_table.VALUE_AT					= 0; //comissão de valores de...
+				_table.VALUE_TO					= 0; //comissão de valores até...
+				
+				_table.COMMISSION_VALUE			= Number(COMMISSION_VALUE_.text); //comissão paga, de valor fixo
+				_table.COMMISSION_PERCENT		= Number(COMMISSION_PERCENT_.text); //comissao paga, de porcentagem sobre o valor vendido
+				
+				_table.DISCOUNT_VALUE			= 0; //desconto dado no máximo em valor
+				_table.DISCOUNT_PERCENT			= 0; //desconto dado no máximo em porcentagem
+				
+				//DATE_START:String				= ''; // OFF //comissão valida DE
+				//DATE_END:String				= ''; // OFF //comissão valida ATE
+				
+				//public var LEVEL:uint			= 0; // OFF //criar uma nova tabela de regras para este
+
+				var _sql:String = new gnncSql().__INSERT(_table,false,true,true) + gnncGlobalStatic._breakSql;
+				
+				_connSellerCommission.__sql(_sql,'','',__fResult,__fFault);
+			
+				function __fResult(e:*):void
+				{
+					_change = true;
+					_gnncPopUp.__close();
+					__close();
+				}
+				
+				function __fFault(e:*):void
+				{
+					_gnncPopUp.__close();
+				}
+				
+			}
+			
+			private function __valueValidad(e:*):void 
+			{
+				var p:Point 		= new Point();
+				var o:Object 		= e.currentTarget;
+				var idx:int			= o.text.indexOf(',');
+				var v1:String		= '';
+				var v2:String		= '';
+				
+				//verifica se existe virgula e substitue por ponto
+				if(idx>-1)
+				{
+					p 				= new Point(o.selectionAnchorPosition,o.selectionActivePosition);
+					o.text 			= gnncData.__replace(o.text,',','.');
+					o.selectRange	(p.x,p.y);
+				}
+				
+				valueShow_.text = safe_.format(Number(COMMISSION_VALUE_.text));
+				//valueShow_.text = safe_.format(Number(o.text));
+				
+				/*
+				if(Number(VALUE_.text)>0)
+				{
+				VALUE_OUT_.enabled 		= true;
+				PERCENT_OUT_.enabled 	= true;
+				}
+				else
+				{
+				VALUE_OUT_.enabled 		= false;
+				PERCENT_OUT_.enabled 	= false;
+				}*/
+				
+				__valueOut();
+			}
+			
+			private function __valueOut():void
+			{
+				/*var v:Number 	= Number(VALUE_.text);
+				var o:Number 	= Number(VALUE_OUT_.text);
+				var p:Number 	= Number(PERCENT_OUT_.text);
+				
+				_valueOut 		= o + ((p*v)/100); //taxa
+				_valueTrans 	= v-_valueOut; //taxa
+				
+				valueOutLabel_.text 	= '+ ' + gnncDataNumber.__safeReal(o);
+				valuePercLabel_.text 	= '+ ' + gnncDataNumber.__safeReal((p*v)/100);
+				
+				valueSumLabel_.text 	= gnncDataNumber.__safeReal( _valueOut );
+				valueTransLabel_.text 	= gnncDataNumber.__safeReal( _valueTrans );*/
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<elements:elementStageBoxPopUp />
+	<elements:elementLabelFont id="titlePopUp_" text="COMISSÕES DE VENDAS" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+		<s:Rect width="100%"/>
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%">
+			<s:layout>
+				<s:HorizontalLayout />
+			</s:layout>
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:FormItem label="Nome">
+					<s:TextInput id="NAME_" text="" height="30" fontSize="15" fontWeight="normal" width="200" 
+								 paddingLeft="7" maxChars="30" />
+				</s:FormItem>
+				<elements:elementHLine height="40" alpha=".5" />
+				<elements:elementLabelFont text="COMISSÃO" fontSize="16" height="30" fontWeight="normal" paddingLeft="5" paddingTop="1" paddingBottom="5" />
+				<elements:elementHLine height="20" alpha=".5" />
+				<s:FormItem label="Porcentagem (%)">
+					<s:TextInput id="COMMISSION_PERCENT_" text="" height="25" fontWeight="normal" width="100" 
+								 keyUp="{__valueValidad(event)}" mouseUp="{__valueValidad(event)}" 
+								 restrict="[0-9][\.\,]" paddingLeft="5" maxChars="6" />
+					<s:Rect width="100%"/>
+					<s:Label id="percentShow_" text="{Number(COMMISSION_PERCENT_.text)}" fontWeight="bold"/>
+				</s:FormItem>
+				<s:FormItem label="Valor (R$)">
+					<s:TextInput id="COMMISSION_VALUE_" text="" height="25" fontWeight="normal" width="100" 
+								 keyUp="{__valueValidad(event)}" mouseUp="{__valueValidad(event)}" 
+								 restrict="[0-9][\.\,]" paddingLeft="5" maxChars="11" />
+					<s:Rect width="100%"/>
+					<s:Label id="valueShow_" text="R$ 0,00" fontWeight="bold"/>
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="TAXAS E DESCONTOS" width="100%" height="100%">
+			<s:layout>
+				<s:HorizontalLayout />
+			</s:layout>
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<elements:elementLabelFont text="TAXA E IMPOSTO FIXO" fontSize="16" height="30" fontWeight="normal" paddingLeft="5" paddingTop="1" paddingBottom="5" />
+				<elements:elementHLine height="20" alpha=".5" />
+				<s:FormItem label="Valor (R$)">
+					<s:TextInput text="0.0" height="25" fontWeight="normal" width="100" enabled="false" />
+				</s:FormItem>
+				<s:FormItem label="Porcentagem (%)">
+					<s:TextInput text="0.0" height="25" fontWeight="normal" width="100" enabled="false" />
+				</s:FormItem>
+				<elements:elementHLine height="40" alpha=".5" />
+				<elements:elementLabelFont text="DESCONTO MÁXIMO ESTABELECIDO" fontSize="16" height="30" fontWeight="normal" paddingLeft="5" paddingTop="1" paddingBottom="5" />
+				<s:FormItem label="Valor (R$)">
+					<s:TextInput text="0.0" height="25" fontWeight="normal" width="100" enabled="false" />
+				</s:FormItem>
+				<s:FormItem label="Porcentagem (%)">
+					<s:TextInput text="0.0" height="25" fontWeight="normal" width="100" enabled="false" />
+				</s:FormItem>
+				<!-- elements:elementHLine height="20" alpha=".5" /-->
+				<!-- s:FormItem label="Data da Transf.">
+				
+				<gnncDateField4:gnncDateField4 id="DATE_END_" 			fontSize="11" autoShowDropDown="false" width="95" height="25" showToday="true" yearNavigationEnabled="true" 
+				keyDown="{}" keyUp="{}" editable="false" formatString="DD/MM/YYYY" firstDayOfWeek="0" restrict="[0-9]\\\/\.\," focusAlpha="0" showErrorSkin="false" showErrorTip="false"
+				focusOut="{}" selectedDate="{new Date()}" change="{}" errorString="..."
+				/>
+				</s:FormItem>
+				<s:FormItem label="Auto-Baixa">
+				<gnncDateField4:gnncDateField4 id="DATE_FINAL_AUTO_" 			fontSize="11" autoShowDropDown="false" width="95" height="25" showToday="true" yearNavigationEnabled="true" 
+				keyDown="{}" keyUp="{}" editable="false" formatString="DD/MM/YYYY" firstDayOfWeek="0" restrict="[0-9]\\\/\.\," focusAlpha="0" showErrorSkin="false" showErrorTip="false" errorString="..." 
+				focusOut="{}" selectedDate="{null}" change="{}"
+				/>
+				</s:FormItem-->
+			</s:Form>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%" />
+		<s:Button id="btnSave_" icon="{gnncEmbedBlackWhite.bw_new_16}" label="Cadastrar (Ctrl+Enter)" click="{__save()}" fontWeight="bold" height="25" >
+			<s:keyUp>
+				<![CDATA[
+				if( gnncKeyboard.__ENTER(event) && !gnncKeyboard.__CONTROL_ENTER(event) ) 
+				__save()
+				]]>
+			</s:keyUp>
+		</s:Button>
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" height="25" skinClass="GNNC.skin.button.skin_buttonLink" />	
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

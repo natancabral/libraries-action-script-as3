@@ -1,0 +1,917 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009"
+		  xmlns:s="library://ns.adobe.com/flex/spark"
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  
+		  xmlns:elements="GNNC.UI.elements.*"
+		  xmlns:stage="GNNC.elements.stage.*"
+		  xmlns:list="GNNC.elements.component.list.*"
+		  xmlns:select="GNNC.elements.component.select.*"
+		  
+		  width="750" height="520" 
+		  creationComplete="{__start()}" 
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataObject;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.file.gnncFilePdf;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.client.formNew.selectClient;
+			import GNNC.modules.course.formNew.selectCourse;
+			import GNNC.sqlTables.table_series;
+			
+			import flash.events.*;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.graphics.SolidColor;
+			
+			import org.alivepdf.layout.Orientation;
+			import org.alivepdf.layout.Size;
+			
+			//[Bindable] 
+			private var _gnncGlobal:gnncGlobalStatic 	= new gnncGlobalStatic();
+			private var _gnncPop:gnncPopUp 				= new gnncPopUp();
+			private var _gnncPdf:gnncFilePdf 			= new gnncFilePdf();
+			//[Bindable] public var _tableClient:table_client = new table_client(); 
+			
+			public var _list:ArrayCollection = new ArrayCollection();
+			
+			private const _fontSize:ArrayCollection = new ArrayCollection([
+				{label:'12', value:12},
+				{label:'11', value:11},
+				{label:'10', value:10},
+				{label:'9',  value:9},
+				{label:'8',  value:8},
+				{label:'7',  value:7},
+				{label:'6',  value:6}
+			]);
+
+			private const _label:ArrayCollection = new ArrayCollection([
+				{label:'Nome completo', 	value:'NAME'},
+				{label:'Apelido', 			value:'NICK_NAME'},
+				{label:'E-mail', 			value:'EMAIL'},
+				{label:'Aniversário',  		value:'DATE_BIRTH'},
+				{label:'Endereço completo', value:'ADDRESS_COMPLETE'},
+				{label:'Matrícula', 		value:'ENROLLMENT'},
+				{label:'Logradouro',  		value:'ADDRESS_PLUS'},
+				{label:'Cep',  				value:'ZIPCODE'},
+				{label:'Cidade',  			value:'CITY'},
+				{label:'País',  			value:'ISO_COUNTRY'},
+				{label:'Departamento',  	value:'DEPARTAMENT'},
+				{label:'Grupo',  			value:'GROUP'},
+				{label:'Categoria',  		value:'CATEGORY'}
+			]);
+
+			private function __start():void
+			{
+				if(!_list)
+					_list = new ArrayCollection();
+				
+				listRows_.text = 'Contém ' + _list.length + ' etiqueta(s)';
+
+				__config();
+				__labelConfig();
+				//gnncFocus.__set(list_);
+			}
+
+			public function __config(e:*=null):void 
+			{ 
+			}
+
+			public function __close():void 
+			{ 
+				new gnncPopUp().__close(this);
+			}
+
+			public function __selectClient():void 
+			{ 
+				new gnncPopUp().__creation(new selectClient());
+			}
+
+			public function __selectCourse():void 
+			{ 
+				new gnncPopUp().__creation(new selectCourse());
+			}
+
+			public function __paperO(event:MouseEvent):void 
+			{ 
+				documentOrientationVertical_.selected 	= false;
+				documentOrientationHorizontal_.selected = false;
+				
+				event.currentTarget.selected = true;
+				
+				__labelConfig();
+			}
+
+			private var backWHPaper:Array 		= new Array(); //width and height paper
+			private var backWPaper:uint 		= 0; //width
+			private var backHPaper:uint 		= 0; //height
+			
+			private var wPaper:Number 			= 0; //width paper
+			private var hPaper:Number 			= 0; //height paper
+			private var i:uint					= 0; // itens in page
+			private var row:uint				= 0; // lines box
+			private var boxW:uint				= 0; // box width
+			private var boxH:uint				= 0; // box height
+			private var boxPaddingError:uint	= 0; // padding box internal to text
+			private var boxPaddingText:uint		= 0; // height lines
+			private var xP:Array				= new Array(); //x
+			private var yP:Array				= new Array(); //y
+			private var itensForPageCount:uint	= 0; // 
+			private var itensForPage:uint		= 0; //
+
+			private function __labelConfig(tryDocument_:Boolean=false):void
+			{
+				var _listModel:ArrayCollection = new ArrayCollection();
+				
+				for(var z:uint = 0; z < 50; z++)
+				{
+					_listModel.addItem(new Object());
+				}
+
+				//#######################################################
+				//#######################################################
+
+				_gnncPdf 					= new gnncFilePdf();
+				
+				_gnncPdf._pageOrientation 	= Orientation.PORTRAIT; //OV_.selected ? Orientation.PORTRAIT : Orientation.LANDSCAPE;
+				_gnncPdf._pageSize			= documentOrientationVertical_.selected ? Size.A4 : Size.A4i;
+				_gnncPdf._pageMarginTop 	= documentMarginTop_.value;
+				_gnncPdf._pageMarginBottom 	= documentMarginBottom_.value;
+				_gnncPdf._pageMarginLeft 	= documentMarginLeft_.value;
+				_gnncPdf._pageMarginRight 	= documentMarginRight_.value;
+				//_gnncPdf._pageWidth		= backWPaper;
+				//_gnncPdf._pageHeight		= backHPaper;
+				_gnncPdf._showHeader		= false;
+				_gnncPdf.__addPage			();
+
+				//#######################################################
+				//#######################################################
+				
+				//setting
+				wPaper 						= _gnncPdf._pageWidthWithoutMargin; //width paper
+				hPaper 						= _gnncPdf._pageHeightWithoutMargin; //height paper
+				i							= 0; // itens in page
+				row							= 0; // lines box
+				boxW						= 0; // box width
+				boxH						= 0; // box height
+				boxPaddingError				= boxTextMargin_.value;
+				boxPaddingText				= boxTextGapLine_.value;
+				xP							= new Array(); //x
+				yP							= new Array(); //y
+				itensForPageCount			= 0; // 
+				itensForPage				= documentColumns_.value*documentRows_.value; //
+				
+				//#######################################################
+				//#######################################################
+
+				//paper
+				wPaper 						= wPaper-(gapHorizontal_.value*(documentColumns_.value-1));
+				hPaper 						= hPaper-(gapVertical_.value*(documentRows_.value-1));
+				
+				//box
+				boxW 						= wPaper/documentColumns_.value;
+				boxH 						= hPaper/documentRows_.value;
+
+				//#######################################################
+				//#######################################################
+
+				//get boxes sizes and positions
+				for(i=0; i<itensForPage; i++)
+				{
+					xP.push(_gnncPdf._x);
+					yP.push(_gnncPdf._y);
+					
+					_gnncPdf.__addCell(_gnncPdf._x+'-'+_gnncPdf._y,boxW,"C",boxH,0xEEEEEE,0x999999);
+					
+					if(row < documentColumns_.value && gapHorizontal_.value)
+						_gnncPdf.__addCell('',gapHorizontal_.value,"L",1);
+					
+					row++;
+					if(row == documentColumns_.value)
+					{
+						row=0;
+						_gnncPdf.__breakLine( boxH + gapVertical_.value);
+					}
+				}
+
+				//#######################################################
+				//#######################################################
+
+				//set values and clear paper sample
+				paper_.width				= _gnncPdf._pageWidth;
+				paper_.height				= _gnncPdf._pageHeight;
+				paperContent_.removeAllElements();
+				
+				//set values in label
+				//label_.width				= boxW*2;
+				//label_.height				= boxH*2;
+				//labelContent_.removeAllElements();
+				
+				//create paper sample
+				for(i=0; i<itensForPage; i++)
+				{
+					var r:Rect 		= new Rect();
+					r.fill 			= new SolidColor(0xAAAAAA);
+					r.alpha			= .5;
+					r.width 		= boxW; //boxW
+					r.height 		= boxH; //boxH
+					r.x 			= xP[row];
+					r.y				= yP[itensForPageCount];
+
+					var b:Rect 		= new Rect();
+					b.fill 			= new SolidColor(0x888888);
+					b.alpha			= .5;
+					b.width 		= boxW-(boxTextMargin_.value*2); //boxW
+					b.height 		= boxH-(boxTextMargin_.value*2); //boxH
+					b.x 			= xP[row]+boxTextMargin_.value;
+					b.y				= yP[itensForPageCount]+boxTextMargin_.value;
+
+					paperContent_.addElement(r);
+					paperContent_.addElement(b);
+					row++;
+					itensForPageCount++;
+				}
+				
+				if(tryDocument_)
+					_gnncPdf.__saveDesktop('DAYBYDAY - '+gnncGlobalStatic._programName+' - Etiquetas - Try');
+
+			}
+			
+			private function __reportLabel():void
+			{
+				if(!_list.length)
+				{
+					new gnncAlert().__alert('Nenhuma listagem encontrada.');
+					return;
+				}
+				
+				__labelConfig();
+				
+				i							= 0; // itens in page
+				row							= 0; // lines box
+				itensForPageCount			= 0; //
+
+				_gnncPdf.__removeAllPages();
+				_gnncPdf.__addPage();
+				_gnncPdf._PDF.setXY( 0, 0);
+
+				var _boxW:Number			= boxW - (boxPaddingError*2);
+				
+				function __labelCreate(typeInfo_:String,itemObject_:Object):String
+				{
+					/*
+					{label:'Nome completo', 	value:'NAME'},
+					{label:'Apelido', 			value:'NICK_NAME'},
+					{label:'E-mail', 			value:'EMAIL'},
+					{label:'Aniversário',  		value:'DATE_BIRTH'},
+					{label:'Endereço completo', value:'ADDRESS_COMPLETE'},
+					{label:'Matrícula', 		value:'ENROLLMENT'},
+					{label:'Logradouro',  		value:'ADDRESS_PLUS'},
+					{label:'Cep',  				value:'ZIPCODE'},
+					{label:'Cidade',  			value:'CITY'},
+					{label:'País',  			value:'ISO_COUNTRY'},
+					{label:'Departamento',  	value:'DEPARTAMENT'},
+					{label:'Grupo',  			value:'GROUP'},
+					{label:'Categoria',  		value:'CATEGORY'}
+					*/
+					var _str:String 	= '';
+					
+					switch(typeInfo_)
+					{
+						case 'NAME':
+							_str 	= gnncData.__firstLetterUpperCase(_object.NAME);
+							break;
+						case 'NICK_NAME':
+							_str 	= gnncData.__firstLetterUpperCase(_object.NICK_NAME);
+							break;
+						case 'EMAIL':
+							_str 	= String(_object.EMAIL).toLowerCase();
+							break;
+						case 'DATE_BIRTH':
+							_str 	= gnncDate.__date2Legend(_object.DATE_BIRTH,null,false);
+							break;
+						case 'ADDRESS_COMPLETE':
+							
+							_str	= _object.ADDRESS+", "+_object.ADDRESS_NUMBER+", "+_object.ADDRESS_COMPLEMENT + " - ";
+							_str 	= gnncData.__replace(_str,", , ",",");
+							_str 	= gnncData.__replace(_str,", 0 - "," - ");
+							_str 	= gnncData.__replace(_str,",  - "," - ");
+							
+							_str 	= _str + (_object.CITY?_object.CITY:'Cidade') + " - " + (_object.STATE ? _object.STATE : 'Estado' ) + " - " + (_object.ISO_COUNTRY ? _object.ISO_COUNTRY : 'BR' ) + " CEP "+_object.ZIPCODE;
+							
+							_str 	= gnncData.__replace(_str,", 0 - Cidade","Endereço - Cidade");
+							
+							_str	= gnncData.__firstLetterUpperCase(_str);
+							break;
+						case 'ENROLLMENT':
+							_str 	= _object.ENROLLMENT;
+							break;
+						case 'ZIPCODE':
+							_str 	= _object.ZIPCODE;
+							break;
+						case 'CITY':
+							_str 	= _object.CITY;
+							break;
+						case 'ISO_COUNTRY':
+							_str 	= _object.ISO_COUNTRY;
+							break;
+						case 'DEPARTAMENT':
+							_str 	= _object.NAME_DEPARTAMENT;
+							break;
+						case 'GROUP':
+							_str 	= _object.NAME_GROUP;
+							break;
+						case 'CATEGORY':
+							_str 	= _object.NAME_CATEGORY;
+							break;
+						default:
+							_str 	'';
+					}
+					
+					return _str;
+				}
+
+				for(i=0; i<_list.length; i++)
+				{
+					var _object:Object 	= _list.getItemAt(i);
+					var _px:Number		= xP[row] + boxPaddingError;
+					var _py:Number		= yP[itensForPageCount] + boxPaddingError;
+
+					//########## Text
+
+					if(lineLabel1_.selectedIndex > -1)
+					{
+						_gnncPdf.__setFontStyle		( lineSize1_.selectedItem.value ); //10
+						_gnncPdf.__setXY			( _px, _py );
+						_gnncPdf._PDF.addMultiCell	( _boxW, 3, __labelCreate(lineLabel1_.selectedItem.value,_object), 0, "L" ); //line=3=LINE_.value = y
+					}
+
+					if(lineLabel2_.selectedIndex > -1)
+					{
+						_gnncPdf.__setFontStyle		( lineSize2_.selectedItem.value ); //6
+						_gnncPdf.__setXY			( _px, _gnncPdf._y + boxPaddingText ); //line=5=LINE_.value
+						_gnncPdf._PDF.addMultiCell	( _boxW, 3, __labelCreate(lineLabel2_.selectedItem.value,_object), 0, "L" ); //line=3=LINE_.value - 5
+					}
+
+					if(lineLabel3_.selectedIndex > -1)
+					{
+						_gnncPdf.__setFontStyle		( lineSize3_.selectedItem.value ); //5
+						
+						_gnncPdf.__setXY			( 
+							_px, 
+							_gnncPdf._y + 
+							boxPaddingText 
+						); //line=5=LINE_.value
+						
+						_gnncPdf._PDF.addMultiCell	( _boxW, 3, __labelCreate(lineLabel3_.selectedItem.value,_object), 0, "L" ); //line=3=LINE_.value - 10
+					}
+
+					if(lineLabel4_.selectedIndex > -1)
+					{
+						_gnncPdf.__setFontStyle		( lineSize4_.selectedItem.value ); //¢
+						_gnncPdf.__setXY			( _px, _gnncPdf._y + boxPaddingText ); //line=5=LINE_.value
+						_gnncPdf._PDF.addMultiCell	( _boxW, 3, __labelCreate(lineLabel4_.selectedItem.value,_object), 0, "L" ); //line=3=LINE_.value - 10
+					}
+
+					if(lineLabel5_.selectedIndex > -1)
+					{
+						_gnncPdf.__setFontStyle		( lineSize5_.selectedItem.value ); //5
+						_gnncPdf.__setXY			( _px, _gnncPdf._y + boxPaddingText ); //line=5=LINE_.value
+						_gnncPdf._PDF.addMultiCell	( _boxW, 3, __labelCreate(lineLabel5_.selectedItem.value,_object), 0, "L" ); //line=3=LINE_.value - 10
+					}
+
+
+					//########## End Text
+
+					/*
+					_gnncPdf._PDF.addMultiCell( boxW, LINE_.value, gnncData.__firstLetterUpperCase
+						(
+							_object.NAME+"\n"+
+							"<b>END: "+_object.ADDRESS+", "+_object.ADDRESS_NUMBER+", "+_object.ADDRESS_COMPLEMENT+" \n"+
+							_object.CITY + " - " + _object.STATE + " - " + _object.ISO_COUNTRY+"\n"+
+							"<strong>CEP: "+_object.ZIPCODE
+						));
+					*/
+
+					//_gnncPdf.__addTextHtml("<strong>"+_object.NAME+"</strong><br/><br/><b>AAA</b><p>BBB</p>");
+					
+					row++;
+					itensForPageCount++;
+					
+					if(row == documentColumns_.value)
+					{
+						row = 0;
+						_gnncPdf.__setXY( _gnncPdf._x, boxH);
+						//_gnncPdf.__breakLine(boxH);
+					}
+					
+					if(itensForPageCount == itensForPage)
+					{
+						itensForPageCount = 0;
+						
+						if(i != (_list.length-1))
+							_gnncPdf.__addPage();
+						
+						_gnncPdf.__setXY(0,0);
+					}
+				}
+				
+				//_gnncPdf._PDF.addText("This is some addText() text \\n abc \n abc",20,5 );
+				//_gnncPdf._PDF.writeFlashHtmlText();
+				
+				_gnncPdf.__saveDesktop('DAYBYDAY - '+gnncGlobalStatic._programName+' - Etiquetas');
+			}
+			
+			private function __labelLoad(document_:Boolean):void
+			{
+				var _value:uint = document_ ? labelDocucment_.value : labelTag_.value;
+				
+				if(document_)
+				{
+					if(labelDocucment_.selectedIndex < 0 || !_value)
+						return;
+				}
+				else
+				{
+					if(labelTag_.selectedIndex < 0 || !_value)
+						return;
+				}
+
+				var _obj:Object = null;
+
+				if(document_)
+					_obj = labelDocucment_.LIST_.dataProvider.getItemAt(labelDocucment_.selectedIndex);
+				else
+					_obj = labelTag_.LIST_.dataProvider.getItemAt(labelTag_.selectedIndex);
+
+				var _name:String = _obj.NAME;
+				var _desc:String = _obj.DESCRIPTION;
+				
+				//new gnncAlert().__alert(_desc,_name);
+				
+				var _array:Array = gnncData.__toArray(_desc,"|");
+				var _arra2:Array = null;
+				var _var:String  = '';
+				var _val:Object  = 0;
+				var _i:uint	     = 0;
+				
+				for(_i=0; _i<_array.length;_i++)
+				{
+					if(gnncData.__trimText(_array[_i]))
+					{
+						_arra2 = gnncData.__toArray(String(_array[_i]),':');
+						
+						var o:Object = this[gnncData.__trimText(_arra2[0])+'_'];
+						var t:String = gnncData.__trimText(gnncDataObject.__getTypeToSetValue(o));
+						
+						//new gnncAlert().__alert(o+'<',t);
+						
+						if(document_)
+							o[t] = _arra2[1];
+						else
+							o[t] = gnncData.__trimText(_arra2[1]) ? new gnncDataArrayCollection().__getIndex(new ArrayCollection(o.dataProvider.toArray()),'value',_arra2[1]) : -1;
+					}
+				}
+
+				panel_.selectedIndex = document_ ? 0 : 1;
+				
+				callLater(__labelConfig);
+			}
+
+			private function __labelDelete(document_:Boolean):void
+			{
+				var OBJ:Object					= null;
+				var IDXDATP:int 				= 0;
+				
+				if(document_)
+				{
+					if(labelDocucment_.selectedIndex < 0)
+						return;
+				}
+				else
+				{
+					if(labelTag_.selectedIndex < 0)
+						return;
+				}
+				
+				var _obj:Object = null;
+				
+				if(document_)
+				{
+					_obj 		= labelDocucment_.LIST_.dataProvider.getItemAt(labelDocucment_.selectedIndex);
+					OBJ			= labelDocucment_.LIST_.selectedItem;
+					IDXDATP	 	= labelDocucment_.LIST_.selectedIndex;
+				}
+				else
+				{
+					_obj 		= labelTag_.LIST_.dataProvider.getItemAt(labelTag_.selectedIndex);
+					OBJ			= labelTag_.LIST_.selectedItem;
+					IDXDATP	 	= labelTag_.LIST_.selectedIndex;
+				}
+
+				if(IDXDATP < 0)
+				{
+					return;
+				}
+				
+				Alert.show("Você deseja excluir esse item definitivamente?",'Excluir...',3,null,__fClose);
+
+				function __fClose(event:CloseEvent):void
+				{
+					if(event.detail == Alert.YES)
+					{
+						_gnncPop.__loading('Excluindo...');
+
+						function __fResult(e:*):void
+						{
+							_gnncPop.__close();
+							labelDocucment_._gnncGlobal._SERIES.__sqlRefresh();
+						}
+						
+						function __fFault(e:*):void
+						{
+							_gnncPop.__close();
+						}
+
+						var _sql:String = new gnncSql().__DELETE(new table_series(),[OBJ.ID],true);
+						//_sql += gnncGlobalStatic._breakSql+" UPDATE dbd_"+String(_TABLE_SERIES._TABLE).toLowerCase()+" SET ID_FATHER = '"+OBJ.ID_FATHER+"', LEVEL = '"+OBJ.LEVEL+"' WHERE ID_FATHER like '"+OBJ.ID+"'";
+						_gnncGlobal._SERIES.__sql(_sql,'','',__fResult,__fFault);
+						
+					}
+				}
+				
+			}
+
+			private function __labelSave(document_:Boolean):void
+			{
+				if(document_)
+				{
+					if(!nameLabelDocument_.text)
+						return;
+				}
+				else
+				{
+					if(!nameLabelTag_.text)
+						return;
+				}
+
+				//repeat name
+				var _nameSave:String 		= '';
+				var _arrC:ArrayCollection 	= new ArrayCollection();
+				
+				if(document_)
+				{
+					_nameSave 	= nameLabelDocument_.text;
+					_arrC 		= new ArrayCollection(labelDocucment_.LIST_.dataProvider.toArray());
+				}
+				else
+				{
+					_nameSave 	= nameLabelTag_.text;
+					_arrC 		= new ArrayCollection(labelTag_.LIST_.dataProvider.toArray());
+				}
+
+				if(new gnncDataArrayCollection().__getIndex(_arrC,'NAME',_nameSave,true) > -1)
+				{
+					new gnncAlert().__alert('Nome já utilizado, tente cadastrar outro nome.');
+					return;
+				}
+
+				_gnncPop.__loading('Salvando...');
+
+				//JSON CREATE
+				//http://www.json-generator.com/
+				
+				var _table:table_series = new table_series();
+				_table.NAME 			= document_ ? nameLabelDocument_.text : nameLabelTag_.text;
+				_table.MIX 				= document_ ? 'LABEL_DOCUMENT' : 'LABEL_TAG';
+
+				if(document_)
+				{
+					_table.DESCRIPTION 		= "" +
+	
+						"documentColumns:" 					+ documentColumns_.value + "|" + 
+						"documentRows:" 					+ documentColumns_.value + "|" + 
+						
+						"gapVertical:" 						+ boxTextGapLine_.value + "|" + 
+						"gapHorizontal:" 					+ gapHorizontal_.value + "|" + 
+						
+						"boxTextMargin:" 					+ boxTextMargin_.value + "|" + 
+						"boxTextGapLine:" 					+ boxTextGapLine_.value + "|" + 
+						
+						"documentOrientationVertical:" 		+ (documentOrientationVertical_.selected ? 'true' : 'false') + "|" + 
+						"documentOrientationHorizontal:" 	+ (documentOrientationHorizontal_.selected ? 'true' : 'false') + "|" + 
+						
+						"documentMarginTop:" 				+ documentMarginTop_.value + "|" + 
+						"documentMarginBottom:" 			+ documentMarginBottom_.value + "|" + 
+						"documentMarginLeft:" 				+ documentMarginLeft_.value + "|" + 
+						"documentMarginRight:" 				+ documentMarginRight_.value + "|" + 
+						
+						"";
+				}
+				else
+				{
+					_table.DESCRIPTION 		= "" +
+						
+						"lineLabel1:" 						+ (lineLabel1_.selectedIndex > -1 ? lineLabel1_.selectedItem.value : '') + "|" + 
+						"lineSize1:" 						+ lineSize1_.selectedItem.value + "|" + 
+
+						"lineLabel2:" 						+ (lineLabel2_.selectedIndex > -1 ? lineLabel2_.selectedItem.value : '') + "|" + 
+						"lineSize2:" 						+ lineSize2_.selectedItem.value + "|" + 
+
+						"lineLabel3:" 						+ (lineLabel3_.selectedIndex > -1 ? lineLabel3_.selectedItem.value : '') + "|" + 
+						"lineSize3:" 						+ lineSize3_.selectedItem.value + "|" + 
+
+						"lineLabel4:" 						+ (lineLabel4_.selectedIndex > -1 ? lineLabel4_.selectedItem.value : '') + "|" + 
+						"lineSize4:" 						+ lineSize4_.selectedItem.value + "|" + 
+							
+						"lineLabel5:" 						+ (lineLabel5_.selectedIndex > -1 ? lineLabel5_.selectedItem.value : '') + "|" + 
+						"lineSize5:" 						+ lineSize5_.selectedItem.value + "|" + 
+
+						"";
+
+				}
+				
+				var _sql:String = new gnncSql().__INSERT(_table);
+				
+				new gnncAMFPhp().__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{
+					_gnncPop.__close();
+					
+					labelDocucment_._gnncGlobal._SERIES.__sqlRefresh();
+					
+					if(document_)
+						nameLabelDocument_.text = '';
+					else
+						nameLabelTag_.text = '';
+
+				}
+				
+				function __fFault(e:*):void
+				{
+					_gnncPop.__close();
+				}
+			}
+
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp />
+
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panel_}" height="30" />
+		<s:Rect width="100%"/>
+	</s:HGroup>
+
+	<mx:ViewStack id="panel_" left="20" right="20" top="55" bottom="52" >
+		<s:NavigatorContent label="DOCUMENTO" width="100%" height="100%" creationPolicy="all">
+			<s:HGroup width="100%" height="100%" gap="10">
+				<s:VGroup width="200" height="100%" gap="1" paddingTop="5">
+					
+					<s:Label text="Etiqueta" height="15" verticalAlign="middle" fontWeight="bold" fontSize="12"/>
+					
+					<s:Label text="Coluna e Linha" height="15" verticalAlign="middle"/>
+					<s:HGroup width="100%" gap="2" verticalAlign="middle">
+						<s:Image source="{gnncEmbedImage.LABEL_16_COLUMN}"/>
+						<s:NumericStepper id="documentColumns_" width="45" value="3" minimum="1" maximum="15" stepSize="1" borderAlpha=".4" change="{__labelConfig()}" />
+						<s:Rect width="15"/>
+						<s:Image source="{gnncEmbedImage.LABEL_16_ROW}"/>
+						<s:NumericStepper id="documentRows_" width="45" value="5" minimum="1" maximum="15" stepSize="1" borderAlpha=".4" change="{__labelConfig()}" />
+					</s:HGroup>
+					<s:Label text="Espaçamento" height="15" verticalAlign="middle"/> 
+					<s:HGroup width="100%" gap="2" verticalAlign="middle">
+						<s:Image source="{gnncEmbedImage.LABEL_PADDING_16_V}"/>
+						<s:NumericStepper id="gapHorizontal_" width="45" value="1" stepSize="1" minimum="0" maximum="11" borderAlpha=".4" change="{__labelConfig()}" />
+						<s:Rect width="15"/>
+						<s:Image source="{gnncEmbedImage.LABEL_PADDING_16_H}"/>
+						<s:NumericStepper id="gapVertical_" width="45" value="1" stepSize="1" minimum="0" maximum="11" borderAlpha=".4" change="{__labelConfig()}" />
+					</s:HGroup>
+					
+					<elements:elementHLine height="25"/>
+					<!--s:Rect height="15"/-->
+					
+					<s:Label text="Texto" height="15" verticalAlign="middle" fontWeight="bold" fontSize="12"/>
+					
+					<s:Label text="Recuo Interno" height="15" verticalAlign="middle"/>
+					<s:HGroup width="100%" gap="2" verticalAlign="middle">
+						<s:Image source="{gnncEmbedImage.LABEL_PADDING_16_BOX}"/>
+						<s:NumericStepper id="boxTextMargin_" 	width="45" value="2" stepSize="1" minimum="0" maximum="5" borderAlpha=".4" change="{__labelConfig()}" />
+					</s:HGroup>
+					<s:Label text="Distância entre Linhas" height="15" verticalAlign="middle"/>
+					<s:HGroup width="100%" gap="2" verticalAlign="middle">
+						<s:Image source="{gnncEmbedImage.LABEL_PADDING_16_TEXT}"/>
+						<s:NumericStepper id="boxTextGapLine_" 	width="45" value="1" stepSize="1" minimum="0" maximum="3" borderAlpha=".4" change="{__labelConfig()}" />
+					</s:HGroup>
+
+					<elements:elementHLine height="25"/>
+					<!--s:Rect height="15"/-->
+
+					<s:Label text="Papel" height="15" verticalAlign="middle" fontWeight="bold" fontSize="12"/>
+					
+					<s:Label text="Orientação" height="15" verticalAlign="middle"/>
+					<s:HGroup width="100%" gap="-1">
+						<s:ToggleButton id="documentOrientationVertical_" label="Vertical"   	width="25" height="25" icon="{gnncEmbedImage.LABEL_ORIENTATION_PAPER_16_V}" click="{__paperO(event)}" selected="true" />
+						<s:ToggleButton id="documentOrientationHorizontal_" label="Horizontal" 	width="25" height="25" icon="{gnncEmbedImage.LABEL_ORIENTATION_PAPER_16_H}" click="{__paperO(event)}" />
+					</s:HGroup>
+					<s:Label text="Margens Laterais" height="15" verticalAlign="middle"/>
+					<s:HGroup width="100%" gap="2" verticalAlign="middle">
+						<s:Image source="{gnncEmbedImage.LABEL_MARGIN_16_TOP}"/>
+						<s:NumericStepper id="documentMarginTop_" 		width="45" value="3" stepSize="1" minimum="0" maximum="30" borderAlpha=".4" change="{__labelConfig()}" />
+						<s:Rect width="15"/>
+						<s:Image source="{gnncEmbedImage.LABEL_MARGIN_16_BOTTOM}"/>
+						<s:NumericStepper id="documentMarginBottom_" 	width="45" value="3" stepSize="1" minimum="0" maximum="30" borderAlpha=".4" change="{__labelConfig()}" />
+					</s:HGroup>
+					<s:HGroup width="100%" gap="2" verticalAlign="middle">
+						<s:Image source="{gnncEmbedImage.LABEL_MARGIN_16_LEFT}"/>
+						<s:NumericStepper id="documentMarginLeft_" 		width="45" value="3" stepSize="1" minimum="0" maximum="30" borderAlpha=".4" change="{__labelConfig()}" />
+						<s:Rect width="15"/>
+						<s:Image source="{gnncEmbedImage.LABEL_MARGIN_16_RIGHT}"/>
+						<s:NumericStepper id="documentMarginRight_" 	width="45" value="3" stepSize="1" minimum="0" maximum="30" borderAlpha=".4" change="{__labelConfig()}" />
+					</s:HGroup>
+					
+				</s:VGroup>				
+				<s:Group width="100%" height="100%" >
+					<s:Rect width="100%" height="100%" fill="{new SolidColor(0x777777)}"/>
+					<s:Group width="100%" height="100%" >
+						
+						<!-- //A4 wth margin = 190 or 260  -->
+						<!-- //A4 wth margin = 380 or 520 % 2  -->
+						<s:Group id="paper_" width="190" height="260" horizontalCenter="0" verticalCenter="0" >
+							<s:RectangularDropShadow width="100%" height="100%" alpha=".5"/>
+							<s:Rect width="100%" height="100%" fill="{new SolidColor(0xFFFFFF)}" />
+							<s:Group id="paperContent_"/>
+						</s:Group>
+						
+					</s:Group>
+				</s:Group>
+				
+			</s:HGroup>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="ETIQUETA" width="100%" height="100%" creationPolicy="all">
+			<s:HGroup width="100%" height="100%" gap="10">
+				<s:VGroup width="200" height="100%" gap="1" paddingTop="5">
+					
+					<s:Label text="Impressão" height="15" verticalAlign="middle" fontWeight="bold" fontSize="12"/> 
+					
+					<s:Label text="Linha Principal" height="25" verticalAlign="middle" fontSize="15" fontWeight="bold"/>
+					<s:HGroup width="100%" gap="1">
+						<s:DropDownList id="lineLabel1_" width="100%" height="25" prompt="Selecione..." dataProvider="{_label}" selectedIndex="0"/>
+						<s:DropDownList id="lineSize1_" width="40" height="25" prompt="-" dataProvider="{_fontSize}" selectedIndex="2" />
+					</s:HGroup>
+					
+					<s:Label text="Segunda Linha" height="25" verticalAlign="middle" fontSize="14" fontWeight="bold"/>
+					<s:HGroup width="100%" gap="1">
+						<s:DropDownList id="lineLabel2_" width="100%" height="25" prompt="Selecione..." dataProvider="{_label}"/>
+						<s:DropDownList id="lineSize2_" width="40" height="25" prompt="-" dataProvider="{_fontSize}" selectedIndex="4" />
+						<s:Button label="Limpar seleção" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="25" height="25" click="{ lineLabel2_.selectedIndex = -1 }" skinClass="GNNC.skin.button.skin_buttonLink"/>
+					</s:HGroup>
+					
+					<s:Label text="Terceira Linha" height="25" verticalAlign="middle" fontSize="14"/>
+					<s:HGroup width="100%" gap="1">
+						<s:DropDownList id="lineLabel3_" width="100%" height="25" prompt="Selecione..." dataProvider="{_label}"/>
+						<s:DropDownList id="lineSize3_" width="40" height="25" prompt="-" dataProvider="{_fontSize}" selectedIndex="5" />
+						<s:Button label="Limpar seleção" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="25" height="25" click="{ lineLabel3_.selectedIndex = -1 }" skinClass="GNNC.skin.button.skin_buttonLink"/>
+					</s:HGroup>
+					
+					<s:Label text="Observação 1" height="25" verticalAlign="middle"/>
+					<s:HGroup width="100%" gap="1">
+						<s:DropDownList id="lineLabel4_" width="100%" height="25" prompt="Selecione..." dataProvider="{_label}"/>
+						<s:DropDownList id="lineSize4_" width="40" height="25" prompt="-" dataProvider="{_fontSize}" selectedIndex="5" />
+						<s:Button label="Limpar seleção" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="25" height="25" click="{ lineLabel4_.selectedIndex = -1 }" skinClass="GNNC.skin.button.skin_buttonLink"/>
+					</s:HGroup>
+					
+					<s:Label text="Observação 2" height="25" verticalAlign="middle"/>
+					<s:HGroup width="100%" gap="1">
+						<s:DropDownList id="lineLabel5_" width="100%" height="25" prompt="Selecione..." dataProvider="{_label}"/>
+						<s:DropDownList id="lineSize5_" width="40" height="25" prompt="-" dataProvider="{_fontSize}" selectedIndex="5" />
+						<s:Button label="Limpar seleção" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="25" height="25" click="{ lineLabel5_.selectedIndex = -1 }" skinClass="GNNC.skin.button.skin_buttonLink"/>
+					</s:HGroup>
+					
+				</s:VGroup>
+				
+				<s:Group width="100%" height="100%" >
+					<s:Rect width="100%" height="100%" fill="{new SolidColor(0x777777)}"/>
+					<s:Group width="100%" height="100%" >
+						
+						<!-- //A4 wth margin = 190 or 260  -->
+						<!-- //A4 wth margin = 380 or 520 % 2  -->
+						<s:Group id="label_" width="400" height="200" horizontalCenter="0" verticalCenter="0" >
+							<s:RectangularDropShadow width="100%" height="100%" alpha=".5"/>
+							<s:Rect width="100%" height="100%" fill="{new SolidColor(0xFFFFFF)}" />
+							<s:VGroup width="100%" height="100%" verticalAlign="middle" paddingRight="25" paddingLeft="25" >
+								<s:Label text="Linha Principal" 	height="25" verticalAlign="middle" fontSize="15" fontWeight="bold"/>
+								<s:Label text="Segunda Linha" 		height="25" verticalAlign="middle" fontSize="13" fontWeight="bold"/>
+								<s:Label text="Terceira Linha" 		height="25" verticalAlign="middle" fontSize="11" fontWeight="bold"/>
+								<s:Label text="Observação 1" 		height="25" verticalAlign="middle" fontSize="9" fontWeight="bold"/>
+								<s:Label text="Observação 2" 		height="25" verticalAlign="middle" fontSize="7" fontWeight="bold"/>
+							</s:VGroup>
+						</s:Group>
+						
+					</s:Group>
+				</s:Group>
+				
+			</s:HGroup>
+		</s:NavigatorContent>	
+		<s:NavigatorContent label="MODELO" width="100%" height="100%" creationPolicy="all">
+
+			<s:HGroup gap="5" horizontalCenter="0" verticalCenter="0">
+
+				<s:VGroup gap="5" width="100%" height="100%">
+					
+					<s:Image source="{gnncEmbedBlackWhite.bw_report_32}"/>
+					
+					<s:Label text="Documento" height="20" verticalAlign="middle" fontWeight="bold" fontSize="12"/> 
+
+					<elements:elementHLine height="20"/>
+					
+					<s:HGroup width="100%" gap="1">
+						<s:TextInput id="nameLabelDocument_" width="160" height="25" prompt="Nome" fontSize="12" />
+						<!--s:Button icon="{gnncEmbedImage.ADD_16}" label="Cadastrar" height="25" fontWeight="bold" width="100" /-->
+						<s:Button label="Cadastrar" height="25" fontWeight="bold" width="80" click="{__labelSave(true)}" />
+					</s:HGroup>
+
+					<elements:elementHLine height="20"/>
+
+					<s:HGroup width="100%" gap="1">
+						<select:conSelect_SERIES id="labelDocucment_" width="160" _ADD="false" _MIX="LABEL_DOCUMENT" />
+						<!--s:Button icon="{gnncEmbedImage.REFRESH_16_GREEN}" label="Carregar" height="25" fontWeight="bold" width="100" /-->
+						<s:Button label="Carregar" height="25" fontWeight="bold" width="80" click="{__labelLoad(true)}" />
+					</s:HGroup>
+					
+					<elements:elementHLine height="20"/>
+					
+					<s:HGroup width="100%" gap="1" verticalAlign="middle">
+						<s:Label text="Selecione o modelo acima." width="100%" />
+						<!--s:Button icon="{gnncEmbedImage.REMOVE_16}" label="Excluir" height="25" fontWeight="bold" width="100" /-->
+						<s:Button label="Excluir" height="25" fontWeight="bold" width="80" click="{__labelDelete(true)}" />
+					</s:HGroup>					
+					
+				</s:VGroup>
+				
+				<elements:elementVLine width="40"/>
+
+				<s:VGroup gap="5" width="100%" height="100%">
+					
+					<s:Image source="{gnncEmbedBlackWhite.bw_tag_32}"/>
+
+					<s:Label text="Etiqueta" height="20" verticalAlign="middle" fontWeight="bold" fontSize="12"/> 
+
+					<elements:elementHLine height="20"/>
+					
+					<s:HGroup width="100%" gap="1">
+						<s:TextInput id="nameLabelTag_" width="160" height="25" prompt="Nome" fontSize="12" />
+						<!--s:Button icon="{gnncEmbedImage.ADD_16}" label="Cadastrar" height="25" fontWeight="bold" width="100" /-->
+						<s:Button label="Cadastrar" height="25" fontWeight="bold" width="80" click="{__labelSave(false)}" />
+					</s:HGroup>
+
+					<elements:elementHLine height="20"/>
+
+					<s:HGroup width="100%" gap="1">
+						<select:conSelect_SERIES id="labelTag_" width="160" _ADD="false" _MIX="LABEL_TAG" />
+						<!--s:Button icon="{gnncEmbedImage.REFRESH_16_GREEN}" label="Carregar" height="25" fontWeight="bold" width="100" /-->
+						<s:Button label="Carregar" height="25" fontWeight="bold" width="80" click="{__labelLoad(false)}" />
+					</s:HGroup>
+					
+					<elements:elementHLine height="20"/>
+					
+					<s:HGroup width="100%" gap="1" verticalAlign="middle">
+						<s:Label text="Selecione o modelo acima." width="100%" />
+						<!--s:Button icon="{gnncEmbedImage.REMOVE_16}" label="Excluir" height="25" fontWeight="bold" width="100" /-->
+						<s:Button label="Excluir" height="25" fontWeight="bold" width="80" click="{__labelDelete(false)}" />
+					</s:HGroup>
+					
+				</s:VGroup>
+
+			</s:HGroup>
+
+			
+		</s:NavigatorContent>	
+	</mx:ViewStack>
+
+	<s:HGroup  left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<elements:elementLabelBackgroudColor id="listRows_" _fontSize="12" _fontWeight="bold" height="25" _colorBackground="0x444444" />
+		<s:Rect width="100%"/> 
+		<s:Button icon="{gnncEmbedBlackWhite.bw_document_16_pdf}" height="25" label="Gerar Modelo" fontWeight="normal" click="{__labelConfig(true)}"/>
+		<s:Button icon="{gnncEmbedBlackWhite.bw_document_16_pdf}" height="25" label="Gerar Etiquetas" fontWeight="bold" click="{__reportLabel()}"/>
+		<s:Button left="0" right="0" bottom="0" label="Fechar" click="{__close()}" icon="{gnncEmbedBlackWhite.app_close_16_clean}" skinClass="GNNC.skin.button.skin_buttonLink"/>
+	</s:HGroup>
+	
+	<s:Button right="4" top="4" width="10" height="10" click="{__close()}" tabFocusEnabled="false"  toolTip="Fechar"/>
+	
+</s:Module>

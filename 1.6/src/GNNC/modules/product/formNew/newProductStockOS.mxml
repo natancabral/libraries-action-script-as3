@@ -1,0 +1,440 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	width="650" height="470"
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:select="GNNC.elements.component.select.*" 
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*" 
+	xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*" 
+	xmlns:gnncDateField4="GNNC.UI.gnncDateField4.*" xmlns:gnncDateButton="GNNC.UI.gnncDateButton.*" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.others.gnncViewStackCommand;
+			import GNNC.sqlTables.table_product_stock_os;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.CalendarLayoutChangeEvent;
+			import mx.rpc.Fault;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			//[Bindable] private var _gnncGlobal:gnncGlobalStatic 	= new gnncGlobalStatic(true);
+			public const _MIX:String = "PRODUCT_STOCK_OS";
+			[Bindable] public var _tableProduct:table_product_stock_os		= new table_product_stock_os();
+			
+			[Bindable] private var _connProduct:gnncAMFPhp = new gnncAMFPhp();
+			
+			public var _change:Boolean = false;
+			public var _allowEnterBreak:Boolean = false;
+			
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			
+			private var _idsDelete:Array = new Array();
+			
+			private function __start():void
+			{
+				
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(_allowEnterBreak)
+							return;
+						
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+					}
+				);
+				
+				SAVE_.addEventListener(KeyboardEvent.KEY_DOWN,__save);
+				DATE_START_.DATE_.addEventListener(CalendarLayoutChangeEvent.CHANGE,__setDateWeek);
+				DATE_END_.DATE_.addEventListener(CalendarLayoutChangeEvent.CHANGE,__setDateWeek);
+				addDays_.addEventListener(IndexChangeEvent.CARET_CHANGE,__addDaysSelected);
+				__addDaysArrays();
+				__check();
+				__setDateWeek();
+				__serviceOrProduct(true);
+				
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void 
+			{ 
+				addDays_.selectedIndex = 6;
+				ID_CLIENT_.list_.textInput.setFocus();
+			}
+			
+			public function __addDaysArrays():void 
+			{ 
+				var ar:ArrayCollection = new ArrayCollection();
+				var ob:Object = new Object();
+				for(var i:uint=1;i<=30;i++)
+				{
+					ob       = new Object();
+					ob.label = i==1?'+1 dia':'+'+i+' dias';
+					ob.data  = i;
+					ar.addItem(ob);
+				}
+				addDays_.dataProvider = ar;
+				__addDays(7);
+			}			
+
+			public function __addDaysSelected(e:*=null):void 
+			{
+				if(addDays_.selectedIndex>-1)
+					__addDays(addDays_.selectedItem.data);
+			}
+			
+			public function __addDays(days_:uint=0):void 
+			{
+				DATE_END_.selectedDate = DateUtils.dateAdd(DateUtils.DAY_OF_MONTH,days_,DATE_START_.selectedDate);
+				__setDateWeek();
+			}			
+
+			public function __serviceOrProduct(check_:Boolean=false):void 
+			{ 
+				if(_tableProduct!=null && check_)
+				{
+					if(_tableProduct.NUMBER_TYPE)
+					{
+						SERVICE_TYPE_.selected 	= _tableProduct.NUMBER_TYPE == 'OS' ? true : false;
+						ORDER_TYPE_.selected 	= _tableProduct.NUMBER_TYPE == 'OS' ? false : true;
+					}
+				}
+				
+				titlePopUp_.text 			= SERVICE_TYPE_.selected ? 'ORDEM DE SERVIÇO' : 'ORDEM DE VENDA';
+			}
+			
+			private function __check():void
+			{
+				if(_tableProduct != null)
+				{
+					if(_tableProduct.ID)
+					{
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						var _SQL:String 		= new gnncSql().__SELECT(new table_product_stock_os(_tableProduct.ID));
+						_connProduct.__sql		(_SQL,'','',__fResultEdit,__fFaultEdit);
+					}
+					else
+					{
+						//ACTIVE_.value = 1;
+					}
+				} 
+				else 
+				{
+					_tableProduct = new table_product_stock_os();
+					//ACTIVE_.value = 1;
+				}
+			}
+			
+			protected function __fFaultEdit(event:*):void
+			{
+				_gnncPopUp.__close();
+				gnncPopUp(this).__close(this);
+			}
+			
+			protected function __fResultEdit(event:*):void
+			{
+				if(!_connProduct.DATA_ROWS)
+					return;
+				
+				var _object:Object 					= _connProduct.DATA_ARR.getItemAt(0);
+				
+				_tableProduct.ID					= _object.ID; 
+				_tableProduct.ID_KEY			    = _object.ID_KEY; 
+				
+				ID_CLIENT_.value			        = _object.ID_CLIENT; 
+				ID_CLIENT_SELLER_.value			    = _object.ID_CLIENT_SELLER; 
+
+				_tableProduct.NUMBER_TYPE           = _object.NUMBER_TYPE;
+				
+				NUMBER_.text		                = _object.NUMBER;
+				SERVICE_TYPE_.selected              = _object.NUMBER_TYPE == 'OS' ? true : false ;
+				ORDER_TYPE_.selected              = _object.NUMBER_TYPE == 'OS' ? false : true ;
+
+				DATE_START_.selectedDate            = gnncDate.__string2Date(_object.DATE_START); 
+				DATE_END_.selectedDate              = gnncDate.__string2Date(_object.DATE_END); 
+				_tableProduct.DATE_FINAL            = _object.DATE_FINAL; 
+
+				_tableProduct.VALUE_IN				= _object.VALUE_IN; 
+				_tableProduct.VALUE_OUT			    = _object.VALUE_OUT; 
+				_tableProduct.DISCOUNT_VALUE        = _object.DISCOUNT_VALUE;
+
+				payTypeFinal_.selectedIndex         = _object.PAY_TYPE==''?0:new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._FINANCIAL_PAY_TYPE,'data',_object.PAY_TYPE);
+				_tableProduct.PAY_TYPE 				= _object.PAY_TYPE;
+
+				DESCRIPTION_.text                   = _object.DESCRIPTION;
+
+				ACTIVE_.selectedIndex			    = new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._activeProdcutStock,'data',_object.ACTIVE); 
+			
+				__serviceOrProduct(true);
+				__setDateWeek();
+				
+				_gnncPopUp.__close();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __NEXT():void
+			{
+				gnncViewStackCommand.__next(panelCenter_);
+			}
+			
+			private function __PREV():void
+			{
+				gnncViewStackCommand.__prev(panelCenter_);
+			}
+			
+			private function __save(e:*=null):void
+			{
+				if(ID_CLIENT_.value == 0){
+					new gnncNotification().__show('Cliente','Selecione um cliente.');
+					ID_CLIENT_.list_.setFocus();
+					return;
+				}
+				
+				if(DATE_START_.selectedDate == null || DATE_END_.selectedDate == null){
+					new gnncAlert().__alert('Verifique as datas','Preencha os campos');
+					return;
+				}
+				
+				if(DATE_START_.selectedDate.time > DATE_END_.selectedDate.time){
+					new gnncAlert().__alert('A data de entrega está menor que a data de abertura','Preencha os campos');
+					return;
+				}
+
+				_gnncPopUp.__loading();
+				
+				//gnncData.__scapeText([],[ID_CLIENT_.list_.textInput]);
+				
+				var _object:table_product_stock_os 	= new table_product_stock_os();
+
+				var mm:String = DESCRIPTION_.text;
+				
+				mm = gnncData.__replace(mm,'´','\"');
+				mm = gnncData.__replace(mm,'`','\"');
+				mm = gnncData.__replace(mm,'"','\"');
+				mm = gnncData.__replace(mm,"'",'\"');
+				mm = gnncData.__replace(mm,'\\','\\\\');
+				
+				_object.ID					= _tableProduct.ID; 
+				_tableProduct.ID_KEY	    = _tableProduct.ID_KEY ? _tableProduct.ID_KEY : gnncDataRand.__key(); 
+				
+				_object.ID_KEY			    = _tableProduct.ID_KEY; 
+				_object.ID_CLIENT			= ID_CLIENT_.value; 
+				_object.ID_CLIENT_SELLER    = ID_CLIENT_SELLER_.value; 
+
+				_object.NUMBER		        = Number(NUMBER_.text);
+				_object.NUMBER_TYPE			= SERVICE_.selectedValue.toString();
+				
+				_object.VALUE_IN			= _tableProduct.VALUE_IN;
+				_object.VALUE_OUT		    = _tableProduct.VALUE_OUT;
+				_object.DISCOUNT_VALUE		= _tableProduct.DISCOUNT_VALUE;
+				
+				_object.PAY_TYPE          = payTypeFinal_.selectedIndex>-1?payTypeFinal_.selectedItem.data:'';
+				
+				_object.DESCRIPTION         = mm;//gnncData.__scapeString(gnncData.__scapeTextWord(DESCRIPTION_.text));
+				
+				_object.DATE_START          = gnncDate.__date2String(DATE_START_.selectedDate); 
+				_object.DATE_END            = gnncDate.__date2String(DATE_END_.selectedDate); 
+				_object.DATE_FINAL          = _tableProduct.DATE_FINAL; 
+
+				_object.ACTIVE				= ACTIVE_.selectedIndex<0?0:ACTIVE_.selectedItem.data;
+				
+				var _sql:String 	        = new gnncSql().__INSERT(_object,false,true,true);
+				
+				if(!_tableProduct.ID)
+					_sql = _sql + gnncGlobalStatic._breakSql + " update dbd_product_stock_os SET NUMBER=(ID+10000) where ID_KEY = '"+_tableProduct.ID_KEY+"' ";
+
+				_connProduct.__sql	(_sql,'','',__fResult,__fFault);
+			}
+			
+			protected function __fResult(event:ResultEvent):void
+			{
+				_change = true;
+				_gnncPopUp.__close();
+				__close();
+				
+				var _table:table_product_stock_os = new table_product_stock_os();
+				_table.ID      = _tableProduct.ID;
+				_table.ID_KEY  = _tableProduct.ID_KEY;
+				
+				var _page:newProductStockOS_out = new newProductStockOS_out();
+				_page._tableProduct = _table;
+				new gnncPopUp().__creation(_page);
+			}
+			
+			protected function __fFault(event:Fault):void
+			{
+				_gnncPopUp.__close();
+			}
+			
+			private function __setDateWeek(e:*=null):void
+			{
+				if(DATE_END_.selectedDate != null && DATE_START_.selectedDate != null)
+				{
+					startWeekDay_.text = gnncGlobalArrays._WEEK.getItemAt(DateUtils.dayOfWeek(DATE_START_.selectedDate)).label+'';
+					endWeekDay_.text   = gnncGlobalArrays._WEEK.getItemAt(DateUtils.dayOfWeek(DATE_END_.selectedDate)).label+'';
+
+					if(DATE_START_.selectedDate.time > DATE_END_.selectedDate.time)
+					{
+						timeDiff_.text = 'A data de entrega está menor que a data de abertura.';
+						return;
+					}
+					
+					var days:uint = DateUtils.dateDiff(DateUtils.DAY_OF_MONTH,DATE_START_.selectedDate,DATE_END_.selectedDate)
+					if(days)
+						timeDiff_.text = days + ' dias';
+					else
+						timeDiff_.text = 'Entrega no mesmo dia';
+
+				}
+			}
+
+			/*private function __setDateRight():void
+			{
+				if(DATE_START_.selectedDate != null)
+				{
+					DATE_START_.text 			= gnncDate.__setRightDateString(DATE_START_.text,'D-M-Y','D-M-Y','/');
+					DATE_START_.selectedDate 	= gnncDate.__string2Date(gnncDate.__setRightDateString(DATE_START_.text,'D-M-Y','Y-M-D','-'),true);
+				}
+				if(DATE_END_.selectedDate != null)
+				{
+					DATE_END_.text 				= gnncDate.__setRightDateString(DATE_END_.text,'D-M-Y','D-M-Y','/');
+					DATE_END_.selectedDate 		= gnncDate.__string2Date(gnncDate.__setRightDateString(DATE_END_.text,'D-M-Y','Y-M-D','-'),true);
+				}
+				
+			}*/
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:RadioButtonGroup id="SERVICE_" />
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp/>
+	<elements:elementLabelFont id="titlePopUp_" text="ORDEM DE VENDA E SERVIÇO" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+		<s:Rect width="100%"/>
+		<s:HGroup id="CHANGE_TYPE_" gap="10" paddingRight="10" verticalAlign="middle" >
+			<s:Label text="OS" fontWeight="bold" fontSize="12"/>
+			<s:RadioButton id="SERVICE_TYPE_" label="Ordem de Serviço" group="{SERVICE_}" click="{__serviceOrProduct()}" change="{__serviceOrProduct()}" value="OS" selected="true"/>
+			<s:Rect width="5"/>
+			<s:Label text="OV" fontWeight="bold" fontSize="12"/>
+			<s:RadioButton id="ORDER_TYPE_" label="Ordem de Venda" group="{SERVICE_}" click="{__serviceOrProduct()}" change="{__serviceOrProduct()}" value="OV" />
+		</s:HGroup>
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%">
+			<s:layout>
+				<s:VerticalLayout gap="0" />
+			</s:layout>
+			<s:Form width="100%" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-15" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+				<s:FormItem label="Ordem">
+					<s:DropDownList id="ACTIVE_" width="150" height="30" dataProvider="{gnncGlobalArrays._activeProdcutStock}" selectedIndex="0" fontWeight="bold" />
+					<s:TextInput id="NUMBER_" fontSize="12" text="" width="70" height="30" textAlign="right" enabled="false" visible="{NUMBER_.text.length>0?true:false}" paddingRight="7" paddingLeft="7"/>
+					<s:Spacer width="100%"/>
+				</s:FormItem>
+				<s:FormItem label="Data de Abertura">
+					<gnncDateButton:gnncDateButton width="150" height="30" id="DATE_START_" selectedDate="{new Date()}"  />
+					<!-- gnncDateField4:gnncDateField4 id="" fontSize="12" autoShowDropDown="false" width="95" height="25" showToday="true" yearNavigationEnabled="true"
+												   keyDown="{DATE_START_.close()}" keyUp="{}" editable="true" formatString="DD/MM/YYYY" firstDayOfWeek="0" restrict="[0-9]\\\/\.\," focusAlpha="0" showErrorSkin="false" showErrorTip="false"
+												   focusOut="{__setDateRight()}" selectedDate="{new Date()}" change="{/*__protectDate()*/}"
+												   / -->
+					<s:Label id="startWeekDay_" text="" verticalAlign="middle" />
+					<s:Spacer width="100%"/>
+				</s:FormItem>
+				<s:FormItem label="Data de Entrega">
+					<gnncDateButton:gnncDateButton width="150" height="30" id="DATE_END_" selectedDate="{new Date()}"  />
+					<!-- gnncDateField4:gnncDateField4 id="DATE_END_" fontSize="12" autoShowDropDown="false" width="95" height="25" showToday="true" yearNavigationEnabled="true"
+												   keyDown="{DATE_END_.close()}" keyUp="{}" editable="true" formatString="DD/MM/YYYY" firstDayOfWeek="0" restrict="[0-9]\\\/\.\," focusAlpha="0" showErrorSkin="false" showErrorTip="false"
+												   focusOut="{__setDateRight()}" selectedDate="{new Date()}" change="{/*__protectDate()*/}"
+												   / -->
+					<s:Label id="endWeekDay_" text="" verticalAlign="middle" />
+					<s:Spacer width="100%"/>
+					<s:DropDownList id="addDays_" height="30" width="100" prompt="Selecione..."/>
+				</s:FormItem>
+				<s:FormItem label="Período">
+					<s:Label id="timeDiff_" fontWeight="bold" text="Entrega no mesmo dia" width="100%" height="25" verticalAlign="middle" />
+				</s:FormItem>
+				<s:FormItem label="Forma de Pagmnt.">
+					<s:DropDownList id="payTypeFinal_" width="150" height="30" dataProvider="{gnncGlobalArrays._FINANCIAL_PAY_TYPE}" selectedIndex="0" fontWeight="bold"
+									itemRenderer="GNNC.modules.financial.itemRender.itemRender_financialPayType_forList"
+									/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Cliente * ">
+					<select:conSelect_CLIENT id="ID_CLIENT_" value="{_tableProduct.ID_CLIENT}" height="30" />
+				</s:FormItem>
+				<s:FormItem label="Vendedor">
+					<select:conSelect_CLIENT id="ID_CLIENT_SELLER_" value="{_tableProduct.ID_CLIENT_SELLER}" height="30" />
+				</s:FormItem>
+				<!-- s:FormItem label="Produto/Serviço" width="100%">
+					<s:layout>
+						<s:HorizontalLayout gap="5"/>
+					</s:layout>
+					<select:conSelect_PRODUCT width="100%" height="30" _ADDQUICK="false" _EDIT="false" _search="true" />
+					<s:DropDownList id="UNIT_TYPE_" width="100" height="30" dataProvider="{gnncGlobalArrays._UNIT_TYPE}" selectedIndex="1" />
+					<s:TextInput id="UNIT_" width="70" height="30" fontSize="12" paddingLeft="5" paddingRight="5" textAlign="right" prompt="Qnt." text="1" 
+								 keyUp="{gnncDataNumber.__safeKeyEvent(event,true)}" 
+								 keyDown="{gnncDataNumber.__safeKeyEvent(event,true)}"
+								 />
+					<s:TextInput id="VALUE_IN_" width="70" height="30" fontSize="12" fontWeight="bold" paddingLeft="5" paddingRight="5" textAlign="right" prompt="0,00"
+								 keyUp="{gnncDataNumber.__safeKeyEvent(event,true)}" 
+								 keyDown="{gnncDataNumber.__safeKeyEvent(event,true)}"
+								 />
+					<s:Button label="Adicionar" icon="{gnncEmbedBlackWhite.bw_new_16}" height="30" width="30"/>
+				</s:FormItem -->
+			</s:Form>
+			<s:TextArea id="DESCRIPTION_" text="" prompt="Observações" width="100%" height="100%" 
+						paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10" />
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%" />
+		<s:Button id="SAVE_" icon="{_tableProduct.ID?gnncEmbedBlackWhite.bw_edit_16:gnncEmbedBlackWhite.bw_new_16}" label="{_tableProduct.ID?'Salvar Edição':'Cadastrar'}" click="{__save()}" fontWeight="bold" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" />	
+	</s:HGroup>
+	
+	<s:Button top="10" right="10" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

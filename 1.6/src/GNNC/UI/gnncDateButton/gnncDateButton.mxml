@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="25"
+		 creationComplete="{start()}"
+		 >
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.date.gnncDate;
+			import GNNC.gnncEmbedBlackWhite;
+			
+			import mx.events.CalendarLayoutChangeEvent;
+			import mx.events.FlexEvent;
+
+			public function set icon(e:Object):void{ dateFinalButtun_.setStyle('icon',e); }
+
+			public function set eventChangeAllow(e:Boolean):void{ allowCommit = e }
+			public function get eventChangeAllow():Boolean{ return allowCommit }
+
+			public function set eventChange(e:Function):void{ change = e }
+			public function get eventChange():Function{ return change }
+
+			public function set selectedDate(e:Date):void{ d = DATE_.selectedDate = e; refreshDate(); }
+			public function get selectedDate():Date{ return d }
+
+			public function set selectedDateString(e:String):void{ d = DATE_.selectedDate = gnncDate.__string2Date( e );  refreshDate(); }
+			public function get selectedDateString():String{ return gnncDate.__date2String( d ) }
+
+			public function set selectedDateNoCommit(e:Date):void{ d = DATE_.selectedDate = e; refreshDate(); }
+			public function get selectedDateNoCommit():Date{ return d }
+			
+			public function set selectedDateStringNoCommit(e:String):void{ d = DATE_.selectedDate = gnncDate.__string2Date( e );  refreshDate(); }
+			public function get selectedDateStringNoCommit():String{ return gnncDate.__date2String( d ) }
+			
+			private var d:Date = null;
+			public var change:Function = null;
+			public var allowCommit:Boolean = true;
+			
+			private function start():void
+			{
+				if(height!=25){
+					dateFinalButtun_.height = height;
+					showCalendar_.top = height;
+				}
+			}
+
+			private function refreshDate():void
+			{
+				d = DATE_.selectedDate;
+				dateFinalButtun_.label = gnncDate.__date2Legend('',d);
+				
+				if(allowCommit==false)
+					return;
+				
+				dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+				dispatchEvent(new MouseEvent(FlexEvent.VALUE_COMMIT));
+				if(change!=null){
+					change.call();
+				}
+			}
+
+			public function clear():void
+			{
+				d = null;
+				DATE_.selectedDate = d;
+			}
+			
+			public function close():void
+			{
+				showCalendar_.displayPopUp = false;
+				refreshDate();
+			}
+
+			public function changeView():void
+			{
+				showCalendar_.displayPopUp = !showCalendar_.displayPopUp;
+				refreshDate();
+			}
+			
+		]]>
+	</fx:Script>
+	
+		<s:Button id="dateFinalButtun_" label="Nenhuma data" width="100%" height="25" icon="{gnncEmbedBlackWhite.bw_calendar_16}" click="{changeView()}" fontWeight="normal"
+				  />
+		<s:PopUpAnchor id="showCalendar_" popUpPosition="below" displayPopUp="false" top="25">
+			<mx:DateChooser id="DATE_" width="180" height="180" fontSize="11" showToday="true" borderColor="0xCCCCCC"  
+							change="{refreshDate(); close()}" 
+							click="{refreshDate();}"
+							rollOut="{close()}" 
+							borderVisible="true" firstDayOfWeek="0" yearNavigationEnabled="true" 
+							/>
+		</s:PopUpAnchor>
+	
+</s:Group>

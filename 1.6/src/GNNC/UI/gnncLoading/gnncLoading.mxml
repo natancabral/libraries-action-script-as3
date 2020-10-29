@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx		= "http://ns.adobe.com/mxml/2009" 
+		 xmlns:s		= "library://ns.adobe.com/flex/spark" 
+		 xmlns:mx		= "library://ns.adobe.com/flex/mx"
+		 
+		 creationComplete	= "{__start()}"
+		 rightMouseDown		= "{__rightMouseDown(event)}" 
+		 >
+
+	<fx:Declarations>
+		<!--removedFromStage	= "{fadeEffect_.play()}"
+		addedToStage			= "{fadeEffect_.play()}"
+		addedEffect				="{fadeEffect_}"
+		removedEffect			="{fadeEffect_}"
+		<mx:Fade id="fadeEffect_" duration="1000" target="{this}"/ -->
+	</fx:Declarations>
+
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.time.gnncTime;
+			
+			import mx.events.PropertyChangeEvent;
+			import mx.graphics.SolidColor;
+			
+			[Bindable] public var _textLoading:String 			= '';
+			[Bindable] public var _percent:uint					= 0; // bar progress set
+
+			public var  _specialLoading:Boolean					= false;
+			public var  _hideCloseButtonLoading:Boolean			= false;
+
+			private var _gnncBindable:gnncDataBindable 			= new gnncDataBindable();
+			private var _gnncTime:gnncTime 						= new gnncTime();
+			private var _gnncFront:gnncTime 					= new gnncTime();
+			
+			private function __start():void
+			{
+				buttonClose_.visible = _hideCloseButtonLoading;
+				
+				_gnncFront.__start(1000,__toFront,5);
+
+				//popBackground_.visible = !_popManager;
+				if(!isPopUp || currentState == 'special')
+				{
+					removeElement(buttonClose_);
+					//removeElement(dropShadow_);
+				}
+				else
+				{
+					removeElement(popBackground_);
+					_gnncTime.__start(20000,__closeButton,1);
+				}
+				
+				if(!_percent)
+				{
+					//_gnncBindable.__monitoring(_gnncGlobal,'_loading',function(event:PropertyChangeEvent):void{ if(!_gnncGlobal._loading) __closePopUp() });
+					var t:gnncTime = new gnncTime();
+					t.__start(3000,function():void{
+						__closePopUp();
+					},1);
+				}
+				
+				if(_specialLoading)
+				{
+					currentState = 'special';
+					new gnncPopUp().__center(this);
+				}
+			}
+			
+			private function __closeButton():void 
+			{
+				if(currentState != 'special')
+					buttonClose_.visible = true;
+				else
+					_gnncTime.__stop();
+			}
+
+			private function __toFront(e:*=null):void 
+			{
+				if(isPopUp)
+					new gnncPopUp().__toFront(this);
+			}
+
+			private function __close():void 
+			{
+				if(isPopUp)
+					new gnncPopUp().__close(this);
+			}
+
+			private function __closePopUp():void 
+			{
+				if(isPopUp)
+				{
+					if(!_percent)
+					{
+						__close();
+						_gnncBindable.__exitMonitoring();
+					}
+					_gnncTime.__stop();
+				}
+				else
+				{
+					this.visible = false;
+					_gnncTime.__stop();
+					_gnncBindable.__exitMonitoring();
+				}
+			}
+			
+			private function __rightMouseDown(e:MouseEvent):void
+			{
+				if(!isPopUp || currentState == 'special')
+					return;
+				
+				var close:ContextMenuItem 			= new ContextMenuItem("Fechar loading...", false, true);
+				close.addEventListener				(Event.SELECT,function(event:Event):void{ __close() });
+				
+				// Create custom context menu. 
+				var cm:ContextMenu 	= new ContextMenu();
+				cm.hideBuiltInItems	();
+				cm.customItems 		= [close];
+				
+				this.contextMenu 	= cm;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="special"/>
+	</s:states>
+	
+	<!--- SIMPLE LOADING -->
+	
+	<s:Rect id="popBackground_" width="100%" height="100%" alpha=".7" fill="{new SolidColor(0x000000)}" excludeFrom="special" />
+	<s:Rect width="245" height="56" horizontalCenter="0" verticalCenter="0" radiusX="3" radiusY="3" fill="{new SolidColor(0xffffff)}" excludeFrom="special" />
+	<!-- s:RectangularDropShadow id="dropShadow_" width="75" height="56" horizontalCenter="0" verticalCenter="0" distance="2" blurX="0" blurY="0" excludeFrom="special" / -->
+	
+	<s:Group width="245" height="54" horizontalCenter="0" verticalCenter="0" excludeFrom="special" >
+		<s:HGroup width="245" height="54" paddingBottom="5" paddingLeft="10" paddingRight="10" paddingTop="5" verticalAlign="middle">
+			<mx:ProgressBar label="{_textLoading==''?'Aguarde... ':_textLoading}" width="100%" indeterminate="true" labelPlacement="top" chromeColor="{0xeeeeee}" fontSize="11" color="#777777"/>
+		</s:HGroup>
+	</s:Group>
+
+	<s:Button id="buttonClose_" click="{__close()}" width="10" height="10" top="5" right="5" visible="false" />
+
+	<!--- SPECIAL LOADING -->
+	
+	<s:Rect width="400" height="55" horizontalCenter="0" verticalCenter="0" radiusX="0" includeIn="special" >
+		<s:fill>
+			<s:RadialGradient>
+				<s:GradientEntry color="0xFFFFFF"/>
+				<s:GradientEntry color="0xFAFAFA"/>
+			</s:RadialGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<mx:ProgressBar label="{_textLoading==''?'Aguarde... ':_textLoading}" width="380" horizontalCenter="0" verticalCenter="0" left="20" top="20" indeterminate="true" labelPlacement="top" chromeColor="#AAAAAA" fontSize="11" color="#444444" includeIn="special"/>
+
+</s:Group>

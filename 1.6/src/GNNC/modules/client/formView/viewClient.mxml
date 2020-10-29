@@ -1,0 +1,599 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="750" height="520"
+		  
+		  creationComplete		= "{__start()}" 
+		  
+		  xmlns:stage			= "GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:gnncLoading		= "GNNC.UI.gnncLoading.*" 
+		  xmlns:list="GNNC.elements.component.list.*" 
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.UI.gnncView.gnncViewHtml;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncClipBoard;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.file.gnncFilePdf;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.gnncEmbedOperator;
+			import GNNC.modules.client.formNew.newClient;
+			import GNNC.modules.client.report.gnncFileReport_client_viewClient;
+			import GNNC.sqlTables.table_attach;
+			import GNNC.sqlTables.table_client;
+			import GNNC.time.gnncTime;
+			
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.primitives.BitmapImage;
+			
+			[Bindable]
+			private var _CLIENT:gnncAMFPhp = new gnncAMFPhp();
+			
+			private var _ATTACH:gnncAMFPhp = new gnncAMFPhp();
+			public  var _tableClient:table_client = new table_client();
+			
+			public const _MIX:String = 'CLIENT';
+			
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			private var _gnncPdf:gnncFilePdf = new gnncFilePdf();
+			
+			public var _change:Boolean = false;
+			
+			private function __start():void
+			{
+				__clientId();
+				__config();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+
+			private function __config():void
+			{
+				var _tAtt:table_attach 			= new table_attach();
+				_tAtt.ID_MIX					= _tableClient.ID;
+				_tAtt.MIX						= _MIX;
+				attachListNew_._tableClass 		= _tAtt;
+				attachListNew_._sqlOrderBy 		= ['ORDER_ITEM asc','ID'];
+				attachListNew_._sqlOrderDesc 	= true;
+			}
+
+			/*
+			private function __clientEdit():void
+			{
+				var _page:NEW_CLIENT 			= new NEW_CLIENT();
+				_page._TABLE_CLIENT 			= new table_client(_TABLE_CLIENT.ID);
+				new gnncPopUp().__creation		(_page);
+				__close							();
+			}
+			*/
+			
+			private function __clientEdit():void
+			{
+				var o:newClient 	= new newClient();
+				o._TABLE_CLIENT 	= new table_client(_tableClient.ID);
+				_gnncPopUp.__creation(o,true,false,__reload);
+
+				function __reload(e:*):void
+				{
+					if(o._change)
+					__clientId();
+				}
+			}
+
+			private function __clientId():void
+			{
+				if(_tableClient != null)
+				{
+					if(Number(_tableClient.ID)>0)
+					{
+						var COLUMN:Array = [
+							"*",
+							"coalesce((SELECT COUNT(*) FROM dbd_financial as x WHERE x.ID_CLIENT = dbd_client.ID and x.VALUE_IN > 0 and LEFT(x.DATE_END,10) <= LEFT('"+gnncDate.__date2String(new Date())+"',10) and x.DATE_FINAL < 1 and x.DATE_CANCELED < 1 ),'') FINANCIAL_ALERT",
+							"coalesce((SELECT NAME FROM dbd_client as a		WHERE a.ID 					= dbd_client.INDICATED_CLIENT	),'Nenhuma') NAME_CLIENT",
+							"coalesce((SELECT NAME FROM dbd_departament 	WHERE dbd_departament.ID 	= dbd_client.ID_DEPARTAMENT		),'Nenhum') NAME_DEPARTAMENT",
+							"coalesce((SELECT NAME FROM dbd_group 			WHERE dbd_group.ID 			= dbd_client.ID_GROUP			),'Nenhum') NAME_GROUP",
+							"coalesce((SELECT NAME FROM dbd_category 		WHERE dbd_category.ID 		= dbd_client.ID_CATEGORY		),'Nenhum') NAME_CATEGORY",
+							"coalesce((select a.FILE_LINK from dbd_attach a WHERE a.MIX = 'CLIENT_PHOTO' and a.ID_MIX = dbd_client.ID AND (a.EXTENSION = 'jpg' or a.EXTENSION = 'jpeg' or a.EXTENSION = 'png' or a.EXTENSION = 'gif') ORDER BY a.ORDER_ITEM asc,a.ID desc LIMIT 0,1	),'')  ATTACH_CLIENT"
+						];
+						
+						_gnncPopUp.__loading	();
+						
+						var _table:table_client = new table_client(_tableClient.ID);
+						_table.ACTIVE 			= 0;
+						_table.VISIBLE 			= 0;
+						
+						var _sql:String 		= new gnncSql().__SELECT(_table,false,COLUMN);
+						_CLIENT.__sql			(_sql,'','',__fResult,__fFault);
+					}
+				} 
+				else 
+				{
+					_tableClient 	= new table_client();
+					__close			();
+				}
+			}
+			
+			protected function __fFault(event:FaultEvent):void
+			{
+				new gnncAlert().__alert('Não foi possível visualizar este cliente. Tente novamente.');
+				_gnncPopUp.__close();
+				__close();
+			}
+			
+			protected function __fResult(event:ResultEvent):void
+			{
+				_gnncPopUp.__close();
+
+				if(_CLIENT.DATA_ROWS==0)
+				{
+					new gnncAlert().__alert('Impossível visualizar este cliente. Verifique se este está bloqueado.');
+					__close();
+					return;
+				}
+				
+				var obj:Object = _CLIENT.DATA_ARR.getItemAt(0);
+				
+				__operatorIconChange(obj,'PHONE_OPERATOR'			,img1);
+				__operatorIconChange(obj,'PHONE_CEL_OPERATOR'		,img2);
+				__operatorIconChange(obj,'PHONE_COMPANY_OPERATOR'	,img3);
+				__operatorIconChange(obj,'PHONE_FAX_OPERATOR'		,img4);
+
+				if(obj.COMPANY==0){
+					DOCbg_.visible = true;
+					DOC_.text = "" +
+					"" + ( obj.CPF_CNPJ    ?        'CPF: ' + obj.CPF_CNPJ    : '' ) +
+					"" + ( obj.RG_REGISTER ? (obj.CPF_CNPJ?"\n":'') + 'RG: '  + obj.RG_REGISTER : '' );
+				}
+				
+				ENDE_.text = "" + 
+				    "" + gnncData.__firstLetterUpperCase(obj.ADDRESS) + ( Number(obj.ADDRESS_NUMBER)>0 ? ', '+obj.ADDRESS_NUMBER : '' ) + ( obj.ADDRESS_COMPLEMENT ? ' ,'+gnncData.__firstLetterUpperCase(obj.ADDRESS_COMPLEMENT) : '' ) +
+					"" + ( obj.CITY        ? "\n" + 'Cidade: ' + gnncData.__firstLetterUpperCase(obj.CITY)    : '' ) +
+					"" + ( obj.STATE       ? "\n" + 'Estado: ' + gnncData.__firstLetterUpperCase(obj.STATE)   : '' ) +
+					"" + ( Number(obj.ZIPCODE)>0 ? "\n" + 'CEP: '    + obj.ZIPCODE : '' ) ;
+					//"" + ( obj.ISO_COUNTRY ? new gnncDataArrayCollection().__search(gnncGlobalArrays._COUNTRY,'ISO',obj.ISO_COUNTRY,'NICK_NAME'):'');
+				
+				DESC_.text = gnncData.__trimText(obj.DESCRIPTION);
+				
+				if(uint(obj.FINANCIAL_ALERT) > 1)
+				financialAlert_.text = uint(obj.FINANCIAL_ALERT) + ' pendências financeiras';
+				
+				__starRating();
+				attachListNew_.__select();
+			}
+			
+			private function __starRating():void
+			{
+				var _stars:uint = _CLIENT.DATA_ARR.getItemAt(0).STAR_RATING;
+				
+				if(_stars==0)
+					return;
+				
+				for(var i:uint = 1; i<=_stars; i++)
+					this['STAR_'+i+'_'].source = gnncEmbedBlackWhite.bw_star_16;
+			}
+			
+			private function __clientView():void
+			{
+				if(_CLIENT.DATA_ARR.getItemAt(0).INDICATED_CLIENT==0)
+					return;
+				
+				var _page:viewClient 	= new viewClient();
+				_page._tableClient 		= new table_client(_CLIENT.DATA_ARR.getItemAt(0).INDICATED_CLIENT);
+				
+				new gnncPopUp().__creation	(_page);
+			}
+			
+			private function __attachFile():String
+			{
+				//new gnncAlert().__alert(attachListNew_.__fileLocation(0,'ATTACH_CLIENT').toString()+'<');
+				//return attachListNew_.__fileLocation(0,'ATTACH_CLIENT').toString();
+				return gnncGlobalStatic._httpHost+'ATTACH/'+String(gnncGlobalStatic._dataBase).toUpperCase()+'/'+_CLIENT.DATA_ARR.getItemAt(0).ATTACH_CLIENT;
+			}
+			
+			private function __copy(obj_:Object,mensagem:String=''):void
+			{
+				gnncClipBoard.__copyText(obj_.toString());
+				if(mensagem)
+					new gnncNotification().__show(mensagem,'',null,null,true);
+			}
+			
+			private function __operatorIconChange(obj_:Object,property_:String,img_:BitmapImage):void
+			{
+				if(obj_==null)
+					return;
+				
+				if(!obj_.hasOwnProperty(property_))
+					return;
+				
+				switch(obj_[property_])
+				{
+					case 41:
+						img_.source = gnncEmbedOperator.TIM_16;
+						break;
+					case 31:
+						img_.source = gnncEmbedOperator.OI_16;
+						break;
+					case 21:
+						img_.source = gnncEmbedOperator.CLARO_16;
+						break;
+					case 77:
+						img_.source = gnncEmbedOperator.NEXTEL_16;
+						break;
+					case 20:
+						img_.source = gnncEmbedOperator.VIVO_16;
+						break;
+					case 14:
+						img_.source = gnncEmbedOperator.BRASILTELECOM_16;
+						break;
+					default:
+						img_.source = null;
+				}
+			}
+			
+			private function __html(url_:String):void
+			{
+				var _gnncViewHtml:gnncViewHtml 		= new gnncViewHtml();
+				_gnncViewHtml.__create				(url_,null,true);
+				_gnncViewHtml.width					= parentApplication.parent.width - 40;
+				_gnncViewHtml.height				= parentApplication.parent.height - 40;
+				
+				new gnncPopUp().__creation			(_gnncViewHtml);
+			}
+			
+			private function __map():void
+			{
+				var _object:Object					= _CLIENT.DATA_ARR.getItemAt(0);
+				var _country:String 				= _object.ISO_COUNTRY ? new gnncDataArrayCollection().__search(gnncGlobalArrays._COUNTRY,'ISO',_object.ISO_COUNTRY,'NICK_NAME').toString() : '';
+				var _number:String 					= _object.ADDRESS_NUMBER ? _object.ADDRESS_NUMBER : '1';
+				var _address:String 				= _object.ADDRESS + ', ' + _number + ', ' + _object.CITY + ', ' + _object.STATE + ', ' + _country;
+				
+				if(_address.length < 20)
+				{
+					new gnncAlert().__alert('Endereço possivelmente incorreto');
+					return;
+				}
+				
+				__html('http://maps.google.com/maps?q='+_address+'&hl=pt-BR&ie=UTF8&view=map&iwloc=A&sa=X');
+			}
+
+			private function __reportClientForm():void
+			{
+				btnPrint_.enabled = false;	
+				btnPrint_.label   = 'Aguarde...';
+
+				new gnncFileReport_client_viewClient().__createPersonalWithListCourse(_tableClient.ID,PHOTO_);
+				new gnncTime().__start(5000,__result,1);
+				
+				function __result(e:*=null):void
+				{ 
+					btnPrint_.enabled = true;
+					btnPrint_.label   = 'Imprimir';
+				}
+			}
+
+			private function __newPhoto():void
+			{
+				attachListNew_._tableClass.MIX = 'CLIENT_PHOTO';
+				function fRemove(e:*=null):void
+				{
+					attachListNew_._tableClass.MIX = _MIX;
+					callLater(__clientId);
+				}
+				attachListNew_.__fNew(null,fRemove);
+			}
+
+			private function __newAttach():void
+			{
+				attachListNew_._tableClass.MIX = _MIX;
+				function fRemove(e:*=null):void
+				{
+					attachListNew_.__select();
+				}
+				attachListNew_.__fNew(null,fRemove);
+				panelCenter_.selectedIndex = 3;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		
+		<mx:PhoneFormatter id="phoneFormat10_" error="" formatString="(##) ####-####" areaCodeFormat="(##)" validPatternChars="#-() " />
+		<mx:PhoneFormatter id="phoneFormat11_" error="" formatString="(##) ####-#####" areaCodeFormat="(##)" validPatternChars="#-() " />
+		
+	</fx:Declarations>
+	<elements:elementStageBox/>
+	
+	<s:HGroup left="20" top="20" right="20" bottom="45" gap="0">
+		<s:Group width="130" height="100%">
+			<s:VGroup width="130" height="100%" gap="1">
+				<s:BorderContainer width="130" height="130" backgroundColor="0xFFFFFF" borderColor="0xAAAAAA" >
+					<s:Image id="PHOTO_" source="{String(_CLIENT.DATA_ARR.getItemAt(0).ATTACH_CLIENT).length > 10 ? __attachFile() : _CLIENT.DATA_ARR.getItemAt(0).COMPANY ==1 ? gnncEmbedBlackWhite.bw_client_128_company_v2: gnncEmbedBlackWhite.bw_client_128_v2 }" width="128" height="128" smooth="true" smoothingQuality="high" scaleMode="zoom"/>
+					<!--s:Image id="PHOTO_" source="{attachListNew_._length > 0 ? __attachFile() : _CLIENT.DATA_ARR.getItemAt(0).COMPANY ? gnncEmbedImage.CLIENT_128 : gnncEmbedImage.USER_128 }" width="128" height="128" smooth="true" smoothingQuality="high" scaleMode="zoom"/-->
+					<s:Image source="{_CLIENT.DATA_ARR.getItemAt(0).ACTIVE==0?gnncEmbedImage.STATUS_RED_16:_CLIENT.DATA_ARR.getItemAt(0).ACTIVE==1?gnncEmbedImage.STATUS_GREEN_16:_CLIENT.DATA_ARR.getItemAt(0).ACTIVE==2?gnncEmbedImage.STATUS_YELLOW_16:gnncEmbedImage.STATUS_GREY_16}" left="5" top="5" />
+					<s:Group width="25" height="25" right="2" bottom="2" buttonMode="true" click="{__newPhoto()}">
+						<s:Rect width="25" height="25" radiusX="3" radiusY="3">
+							<s:fill>
+								<s:SolidColor color="0xffffff" alpha=".5"/>
+							</s:fill>
+						</s:Rect>
+						<s:Image source="{gnncEmbedImage.PLAYBACK_16_SHOT}" horizontalCenter="0" verticalCenter="0" toolTip="Alterar imagem" />
+					</s:Group>
+				</s:BorderContainer>
+				<s:Rect height="10"/>
+				<s:HGroup horizontalAlign="center" width="100%" gap="1">
+					<s:Image id="STAR_1_" source="{gnncEmbedBlackWhite.bw_star_16_unselected}" toolTip="1 estrela" />
+					<s:Image id="STAR_2_" source="{gnncEmbedBlackWhite.bw_star_16_unselected}" toolTip="2 estrelas" />
+					<s:Image id="STAR_3_" source="{gnncEmbedBlackWhite.bw_star_16_unselected}" toolTip="3 estrelas" />
+					<s:Image id="STAR_4_" source="{gnncEmbedBlackWhite.bw_star_16_unselected}" toolTip="4 estrelas" />
+					<s:Image id="STAR_5_" source="{gnncEmbedBlackWhite.bw_star_16_unselected}" toolTip="5 estrelas" />
+				</s:HGroup>
+				<s:Rect height="10"/>
+				<!-- s:Button label="Foto" 	 				icon="{gnncEmbedImage.PLAYBACK_16_SHOT}" 		width="100%" height="30" click="{__newPhoto()}" skinClass="GNNC.skin.button.skin_buttonTextLeft"/ -->
+				<s:Button label="Editar" 				icon="{gnncEmbedBlackWhite.bw_edit_16}" 		width="100%" height="30" click="{__clientEdit()}" skinClass="GNNC.skin.button.skin_buttonTextLeft" />
+				<s:Button label="Arquivo" 	 			icon="{gnncEmbedBlackWhite.bw_attach_16}" 		width="100%" height="30" click="{__newAttach()}" skinClass="GNNC.skin.button.skin_buttonTextLeft"/>
+				<s:Button label="Enviar e-mail" 		icon="{gnncEmbedBlackWhite.bw_email_16}" 		width="100%" height="30" enabled="false" skinClass="GNNC.skin.button.skin_buttonTextLeft"/>
+				<!-- s:Button label="Mapa" 				icon="{gnncEmbedImage.MAP_16}" 					width="100%" height="30" click="{__map()}" skinClass="GNNC.skin.button.skin_buttonTextLeft" / -->
+				<s:Button label="Imprimir"				icon="{gnncEmbedBlackWhite.bw_document_16_pdf}" width="100%" height="30" click="{__reportClientForm()}" id="btnPrint_" skinClass="GNNC.skin.button.skin_buttonTextLeft" />
+				<s:Rect height="100%"/>
+				<s:Label id="financialAlert_" text="" width="100%" verticalAlign="middle" color="0xcc0000" fontWeight="bold"/>
+			</s:VGroup>
+		</s:Group>
+		<!--ELEMENTS:VLINE width="20"/-->
+		<s:Rect width="20"/>
+		<s:VGroup width="100%" height="100%" gap="0">
+			
+			<s:Group width="100%" height="30">
+				<elements:elementBarGray radiusX="4"/>
+				<s:TabBar dataProvider="{panelCenter_}" height="30"/>
+			</s:Group>
+			
+			<mx:ViewStack id="panelCenter_" width="100%" height="100%">
+				<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all" backgroundColor="0xFFFFFF" >
+					<s:VGroup width="130" height="100%" gap="5"  paddingTop="25" paddingLeft="15" color="0x999999">
+						<s:Label height="30" text="Nome Completo" 			width="100%" textAlign="right" verticalAlign="middle" />
+						<s:Label height="25" text="E-mail" 					width="100%" textAlign="right" verticalAlign="middle" />
+						<s:Label height="16" text="Telefone" 				width="100%" textAlign="right" />
+						<s:Label height="16" text="Celular" 				width="100%" textAlign="right" />
+						<s:Rect height="15"/>
+						<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'':'Aniversário'}" 			width="100%" textAlign="right" />
+						<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'':'Sexo'}" 					width="100%" textAlign="right" />
+						<s:Label height="16" text="Apelido" 				width="100%" textAlign="right" />
+						<s:Label height="16" text="Tipo Cadastro" 			width="100%" textAlign="right" />
+						<s:Label height="16" text="Indicação Prof." 		width="100%" textAlign="right" toolTip="Indicação Profissional" />
+						<s:Rect height="15"/>
+						<s:Label height="16" text="Tel. Empresarial" 		width="100%" textAlign="right" />
+						<s:Label height="16" text="Tel. Fax" 				width="100%" textAlign="right" />
+						<s:Rect height="15"/>
+						<s:HGroup gap="1" width="100%" height="16" verticalAlign="middle">
+							<s:Label height="16" text="Departamento" 		width="100%" textAlign="right" verticalAlign="middle" paddingRight="4" paddingTop="1" />
+							<s:Image source="{gnncEmbedBlackWhite.bw_series_departament_16}"/>
+						</s:HGroup>
+						<s:HGroup gap="1" width="100%" height="16" verticalAlign="middle">
+							<s:Label height="16" text="Grupo" 				width="100%" textAlign="right" verticalAlign="middle" paddingRight="4" paddingTop="1" />
+							<s:Image source="{gnncEmbedBlackWhite.bw_series_group_16}"/>
+						</s:HGroup>
+						<s:HGroup gap="1" width="100%" height="16" verticalAlign="middle">
+							<s:Label height="20" text="Categoria" 			width="100%" textAlign="right" verticalAlign="middle" paddingRight="4" paddingTop="1" />
+							<s:Image source="{gnncEmbedBlackWhite.bw_series_category_16}"/>
+						</s:HGroup>
+					</s:VGroup>
+					<s:VGroup left="140" right="0" height="100%" gap="5" paddingTop="25">
+						<s:HGroup width="100%" gap="3" verticalAlign="middle" paddingRight="10">
+							<s:Label height="30" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME+' '+_CLIENT.DATA_ARR.getItemAt(0).MIDDLE_NAME+' '+_CLIENT.DATA_ARR.getItemAt(0).LAST_NAME)}" maxDisplayedLines="1" showTruncationTip="true" width="100%" fontSize="18" verticalAlign="middle"
+									 paddingLeft="1" paddingRight="10"/>
+							<s:Button icon="{gnncEmbedBlackWhite.bw_clipboard_16_copy}" click="{__copy(_CLIENT.DATA_ARR.getItemAt(0).NAME,'Nome completo copiado.')}" toolTip="Copiar nome completo" width="25" height="25"/>
+						</s:HGroup>
+						<s:Button label="{_CLIENT.DATA_ARR.getItemAt(0).EMAIL==''?'Nenhum email':String(_CLIENT.DATA_ARR.getItemAt(0).EMAIL).toLowerCase()}" height="25" click="{__copy(String(_CLIENT.DATA_ARR.getItemAt(0).EMAIL).toLowerCase(),'E-mail copiado')}" toolTip="Copiar" enabled="{ _CLIENT.DATA_ARR.getItemAt(0).EMAIL ==''? false : true }" textDecoration="underline" color="0x3785e2" />
+						<s:HGroup width="100%" gap="1" verticalAlign="middle" >
+							<s:Label height="16" text="{gnncDataNumber.__clearPhoneNumber(String(_CLIENT.DATA_ARR.getItemAt(0).PHONE))}" width="120" verticalAlign="middle" />
+							<s:BitmapImage id="img1" source="{null}" />
+						</s:HGroup>
+						<s:HGroup width="100%" gap="1" verticalAlign="middle" >
+							<s:Label height="16" text="{gnncDataNumber.__clearPhoneNumber(String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_CEL))}" width="120" verticalAlign="middle" />
+							<s:BitmapImage id="img2" source="{null}" />
+						</s:HGroup>
+						<s:Rect height="15"/>
+						<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'':gnncDate.__date2Legend(_CLIENT.DATA_ARR.getItemAt(0).DATE_BIRTH,null,true)+' - Idade: '+gnncDate.__age(_CLIENT.DATA_ARR.getItemAt(0).DATE_BIRTH,new Date())}" />
+						<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'':_CLIENT.DATA_ARR.getItemAt(0).SEX=='M'?'Masculino':_CLIENT.DATA_ARR.getItemAt(0).SEX=='F'?'Feminino':'Outro'}" />
+						<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NICK_NAME)}" />
+						<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'Pessoa Jurídica':'Pessoa Física'}" />
+						<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME_CLIENT)}" buttonMode="true" textDecoration="underline" color="0x3785e2" click="{__clientView()}" />
+						<s:Rect height="15"/>
+						<s:HGroup width="100%" gap="1" verticalAlign="middle" >
+							<s:Label height="16" text="{gnncDataNumber.__clearPhoneNumber(String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_COMPANY))}" width="120" />
+							<s:BitmapImage id="img3" source="{null}" />
+						</s:HGroup>
+						<s:HGroup width="100%" gap="1" verticalAlign="middle" >
+							<s:Label height="16" text="{gnncDataNumber.__clearPhoneNumber(String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_FAX))}" width="120" />
+							<s:BitmapImage id="img4" source="{null}" />
+						</s:HGroup>
+						<s:Rect height="15"/>
+						<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME_DEPARTAMENT)}" verticalAlign="middle" />
+						<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME_GROUP)}" 	  verticalAlign="middle" />
+						<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME_CATEGORY)}" 	  verticalAlign="middle" />
+					</s:VGroup>
+					
+				<s:VGroup bottom="10" right="10" width="200" >
+
+					<s:Group width="200" id="DOCbg_" visible="false" >
+						<s:Rect width="100%" height="100%" radiusX="4" radiusY="4">
+							<s:stroke>
+								<s:SolidColorStroke color="0xdddddd"/>
+							</s:stroke>
+						</s:Rect>
+						<mx:Text id="DOC_" width="100%" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10"/>
+					</s:Group>
+
+					<s:Group width="200" >
+						<s:Rect width="100%" height="100%" radiusX="4" radiusY="4">
+							<s:stroke>
+								<s:SolidColorStroke color="0xdddddd" />
+							</s:stroke>
+						</s:Rect>
+						<mx:Text id="ENDE_" width="100%" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10"/>
+					</s:Group>
+					
+					<s:Group width="200" height="150">
+						<s:Rect width="100%" height="100%" radiusX="4" radiusY="4">
+							<s:stroke>
+								<s:SolidColorStroke color="0xdddddd"/>
+							</s:stroke>
+						</s:Rect>
+						<mx:Text id="DESC_" width="100%" height="100%" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10" />
+					</s:Group>
+				</s:VGroup>
+					
+				</s:NavigatorContent>
+				<s:NavigatorContent label="CADASTRO" width="100%" height="100%" creationPolicy="all" >
+					
+					<s:Rect width="100%" height="100%">
+						<s:fill>
+							<s:SolidColor color="0xffffff"/>
+						</s:fill>
+					</s:Rect>
+					
+					<s:Scroller id="scrollClick_" width="100%" height="100%">
+						<s:Group width="100%" height="100%">
+							<s:VGroup width="160" height="100%" gap="0" paddingTop="15" paddingLeft="15" color="0x999999">
+								<elements:elementLabelDropShadow text="Básico" fontWeight="normal" fontSize="18" height="30" />
+								<s:Label height="16" text="Id" 					textAlign="right" width="100%" />
+								<s:Label height="16" text="Nome Completo" 		textAlign="right" width="100%" />
+								<s:Label height="16" text="Apelido" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'CNPJ':'CPF'}" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'Inscrição Estadual':'RG'}" 	textAlign="right" width="100%" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'':'Sexo'}" 					textAlign="right" width="100%" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'':'Aniversário'}" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="Tipo Cadastro" 		textAlign="right" width="100%" />
+								<s:Label height="16" text="Nacionalidade" 		textAlign="right" width="100%" />
+								<elements:elementLabelDropShadow text="Acesso" fontWeight="normal"  fontSize="18" height="30" />
+								<s:Label height="16" text="Matrícula" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="E-mail" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="Acesso Web" 			textAlign="right" width="100%" />
+								<elements:elementLabelDropShadow text="Profissão" fontWeight="normal"  fontSize="18" height="30"/>
+								<s:Label height="16" text="Profissão" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="Registro Nº" 		textAlign="right" width="100%" />
+								<s:Label height="16" text="Registro UF" 		textAlign="right" width="100%" />
+								<elements:elementLabelDropShadow text="Telefones" fontWeight="normal"  fontSize="18" height="30"/>
+								<s:Label height="16" text="Telefone" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="Celular" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="Tel. Empresarial" 	textAlign="right" width="100%" />
+								<s:Label height="16" text="Tel. Fax" 			textAlign="right" width="100%" />
+								<elements:elementLabelDropShadow text="Endereço" fontWeight="normal"  fontSize="18" height="30" />
+								<s:Label height="16" text="CEP" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="Logradouro" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="Número" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="Complemento" 		textAlign="right" width="100%" />
+								<s:Label height="16" text="Bairro" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="Cidade" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="Estado" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="País" 				textAlign="right" width="100%" />
+								<elements:elementLabelDropShadow text="Info." fontWeight="normal"  fontSize="18" height="30" />
+								<s:Label height="16" text="Descrição" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="Indicação Prof."  	textAlign="right" width="100%" toolTip="Indicação Profissional" />
+								<elements:elementLabelDropShadow text="Classificação" fontWeight="normal" fontSize="18" height="30" />
+								<s:Label height="16" text="Departamento" 		textAlign="right" width="100%" />
+								<s:Label height="16" text="Grupo" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="Categoria" 			textAlign="right" width="100%" />
+								<elements:elementLabelDropShadow text="Sistema" fontWeight="normal" fontSize="18" height="30"/>
+								<s:Label height="16" text="Status" 				textAlign="right" width="100%" />
+								<s:Label height="16" text="Visível" 			textAlign="right" width="100%" />
+								<s:Label height="16" text="Controle" 			textAlign="right" width="100%" />
+							</s:VGroup>
+							<s:VGroup left="170" right="0" height="100%" gap="0" paddingTop="15">
+								<s:Rect height="30"/>
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ID}" />
+								<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME+' '+_CLIENT.DATA_ARR.getItemAt(0).MIDDLE_NAME+' '+_CLIENT.DATA_ARR.getItemAt(0).LAST_NAME)}" maxDisplayedLines="1" showTruncationTip="true" width="100%" fontSize="14" fontWeight="bold" />
+								<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NICK_NAME)}" />
+								<s:Label height="16" text="{String(_CLIENT.DATA_ARR.getItemAt(0).CPF_CNPJ).substr(0,4)=='2626'?'':_CLIENT.DATA_ARR.getItemAt(0).CPF_CNPJ}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).RG_REGISTER}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'':_CLIENT.DATA_ARR.getItemAt(0).SEX=='M'?'Masculino':_CLIENT.DATA_ARR.getItemAt(0).SEX=='F'?'Feminino':'Outro'}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'':gnncDate.__date2Legend(_CLIENT.DATA_ARR.getItemAt(0).DATE_BIRTH,null,true)}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).COMPANY==1?'Pessoa Jurídica':'Pessoa Física'}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ISO_NACIONALITY?new gnncDataArrayCollection().__search(gnncGlobalArrays._COUNTRY,'ISO',_CLIENT.DATA_ARR.getItemAt(0).ISO_NACIONALITY,'NICK_NAME'):''}" />
+								<s:Rect height="30"/>
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ENROLLMENT.toString()}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).EMAIL.toString().toLowerCase()}" id="EMAIL_"/>
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ACCESS_WEB==1?'Sim':'Não'}" />
+								<s:Rect height="30"/>
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ID_PROFESSIONAL?_CLIENT.DATA_ARR.getItemAt(0).ID_PROFESSIONAL:''}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).PROFESSIONAL_NUMBER}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).PROFESSIONAL_STATE}" />
+								<s:Rect height="30"/>
+								<s:Label height="16" text="{String(_CLIENT.DATA_ARR.getItemAt(0).PHONE).length==10 			? phoneFormat10_.format(_CLIENT.DATA_ARR.getItemAt(0).PHONE) 			: String(_CLIENT.DATA_ARR.getItemAt(0).PHONE).length==11 			? phoneFormat11_.format(_CLIENT.DATA_ARR.getItemAt(0).PHONE) 			: phoneFormat10_.format(gnncDataNumber.__setZero(_CLIENT.DATA_ARR.getItemAt(0).PHONE,10)) }" />
+								<s:Label height="16" text="{String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_CEL).length==10 		? phoneFormat10_.format(_CLIENT.DATA_ARR.getItemAt(0).PHONE_CEL) 		: String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_CEL).length==11 		? phoneFormat11_.format(_CLIENT.DATA_ARR.getItemAt(0).PHONE_CEL) 		: phoneFormat10_.format(gnncDataNumber.__setZero(_CLIENT.DATA_ARR.getItemAt(0).PHONE_CEL,10)) }" />
+								<s:Label height="16" text="{String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_COMPANY).length==10 	? phoneFormat10_.format(_CLIENT.DATA_ARR.getItemAt(0).PHONE_COMPANY) 	: String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_COMPANY).length==11 	? phoneFormat11_.format(_CLIENT.DATA_ARR.getItemAt(0).PHONE_COMPANY) 	: phoneFormat10_.format(gnncDataNumber.__setZero(_CLIENT.DATA_ARR.getItemAt(0).PHONE_COMPANY,10)) }" />
+								<s:Label height="16" text="{String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_FAX).length==10 		? phoneFormat10_.format(_CLIENT.DATA_ARR.getItemAt(0).PHONE_FAX) 		: String(_CLIENT.DATA_ARR.getItemAt(0).PHONE_FAX).length==11 		? phoneFormat11_.format(_CLIENT.DATA_ARR.getItemAt(0).PHONE_FAX) 		: phoneFormat10_.format(gnncDataNumber.__setZero(_CLIENT.DATA_ARR.getItemAt(0).PHONE_FAX,10)) }" />
+								<s:Rect height="30"/>
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ZIPCODE}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ADDRESS}"  maxDisplayedLines="1" showTruncationTip="true" width="100%"/>
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ADDRESS_NUMBER}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ADDRESS_COMPLEMENT}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).NEIGHBORHOOD}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).CITY}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).STATE}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).ISO_COUNTRY?new gnncDataArrayCollection().__search(gnncGlobalArrays._COUNTRY,'ISO',_CLIENT.DATA_ARR.getItemAt(0).ISO_COUNTRY,'NICK_NAME'):''}" />
+								<s:Rect height="30"/>
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).DESCRIPTION}" maxDisplayedLines="1" showTruncationTip="true" width="100%" />
+								<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME_CLIENT)}" maxDisplayedLines="1" showTruncationTip="true" width="100%" />
+								<s:Rect height="30"/>
+								<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME_DEPARTAMENT)}" />
+								<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME_GROUP)}" />
+								<s:Label height="16" text="{gnncData.__firstLetterUpperCase(_CLIENT.DATA_ARR.getItemAt(0).NAME_CATEGORY)}" />
+								<s:Rect height="30"/>
+								<s:Label height="16" text="{gnncGlobalArrays._CLIENT_STATUS.getItemAt(_CLIENT.DATA_ARR.getItemAt(0).ACTIVE).label}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).VISIBLE?'Sim':'Não'}" />
+								<s:Label height="16" text="{_CLIENT.DATA_ARR.getItemAt(0).CONTROL?'Aprovado':'Não Aprovado'}" />
+							</s:VGroup>
+						</s:Group>
+					</s:Scroller>
+				</s:NavigatorContent>
+				<s:NavigatorContent label="DESCRIÇÃO" width="100%" height="100%" creationPolicy="all" >
+					<s:VGroup gap="1" fontWeight="bold" top="15" left="15" right="15" bottom="15">
+						<s:TextArea width="100%" height="100%" text="{_CLIENT.DATA_ARR.getItemAt(0).DESCRIPTION ? _CLIENT.DATA_ARR.getItemAt(0).DESCRIPTION : 'Nenhuma'}" 
+									borderVisible="false" contentBackgroundAlpha="0" editable="false" verticalAlign="top" />
+					</s:VGroup>
+				</s:NavigatorContent>
+				<s:NavigatorContent label="ARQUIVOS" width="100%" height="100%" creationPolicy="all" >
+					<s:VGroup gap="1" fontWeight="bold" top="15" left="15" right="15" bottom="15">
+						<!-- s:HGroup width="100%" gap="1" height="30" verticalAlign="middle">
+							<s:Label text="Defina qual será a foto de rosto do cliente" fontWeight="bold" width="100%" />
+							<s:Button label="Definir como foto principal" height="25" icon="{gnncEmbedImage.PLAYBACK_16_SHOT}" click="{__upPhoto()}" />
+						</s:HGroup>
+						<elements:elementHLine height="10"/ -->
+						<list:conList_attach id="attachListNew_" width="100%" height="100%" />
+					</s:VGroup>
+				</s:NavigatorContent>
+			</mx:ViewStack>
+		</s:VGroup>
+	</s:HGroup>
+	
+	<s:Group left="1" right="1" bottom="1" height="34">
+		<elements:elementBarStatus height="34" />
+		<s:HGroup width="100%" height="34" gap="2" paddingLeft="10" paddingRight="5" verticalAlign="middle">
+			<s:Rect width="100%"/>
+			<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" />	
+		</s:HGroup>
+	</s:Group>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

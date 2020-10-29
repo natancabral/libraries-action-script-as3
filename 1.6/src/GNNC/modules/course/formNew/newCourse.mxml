@@ -1,0 +1,268 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="800" height="550"
+		  
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:stage			= "GNNC.elements.stage.*" 
+		  xmlns:select			= "GNNC.elements.component.select.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:gnncDateField4	= "GNNC.UI.gnncDateField4.*" 
+		  
+		  >
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.sqlTables.table_course;
+			
+			public var _connCourse:gnncAMFPhp = new gnncAMFPhp();
+			public var _tableCourse:table_course = new table_course();
+			public const _MIX:String = 'COURSE';
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			public var _change:Boolean = false;
+
+			private function __start():void
+			{
+				__check();
+				callLater(__firstInput);
+			}
+
+			private function __firstInput():void
+			{
+				NAME_.setFocus();
+			}
+			
+			private function __check():void
+			{
+				if(_tableCourse != null){
+					if(Number(_tableCourse.ID)>0){
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var t:table_course = new table_course(_tableCourse.ID);
+						t.VISIBLE = 0;
+						var _sql:String = new gnncSql().__SELECT(t);
+						_connCourse.__sql(_sql,'','',__fResultCheck,__fFaultCheck);
+					}
+				} else {
+					_tableCourse = new table_course();
+				}
+			}
+			
+			protected function __fFaultCheck(event:*):void
+			{
+				_gnncPopUp.__close();
+				__close();
+			}
+			
+			protected function __fResultCheck(event:*):void
+			{
+				if(_connCourse.DATA_ROWS==0)
+				{
+					new gnncAlert().__alert('Impossível editar esta turma. Verifique se este cliente está bloqueado.');
+					__close();
+					return;
+				}
+				
+				var obj:Object	= _connCourse.DATA_ARR.getItemAt(0);
+
+				if(obj.MIX != 'COURSE'){
+					new gnncAlert().__alert('Este cadastro não é uma turma. Verifique sua credencial.','Problema em MIX');
+					__close();
+					return;
+				}
+				
+				_tableCourse.ID							= obj.ID;
+				
+				NAME_.text 								= gnncData.__removeBreak(obj.NAME).toUpperCase();
+				NAME_CALENDAR_.text                     = gnncData.__removeBreak(obj.NAME_CALENDAR).toUpperCase();
+				COLOR_.value                            = String(obj.COLOR_CALENDAR);
+				
+				//WEBSITE_.text 						= _PROJECT.DATA_ARR.getItemAt(0).WEBSITE;
+				//ROOM_.text 							= _PROJECT.DATA_ARR.getItemAt(0).ROOM;
+				
+				DATE_START_.selectedDate 				= gnncDate.__isNull(obj.DATE_START) ? new Date() : gnncDate.__string2Date(obj.DATE_START,false);
+				DATE_END_.selectedDate 					= gnncDate.__isNull(obj.DATE_END)   ? new Date() : gnncDate.__string2Date(obj.DATE_END,false);
+				DATE_PORT_.selectedDate 				= gnncDate.__isNull(obj.DATE_PORT)  ? new Date() : gnncDate.__string2Date(obj.DATE_PORT,false);
+				
+				_tableCourse.DATE_FINAL				    = obj.DATE_FINAL;
+				_tableCourse.DATE_CANCELED				= obj.DATE_CANCELED;
+				
+				DEPARTAMENT_.value						= obj.ID_DEPARTAMENT;
+				GROUP_.value 							= obj.ID_GROUP;
+				CATEGORY_.value							= obj.ID_CATEGORY;
+
+				_tableCourse.ACTIVE			            = obj.ACTIVE;
+				_tableCourse.VISIBLE					= obj.VISIBLE;
+				_tableCourse.CONTROL					= obj.CONTROL;
+				
+				_gnncPopUp.__close();
+			}
+			
+			private function __close():void
+			{
+				_gnncPopUp.__close();
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __save():void
+			{
+				if(!NAME_.text){
+					NAME_.setFocus();
+					return;
+				}
+				
+				_gnncPopUp.__loading();
+			
+				gnncData.__scapeText(null,[NAME_]);
+				
+				var _table:table_course 	= new table_course();
+				
+				_table.ID					= _tableCourse.ID;
+				_table.ID_CLIENT			= gnncGlobalStatic._idCourse;
+
+				_table.MIX					= _MIX;
+
+				_table.NAME					= gnncData.__removeBreak(NAME_.text).toUpperCase();
+				_table.NAME_CALENDAR		= gnncData.__removeBreak(NAME_CALENDAR_.text).toUpperCase();
+				_table.COLOR_CALENDAR       = COLOR_.value;
+				
+				//_table.DESCRIPTION			= DESCRIPTION_.text;
+				
+				_table.ID_DEPARTAMENT		= DEPARTAMENT_.value;
+				_table.ID_GROUP				= GROUP_.value;
+				_table.ID_CATEGORY			= CATEGORY_.value;
+				
+				_table.DATE_START			= gnncDate.__date2String(DATE_START_.selectedDate,false);
+				_table.DATE_END				= gnncDate.__date2String(DATE_END_.selectedDate,false);
+				_table.DATE_FINAL           = _tableCourse.DATE_FINAL;
+				_table.DATE_CANCELED        = _tableCourse.DATE_CANCELED;
+				_table.DATE_PORT			= gnncDate.__date2String(DATE_PORT_.selectedDate,false);
+
+				_table.ACTIVE 				= _tableCourse.ACTIVE;
+				_table.CONTROL 				= _tableCourse.CONTROL;
+				_table.VISIBLE 				= _tableCourse.VISIBLE;
+				
+				var _sql:String 			= new gnncSql().__INSERT(_table,false,true,true);
+				
+				_connCourse.__sql			(_sql,'','',__fResult,__fFault);
+
+				function __fResult(event:*):void
+				{
+					_change = true;
+					
+					_gnncPopUp.__close();
+					__close();
+				}
+
+				function __fFault(event:*):void
+				{
+					_gnncPopUp.__close();
+				}
+
+				
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<elements:elementStageBoxPopUp />
+	<elements:elementLabelFont id="titlePopUp_" text="TURMA" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" />
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52" >
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:HorizontalLayout gap="5" />
+			</s:layout>
+
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:FormItem label="Nome" width="100%" required="true">
+					<s:TextInput id="NAME_" width="100%" height="30" fontSize="13" paddingLeft="5" prompt="Nome da Turma" maxChars="150" />
+				</s:FormItem>
+
+				<!-- s:FormItem label="Sigla" width="100%" required="true">
+					<s:TextInput id="NICK_NAME_" width="100%" height="30" fontSize="13" paddingLeft="5" prompt="" maxChars="50" />
+				</s:FormItem -->
+
+				<elements:elementHLine height="25" alpha=".5" />
+
+				<s:FormItem label="Calendário" width="100%">
+					<s:layout>
+						<s:HorizontalLayout gap="5"/>
+					</s:layout>
+					<s:TextInput id="NAME_CALENDAR_" width="150" height="30" fontSize="13" paddingLeft="5" prompt="" maxChars="50" /> 
+					<s:Label text="Visível em calendário/cronograma"/>
+				</s:FormItem>
+
+				<s:FormItem label="Cor" width="100%">
+					<select:conSelect_COLOR id="COLOR_" width="120" />
+				</s:FormItem>
+
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Início" width="100%" >
+					<gnncDateField4:gnncDateField4 id="DATE_START_" width="100" yearNavigationEnabled="true" text="" firstDayOfWeek="0" formatString="DD/MM/YYYY" editable="false" selectedDate="{new Date()}" height="25" fontSize="12" />
+					<s:Label id="dateStart_" text="{gnncDate.__date2Legend('',DATE_START_.selectedDate)}" />
+				</s:FormItem>
+				<s:FormItem label="Fim" width="100%" >
+					<gnncDateField4:gnncDateField4 id="DATE_END_" width="100" yearNavigationEnabled="true" text="" firstDayOfWeek="0" formatString="DD/MM/YYYY" editable="false" selectedDate="{new Date()}" height="25" fontSize="12" />
+					<s:Label id="dateEnd_" text="{gnncDate.__date2Legend('',DATE_END_.selectedDate)}" />
+				</s:FormItem>
+				<s:FormItem label="Portaria" width="100%" >
+					<gnncDateField4:gnncDateField4 id="DATE_PORT_" width="100" yearNavigationEnabled="true" text="" firstDayOfWeek="0" formatString="DD/MM/YYYY" editable="false" selectedDate="{new Date()}" height="25" fontSize="12" />
+					<s:Label id="datePort_" text="{gnncDate.__date2Legend('',DATE_PORT_.selectedDate)}" />
+				</s:FormItem>
+				<s:FormItem label="Período" width="100%" >
+					<s:Label text="{DateUtils.dateDiff(DateUtils.DAY_OF_MONTH,DATE_START_.selectedDate,DATE_END_.selectedDate)+' dias'}" paddingRight="10" height="25" verticalAlign="middle"/>
+					<s:Label text="{DateUtils.dateDiff(DateUtils.MONTH,DATE_START_.selectedDate,DATE_END_.selectedDate)+' mês(es)'}" paddingRight="10" height="25" verticalAlign="middle"/>
+				</s:FormItem>
+			</s:Form>
+			
+			<s:Group width="250" height="100%">
+				<elements:elementBarGray radiusX="4" top="15" bottom="0" alpha=".2"/>
+				<s:VGroup width="100%" height="100%" top="20" paddingBottom="20" paddingLeft="20" paddingRight="20" paddingTop="20" gap="5">
+					
+					<s:Label text="Departamento" fontWeight="bold" fontSize="11"/>
+					<select:conSelect_DEPARTAMENT id="DEPARTAMENT_" />
+					
+					<s:Label text="Grupo" fontWeight="bold" fontSize="11"/>
+					<select:conSelect_GROUP id="GROUP_" _MIX="{_MIX}" />
+					
+					<s:Label text="Categoria" 	fontWeight="bold" fontSize="11"/>
+					<select:conSelect_CATEGORY id="CATEGORY_" _MIX="{_MIX}" />
+					
+				</s:VGroup>
+			</s:Group>
+			
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="10" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%" />
+		<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" label="Cadastrar" click="{__save()}" fontWeight="bold" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" />	
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+		
+</s:Module>

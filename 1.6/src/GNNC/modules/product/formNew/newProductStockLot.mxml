@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	width="460" height="340"
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:select="GNNC.elements.component.select.*" 
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*" 
+	xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*" 
+	xmlns:gnncDateField4="GNNC.UI.gnncDateField4.*" 
+	xmlns:gnncDateButton="GNNC.UI.gnncDateButton.*" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.sqlTables.table_product_stock;
+			import GNNC.sqlTables.table_product_stock_lot;
+			
+			import mx.rpc.Fault;
+			import mx.rpc.events.ResultEvent;
+
+			public var _tableProductStockLot:table_product_stock_lot = new table_product_stock_lot();
+			
+			private var _connProduct:gnncAMFPhp = new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			
+			public var _change:Boolean = false;
+			
+			private function __start():void
+			{
+				
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						/*if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}*/
+					}
+				);
+				
+				__check();
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void 
+			{ 
+				if(uint(_tableProductStockLot.ID)==0){
+					NAME_DYNAMIC_.text = newName();
+				}
+			}
+			public function newName():String 
+			{
+				var arr:Array = ['DO','SE','TE','QA','QI','SX','SA'];
+				var d:Date = new Date();
+				var w:String = String(arr[DateUtils.dayOfWeek(d)])
+				var f:String = d.fullYear + gnncDataNumber.__setZero(d.month) + gnncDataNumber.__setZero(d.date);
+				var h:String = gnncDataNumber.__setZero(d.hours) + gnncDataNumber.__setZero(d.minutes);
+				var p:String = gnncDataRand.__passWord(2,false).toUpperCase();
+				return f+'-'+w+'-'+h+'-'+p;
+			}
+
+
+			private function __check():void
+			{
+				if(_tableProductStockLot != null){
+					if(_tableProductStockLot.ID){
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						var _SQL:String 		= new gnncSql().__SELECT(new table_product_stock_lot(_tableProductStockLot.ID),false);
+						_connProduct.__sql		(_SQL,'','',__fResultEdit,__fFaultEdit);
+					}else{
+						//ACTIVE_.value = 1;
+					}
+				} else {
+					_tableProductStockLot = new table_product_stock_lot();
+					//ACTIVE_.value = 1;
+				}
+			}
+
+			protected function __fFaultEdit(event:*):void
+			{
+				_gnncPopUp.__close();
+				gnncPopUp(this).__close(this);
+			}
+
+			protected function __fResultEdit(event:*):void
+			{
+				if(!_connProduct.DATA_ROWS)
+					return;
+				
+				var o:Object 		= _connProduct.DATA_ARR.getItemAt(0);
+				
+				_tableProductStockLot.ID 		= o.ID;
+				_tableProductStockLot.ID_KEY 	= o.ID_KEY;
+				NAME_.text						= gnncData.__firstLetterUpperCase(o.NAME);
+				NAME_DYNAMIC_.text				= o.NAME_DYNAMIC;
+
+				DATE_FABRICATION_.selectedDate 	= gnncDate.__isNull(o.DATE_FABRICATION)? null : gnncDate.__string2Date(o.DATE_FABRICATION) ;
+				DATE_EXPIRATION_.selectedDate  	= gnncDate.__isNull(o.DATE_EXPIRATION) ? null : gnncDate.__string2Date(o.DATE_EXPIRATION)  ;
+
+				_gnncPopUp.__close();
+			}
+
+			private function __save():void
+			{
+				_gnncPopUp.__loading();
+				
+				var o:table_product_stock_lot = new table_product_stock_lot();
+
+				_tableProductStockLot.ID_KEY = _tableProductStockLot.ID_KEY ? _tableProductStockLot.ID_KEY : gnncDataRand.__key(); 
+
+				o.ID = _tableProductStockLot.ID;
+				o.ID_KEY = _tableProductStockLot.ID_KEY;
+				o.NAME_DYNAMIC = NAME_DYNAMIC_._label;
+				o.NAME = String(NAME_.text);
+				
+				o.DATE_FABRICATION = DATE_FABRICATION_.selectedDate == null ? '' : DATE_FABRICATION_.selectedDateString ;
+				o.DATE_EXPIRATION  = DATE_EXPIRATION_.selectedDate  == null ? '' : DATE_EXPIRATION_.selectedDateString  ;
+
+				var _sql:String 	= new gnncSql().__INSERT(o,false,true,true);
+				_connProduct.__sql	(_sql,'','',__fResult,__fFault);
+
+			}
+
+			protected function __fResult(event:ResultEvent):void
+			{
+				_change = true;
+				_gnncPopUp.__close();
+				__close();
+			}
+			
+			protected function __fFault(event:Fault):void
+			{
+				_gnncPopUp.__close();
+			}
+
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp/>
+	<elements:elementLabelFont id="titlePopUp_" text="LOTE" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+		<s:Rect width="100%"/>
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%">
+			<s:layout>
+				<s:VerticalLayout gap="5" padding="20" />
+			</s:layout>
+
+			<s:Label text="Lote" width="100%" fontSize="12" fontWeight="bold" height="20" verticalAlign="middle"/>
+			<elements:elementLabelBackgroudColor id="NAME_DYNAMIC_" _colorBackground="0xeeeeee" _color="0x333333" _fontWeight="normal"
+				text="" _fontSize="15"
+				width="100%" _paddingLeftText="15" _paddingRightText="15"
+				height="40"
+				/>
+
+			<s:Label text="Nome do Lote (não obrigatório)" width="100%" fontSize="12" fontWeight="bold" height="20" verticalAlign="middle"/>
+			<s:TextInput id="NAME_" width="100%" height="40" paddingLeft="10" paddingRight="10" fontSize="14" />
+
+			<s:HGroup width="100%" gap="1" verticalAlign="middle">
+				<s:Label text="Fabricação" width="100%" fontSize="11" fontWeight="bold" height="20" verticalAlign="middle"/>
+				<s:Label text="Validade" width="100%" fontSize="11" fontWeight="bold" height="20" verticalAlign="middle"/>
+			</s:HGroup>
+			<s:HGroup width="100%" gap="1" verticalAlign="middle">
+				
+				<gnncDateButton:gnncDateButton width="100%" height="30" id="DATE_FABRICATION_" selectedDate="{new Date()}" />
+				<s:Button icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="30" height="30" click="{DATE_FABRICATION_.selectedDate = null}"/>
+				<gnncDateButton:gnncDateButton width="100%" height="30" id="DATE_EXPIRATION_" />
+				<s:Button icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="30" height="30" click="{DATE_EXPIRATION_.selectedDate = null}"/>
+				<!-- select:conDateButton width="100%" height="30"/ -->
+				
+			</s:HGroup>
+			
+
+
+		</s:NavigatorContent>
+
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%" />
+		<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" label="Cadastrar" click="{__save()}" fontWeight="bold" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" />	
+	</s:HGroup>
+		
+	<s:Button top="10" right="10" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

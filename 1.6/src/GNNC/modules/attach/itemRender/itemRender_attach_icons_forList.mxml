@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				minHeight="16" minWidth="16" 
+				
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				doubleClickEnabled="true" 
+				
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.file.gnncFilesRemote;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedExtension;
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function getExt(d:Object):String
+			{
+				return String(d).split('.')[1];
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Image source="{data is String?gnncEmbedExtension.__fileExtension(getExt(data),16):data.hasOwnProperty('EXTENSION')==true?gnncEmbedExtension.__fileExtension(data.EXTENSION,16):gnncEmbedBlackWhite.bw_report_16}" width="16" height="16"
+			 toolTip="{getExt(data)}" horizontalCenter="0" verticalCenter="0"
+			 />
+	<!-- 
+	
+	toolTip="{'Arquivo, ID:'+data.ID+'\n'+data.NAME+'\n'+data.EXTENSION+'\n'+gnncFilesRemote.__bytes2Legend(data.SIZE)}"
+	
+	-->
+			 
+</s:ItemRenderer>

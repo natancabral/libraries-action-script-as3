@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009"
+		  xmlns:s="library://ns.adobe.com/flex/spark"
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:stage="GNNC.elements.stage.*"
+		  xmlns:elements="GNNC.UI.elements.*"
+		  xmlns:gnncLoading="GNNC.UI.gnncLoading.*"
+		  xmlns:select="GNNC.elements.component.select.*"
+		  width="100%" height="100%" creationComplete="{__start()}">
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.encrypt.gnncMD5;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.permission.gnncPermission;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.event.gnncCloseEvent;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.modules.user.formNew.newPermissionHost;
+			import GNNC.modules.user.formNew.newUserLogin;
+			import GNNC.sqlTables.table_login;
+			import GNNC.sqlTables.table_permission;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			private var connUser:gnncAMFPhp 		= new gnncAMFPhp();
+			private var connPermission:gnncAMFPhp 	= new gnncAMFPhp();
+			private var connExec:gnncAMFPhp 		= new gnncAMFPhp();
+			
+			private function __start():void
+			{
+				//PERMISSION_GROUP_.LIST_.addEventListener(IndexChangeEvent.CHANGE,__permissionList);
+				groupPermission_.LIST_.addEventListener(IndexChangeEvent.CARET_CHANGE,__permissionList);
+				//permissionList_.addEventListener(gnncEventGeneral._refresh,__permissionList);
+				
+				gnncDataBindable.__loginSession(permission);
+			}
+			
+			private function permission(e:*=null):void
+			{
+				if( gnncGlobalStatic._userAdmin === true )
+					return;
+				else if( gnncGlobalStatic._userClient === true )
+					enabled = false;
+				else
+					gnncPermission.__blockModule(this,'module-user',true,false);
+			}
+			
+			public function __userList():void
+			{				
+				var column:Array = new Array(
+					"ID",
+					"ID_CLIENT",
+					"ID_GROUP",
+					"USER",
+					"USER_EMAIL",
+					"IS_ADMIN",
+					"IS_CLIENT",
+					"PASSW_CHANGE",
+					"TOKEN",
+					"UTC",
+					"ACTIVE",
+					"SUMMER_TIME",
+					"(select NAME from dbd_client where dbd_client.ID = dbd_login.ID_CLIENT) as NAME_CLIENT",
+					"(select NAME from dbd_group  where dbd_group.ID  = dbd_login.ID_GROUP ) as NAME_GROUP"
+				);
+				
+				var sql:String = " SELECT "+column.join(',')+" from dbd_login where ID >= 0 order by USER,NAME_GROUP asc ";
+				enabled = false;
+				connUser.__sql(sql,'','',fResult,fFault);
+				
+				function fResult(e:*=null):void
+				{
+					enabled = true;
+					userList_.dataProvider = connUser.DATA_ARR;
+				}
+				
+				function fFault(e:*=null):void
+				{
+					enabled = true;
+				}
+			}
+			
+			private function __permissionList(e:*=null):void
+			{
+				var i:int 		= groupPermission_.selectedIndex;
+				
+				if(i < 0){
+					//groupPermission_.LIST_.openDropDown();
+					return;
+				}
+				
+				var v:uint = groupPermission_.value;
+				enabled = false;
+				
+				var t:table_permission = new table_permission();
+				t.ID_GROUP 		= v;
+				var sql:String 	= new gnncSql().__SELECT(t);
+				
+				connPermission.__sql(sql,'','',fResult,fFault);
+				
+				function fResult(e:*=null):void
+				{
+					enabled = true;
+					permissionList_.dataProvider = connPermission.DATA_ARR;
+				}
+				function fFault(e:*=null):void
+				{
+					enabled = true;
+				}
+				
+			}
+			
+			public function __permissionNew():void
+			{
+				var _page:newPermissionHost = new newPermissionHost();
+				new gnncPopUp().__creation	(_page,true,false,_fRemove)
+				
+				function _fRemove(e:*):void{ 
+					if(_page._change){ 
+						groupPermission_.value = _page.group_.value; 
+						__permissionList(); 
+					} 
+				}
+			}
+			
+			public function __userNew():void
+			{
+				var _page:newUserLogin = new newUserLogin();
+				new gnncPopUp().__creation	(_page,true,false,_fRemove)
+				function _fRemove(e:*):void{ 
+					if(_page._change) 
+						__userList(); 
+				}
+			}
+			
+			public function __edit(user:Boolean):void
+			{
+				var objDat:Object         = userList_.selectedItem;
+				var idxDat:int            = userList_.selectedIndex;
+				var idxArr:int            = connUser.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = userList_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(user==false)
+				{
+					objDat     = permissionList_.selectedItem;
+					idxDat     = permissionList_.selectedIndex;
+					idxArr     = connPermission.DATA_ARR.getItemIndex(objDat);
+					itens      = permissionList_.selectedItems;
+					itensCount = itens.length;
+				}
+				
+				if(idxDat<0){
+					new gnncAlert().__alert('Selecione um item na listagem para editar.');
+					return;
+				}
+
+				if(itensCount>1){
+					new gnncAlert().__alert('Selecione apenas um item na listagem.');
+					return;
+				}
+
+				if(user==false)
+				{
+					var pP:newPermissionHost = new newPermissionHost();
+					pP._tablePermission = new table_permission(objDat.ID);
+					new gnncPopUp().__creation(pP,true,false,_fRemoveP);
+					function _fRemoveP(e:*):void{ 
+						if(pP._change)
+							__permissionList(); 
+					}
+					return;
+				}
+				
+				if(gnncGlobalStatic._userAdmin==false && uint(objDat.IS_ADMIN) === 1){
+					gnncPermission.__alert();
+					new gnncNotification().__show('Administrador','Você precisa ser um administrador para editar este usuário.');
+					return;
+				}
+				
+				var p:newUserLogin = new newUserLogin();
+				p._tableLogin = new table_login(objDat.ID);
+				new gnncPopUp().__creation	(p,true,false,_fRemove);
+				function _fRemove(e:*):void{ 
+					if(p._change)
+						__userList(); 
+				}
+				
+				
+			}
+			
+			public function __remove(user:Boolean):void
+			{
+				var objDat:Object         = userList_.selectedItem;
+				var idxDat:int            = userList_.selectedIndex;
+				var idxArr:int            = connUser.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = userList_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(user==false)
+				{
+					objDat     = permissionList_.selectedItem;
+					idxDat     = permissionList_.selectedIndex;
+					idxArr     = connPermission.DATA_ARR.getItemIndex(objDat);
+					itens      = permissionList_.selectedItems;
+					itensCount = itens.length;
+				}
+
+				if(itensCount>1){
+					new gnncAlert().__alert('Selecione apenas um item na listagem.');
+					return;
+				}
+
+				if(idxDat<0){
+					new gnncAlert().__alert('Selecione um item na listagem para excluir.');
+					return;
+				}
+				
+				if(user==false)
+				{
+					gnncAlert.__delete("Você deseja excluir definitivamente estas regras de permissão?",'Excluir definitivamente',
+						function(event:gnncCloseEvent):void
+						{
+							if(event.detail != Alert.YES)
+								return;
+							
+							enabled = false;
+							var _sql:String = new gnncSql().__DELETE(new table_permission(),[objDat.ID],true);
+							connExec.__sql(_sql,'Dados deletados.','',fResultP,fFaultP);
+							
+							function fResultP(e:ResultEvent):void{ 
+								enabled = true;
+								permissionList_.dataProvider.removeItemAt(idxDat);
+								connPermission.DATA_ARR = new ArrayCollection(permissionList_.dataProvider.toArray());
+							}
+							function fFaultP(e:FaultEvent):void{ 
+								enabled = true;
+							}							
+						},[gnncAlert.YES,gnncAlert.CANCEL]);
+					
+					return;
+				}
+				
+				if(gnncGlobalStatic._userAdmin==false && uint(objDat.IS_ADMIN) === 1){
+					gnncPermission.__alert();
+					new gnncNotification().__show('Administrador','Você precisa ser um administrador para excluir este usuário.');
+					return;
+				}
+				
+				gnncAlert.__delete("Você deseja excluir esse usuário definitivamente?",'Excluir definitivamente',
+					function(event:gnncCloseEvent):void
+					{
+						if(event.detail != Alert.YES)
+							return;
+						
+						enabled = false;
+						var _sql:String = new gnncSql().__DELETE(new table_login(),[objDat.ID],true);
+						connExec.__sql(_sql,'Dados deletados.','',fResult,fFault);
+						
+						function fResult(e:ResultEvent):void{ 
+							enabled = true;
+							userList_.dataProvider.removeItemAt(idxDat);
+							connUser.DATA_ARR = new ArrayCollection(userList_.dataProvider.toArray());
+						}
+						function fFault(e:FaultEvent):void{ 
+							enabled = true;
+						}							
+						
+					},[gnncAlert.YES,gnncAlert.CANCEL]);
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Style>
+		.AC {
+			skin: ClassReference("GNNC.skin.accordion.skin_accordion_header");
+		}
+	</fx:Style>
+	
+	<elements:elementBarStatus width="67" height="100%"/>
+	
+	<s:HGroup width="100%" height="100%" gap="0">
+
+		<s:VGroup width="67" height="100%" gap="1">
+
+			<s:Button width="100%" height="60" click="{__userList()}"
+					  icon="{gnncEmbedBlackWhite.bw_all_32}" iconPlacement="top"
+					  skinClass="GNNC.skin.button.skin_buttonLink" toolTip="Listar Usuários"/>
+
+			<s:Button width="100%" height="60" click="{__userNew()}"
+					  icon="{gnncEmbedBlackWhite.bw_user_32}" iconPlacement="top"
+					  skinClass="GNNC.skin.button.skin_buttonLink" toolTip="Novo Usuário"/>
+			
+			<s:HGroup width="100%" gap="1">
+				<s:Button width="100%" height="33" icon="{gnncEmbedBlackWhite.bw_edit_16}"   toolTip="Editar" 	iconPlacement="right" skinClass="GNNC.skin.button.skin_buttonLink" click="{__edit(true)}"/>
+				<s:Button width="100%" height="33" icon="{gnncEmbedBlackWhite.bw_delete_16}" toolTip="Excluir" 	iconPlacement="right" skinClass="GNNC.skin.button.skin_buttonLink" click="{__remove(true)}"/>
+			</s:HGroup>
+		</s:VGroup>
+
+		<elements:elementVLine width="1"/>
+		
+		<s:VGroup width="100%" height="100%" gap="0">
+			
+			<s:List id="userList_" width="100%" height="100%" borderVisible="false" contentBackgroundAlpha="0"
+					horizontalScrollPolicy="off" itemRenderer="GNNC.modules.user.itemRender.itemRender_user_forList">
+				<s:layout>
+					<s:VerticalLayout gap="0" padding="20" rowHeight="30"/>
+				</s:layout>
+			</s:List>
+			
+		</s:VGroup>
+		
+		<elements:elementVLine width="1" />
+
+		<s:VGroup width="300" height="100%" gap="0">
+			
+			<s:Group width="100%">
+				<elements:elementBarStatus height="100%" alpha=".4"/>
+				<s:HGroup width="100%" gap="1" paddingLeft="10" verticalAlign="middle">
+					<s:VGroup width="100%" gap="1" paddingBottom="10" paddingLeft="10" paddingRight="20" paddingTop="10">
+						<s:Label height="25" fontSize="11" fontWeight="normal" paddingRight="5" text="Permissão em Grupo" verticalAlign="middle"/>
+						<s:HGroup width="100%" gap="1">
+							<select:conSelect_GROUP id="groupPermission_" width="100%" maxWidth="250" height="30" _ADD="false" _ICON="false" _MIX="PERMISSION" fontWeight="bold"/>
+						</s:HGroup>
+					</s:VGroup>
+				</s:HGroup>
+			</s:Group>
+			
+			<elements:elementHLine alpha=".5"/>
+			
+			<s:List id="permissionList_" width="100%" height="100%" borderVisible="false" contentBackgroundAlpha="0" horizontalScrollPolicy="off"
+					itemRenderer="GNNC.modules.user.itemRender.itemRender_permission_forList">
+				<s:layout>
+					<s:VerticalLayout gap="0" padding="20" rowHeight="30"/>
+				</s:layout>
+			</s:List>
+			
+			<elements:elementHLine alpha=".5"/>
+			
+			<s:Group width="100%">
+				<s:HGroup gap="1" padding="5" width="100%">
+					<s:Rect width="100%"/>
+					<s:Button label="..." width="10" height="30" click="{new gnncAlert().__alert(gnncMD5.hash(gnncMD5.hash(PW.text)+'GNNC'))}" visible="{PP.text=='gnncestrategiaempresarial'?true:false}"/>
+					<s:TextInput id="PW" width="10" height="30" displayAsPassword="true" visible="{PP.text=='gnncestrategiaempresarial'?true:false}"/>
+					<s:TextInput id="PP" width="10" height="30" displayAsPassword="true" alpha=".4"/>
+				</s:HGroup>
+			</s:Group>
+			
+		</s:VGroup>
+
+		<elements:elementVLine width="1" />
+		
+		<s:Group width="67" height="100%">
+			<elements:elementBarStatus width="67" height="100%"/>
+			<s:VGroup width="67" height="100%" gap="1">
+				
+				<s:Button width="100%" height="60" click="{__permissionList()}"
+						  icon="{gnncEmbedBlackWhite.bw_all_32}" iconPlacement="top"
+						  skinClass="GNNC.skin.button.skin_buttonLink" toolTip="Listar Permissões"/>
+				
+				<s:Button width="100%" height="60" click="{__permissionNew()}"
+						  icon="{gnncEmbedBlackWhite.bw_permission_32}" iconPlacement="top"
+						  skinClass="GNNC.skin.button.skin_buttonLink"
+						  toolTip="Novas Permissões em Grupo"/>
+				
+				<s:HGroup width="100%" gap="1">
+					<s:Button width="100%" height="33" icon="{gnncEmbedBlackWhite.bw_edit_16}"   toolTip="Editar" 	iconPlacement="right" skinClass="GNNC.skin.button.skin_buttonLink" click="{__edit(false)}"/>
+					<s:Button width="100%" height="33" icon="{gnncEmbedBlackWhite.bw_delete_16}" toolTip="Excluir" 	iconPlacement="right" skinClass="GNNC.skin.button.skin_buttonLink" click="{__remove(false)}"/>
+				</s:HGroup>
+				
+			</s:VGroup>
+		</s:Group>
+
+	</s:HGroup>
+		
+</s:Module>

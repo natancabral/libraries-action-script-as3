@@ -1,0 +1,37 @@
+package GNNC.data.html
+{
+	public class gnncHtmlStyles
+	{
+		
+		public var _fontColor:uint 			= 0x000000;
+		public var _fontFamily:String 		= 'Arial,';
+		public var _fontSize:uint 			= 12;
+		public var _fontAlpha:Number 		= 1;
+		public var _fontWeight:String 		= 'normal';
+		//public var _fontShadow 		= '';
+
+		public var _backgroungColor:uint	= 0xFFFFFF;
+		public var _backgroundAlpha:Number 	= 1;
+
+		public var _borderColor:uint		= 0xEEEEEE;
+		public var _borderType:String 		= 'solid' ;
+		public var _borderWeight:String 	= 'normal' ;
+
+		public var _paddingTop:uint 		= 0;
+		public var _paddingRight:uint 		= 0;
+		public var _paddingBottom:uint 		= 0;
+		public var _paddingLeft:uint 		= 0;
+
+		public var _marginTop:uint 			= 0;
+		public var _marginRight:uint 		= 0;
+		public var _marginBottom:uint 		= 0;
+		public var _marginLeft:uint 		= 0;
+
+		public var _className:String 		= '';
+		
+		public function gnncHtmlStyles()
+		{
+		}
+		
+	}
+}

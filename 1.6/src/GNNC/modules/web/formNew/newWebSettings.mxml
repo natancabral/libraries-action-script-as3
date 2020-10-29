@@ -1,0 +1,198 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	width="600" height="500"
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:select="GNNC.elements.component.select.*" 
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*" 
+	xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataHtml;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_step;
+			import GNNC.sqlTables.table_web_menu_link;
+			
+			import mx.rpc.Fault;
+			import mx.rpc.events.ResultEvent;
+			
+			private var _connWebSettings:gnncAMFPhp 						= new gnncAMFPhp(); //job
+			private var _gnncPopUp:gnncPopUp 								= new gnncPopUp();
+			
+			public  var _change:Boolean = false;
+			
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+						if(gnncKeyboard.__CONTROL_ENTER(event)) __save();
+					}
+				);
+				
+				__check();
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void 
+			{ 
+				NAME_.setFocus();
+			}
+			
+			private function __check():void
+			{
+				_gnncPopUp.__loading	('Recolhendo dados...');
+				//var _sql:String 		= new gnncSql().__SELECT(new table_web_menu_link());
+				//_connWebSettings.__sql	(_sql,'','',__fResultCheck,__fFaultCheck);
+			}
+
+			protected function __fFaultCheck(e:*):void
+			{
+				_gnncPopUp.__close();
+			}
+			
+			protected function __fResultCheck(e:*):void
+			{
+				if(!_connWebSettings.DATA_ROWS)
+					return;
+				
+				_gnncPopUp.__close();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+
+			private function __save():void
+			{
+				_gnncPopUp.__loading();
+				
+				var _object:Object 			= new Object();
+				
+				var _sql:String 			= new gnncSql().__INSERT(_object,false,true,true);
+				
+				_connWebSettings.__sql	(_sql,'','',__fResult,__fFault);
+
+				function __fResult(event:*):void
+				{
+					_change = true;
+					_gnncPopUp.__close();
+					__close();
+				}
+				
+				function __fFault(event:*):void
+				{
+					_gnncPopUp.__close();
+				}
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp />
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="0" paddingLeft="0">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" />
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1" />
+			</s:layout>
+			<s:Form width="100%" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="5" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAME_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAME1_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAME2_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAME3_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAME4_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAME5_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAME51q_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="AVANÇADO" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1" />
+			</s:layout>
+			<s:Form width="100%" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="5" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAMEw_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAMEw1_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAMEw2_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAMEw3_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAMEw4_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAMEw5_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+				<s:FormItem label="Nome" width="100%">
+					<s:TextInput id="NAME5w1q_" width="100%" height="30" fontSize="15" paddingLeft="5" />
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="4" paddingRight="4" verticalAlign="middle">
+		<s:Rect width="100%" />
+		<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" label="Cadastrar (Ctrl+Enter)" click="{__save()}" fontWeight="bold" height="25" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" height="25" />	
+	</s:HGroup>
+	
+	<s:Button top="10" right="10" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

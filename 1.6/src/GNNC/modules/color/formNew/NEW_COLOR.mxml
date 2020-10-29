@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="450" height="340"
+		  creationComplete="(__start())" 
+		  xmlns:stage="GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*" 
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.gnncEmbedImage;
+			
+			import mx.events.FlexEvent;
+			import mx.managers.CursorManager;
+			
+			public function set value(value_:uint):void	{ COLOR_.color = uint(value_)	}
+			public function get value():uint			{ return uint(COLOR_.color) 	}
+			
+			public var _change:Boolean = false;
+
+			private var bm:Bitmap;
+			private var bmd:BitmapData;
+			
+			private function __start():void
+			{
+				lbl.setFocus			();
+				this.addEventListener	(FlexEvent.REMOVE,function(event:FlexEvent):void{__removeCursor()});
+			}
+
+			private function __close():void
+			{
+				__removeCursor			();
+				new gnncPopUp().__close	(this);
+			}
+	
+			private function __imageComplete():void 
+			{
+				bm 						= IMG.content as Bitmap;
+				bmd 					= new BitmapData(IMG.width,IMG.height);
+				bmd.draw				(bm.bitmapData);
+			}
+			
+			private function __overImage(evt:MouseEvent):void
+			{
+				value 					= uint(gnncDataNumber.__toHexColor(bmd.getPixel(evt.localX, evt.localY),true));
+				lbl.text 				= gnncDataNumber.__toHexColor(value,true);
+				
+				cursorManager.setCursor(gnncEmbedImage.CURSOR_COLOR_16,2,0,-10);
+			}
+
+			private function __changeColor():void
+			{
+				value					= uint(gnncDataNumber.__toHexColor(COLOR_PICKER_.selectedColor,true));
+				lbl.text 				= gnncDataNumber.__toHexColor(value,true);
+				__close					();
+			}
+
+			private function __removeCursor():void
+			{
+				cursorManager.removeAllCursors();
+			}
+			
+			private function __noColor():void
+			{
+				lbl.text 				= '';
+				value					= 0;
+				__close					();
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBox/>
+	
+	<s:HGroup left="20" top="20" right="20" bottom="20" gap="5">
+		<s:Group width="300" height="300">
+			<mx:Image id="IMG" source="{gnncEmbedImage.COLOR_PALETTE_01}" width="300" height="300" mouseMove="{__overImage(event)}" creationComplete="{__imageComplete()}" click="{__close()}" mouseOut="{__removeCursor()}"/>
+			<s:RectangularDropShadow width="300" height="300" distance="2" blurX="5" blurY="5"  />
+		</s:Group>
+		<s:VGroup width="100%" height="100%" gap="2">
+			<s:Group width="105" height="105">
+				<s:Rect width="105" height="105">
+					<s:fill>
+						<s:SolidColor id="COLOR_" color="0xFFFFFF" />
+					</s:fill>
+					<s:stroke>
+						<s:SolidColorStroke color="0xCCCCCC" weight="1" />
+					</s:stroke>
+				</s:Rect>
+				<s:RectangularDropShadow width="105" height="105" distance="2" blurX="5" blurY="5"  />
+			</s:Group>
+			<s:Label id="lbl" color="0x000000" textAlign="center" width="100%" height="25" verticalAlign="middle" backgroundAlpha="0xCCCCCC" />
+			<mx:ColorPicker id="COLOR_PICKER_" width="105" height="25" change="{__changeColor()}"/>
+			<s:Rect height="100%" />
+			<s:Button height="25" width="100%" label="Limpar" icon="{gnncEmbedImage.CLEAR_16}" click="{__noColor()}" />
+			<s:Button height="25" width="100%" label="Fechar" icon="{gnncEmbedImage.CLOSE_16}" click="{__close()}" />
+		</s:VGroup>
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__noColor()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+
+</s:Module>

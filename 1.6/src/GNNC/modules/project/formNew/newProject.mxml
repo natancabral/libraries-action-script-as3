@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="500" height="410"
+		  
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:stage			= "GNNC.elements.stage.*" 
+		  xmlns:select			= "GNNC.elements.component.select.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:gnncDateField4	= "GNNC.UI.gnncDateField4.*" xmlns:gnncDateButton="GNNC.UI.gnncDateButton.*"
+		  
+		  >
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.sqlTables.table_project;
+			
+			public const _MIX:String = 'PROJECT';
+			public var _connProject:gnncAMFPhp = new gnncAMFPhp();
+			public var _tableProject:table_project = new table_project();
+			public var _change:Boolean = false;
+			
+			private var _gnncPopUp:gnncPopUp 		= new gnncPopUp();
+
+			private function __start():void
+			{
+				__check();
+				callLater(__firstInput);
+			}
+
+			private function __firstInput():void
+			{
+				NAME_.setFocus();
+			}
+			
+			private function __check():void
+			{
+				if(_tableProject != null){
+					if(_tableProject.ID){
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var _sql:String = new gnncSql().__SELECT(new table_project(_tableProject.ID));
+						_connProject.__sql(_sql,'','',__fResultCheck,__fFaultCheck);
+					}
+				}else{
+					_tableProject = new table_project();
+				}
+			}
+			
+			protected function __fFaultCheck(event:*):void
+			{
+				_gnncPopUp.__close();
+				__close();
+			}
+			
+			protected function __fResultCheck(event:*):void
+			{
+				if(uint(_connProject.DATA_ROWS)==0)
+				{
+					new gnncAlert().__alert('Impossível editar este Projeto. Verifique se este cliente está bloqueado.');
+					__close();
+				}
+				
+				var obj:Object = _connProject.DATA_ARR.getItemAt(0);
+
+				if(obj.MIX != 'PROJECT')
+				{
+					new gnncAlert().__error('Este cadastro não é um Projeto. Verifique sua credencial.','Problema em MIX');
+					__close();
+					return;
+				}
+				
+				_tableProject.ID						= _tableProject.ID;
+				
+				CLIENT_.value 							= obj.ID_CLIENT;
+				NAME_.text 								= obj.NAME;
+				
+				DESCRIPTION_.text 						= obj.DESCRIPTION;
+				//WEBSITE_.text 							= _PROJECT.DATA_ARR.getItemAt(0).WEBSITE;
+				//ROOM_.text 								= _PROJECT.DATA_ARR.getItemAt(0).ROOM;
+				
+				btnDateStart_.selectedDate 			= gnncDate.__isNull(obj.DATE_START) ? new Date() : gnncDate.__string2Date(obj.DATE_START,false) ;
+				btnDateEnd_.selectedDate 			= gnncDate.__isNull(obj.DATE_END)   ? new Date() : gnncDate.__string2Date(obj.DATE_END,false) ;
+				_tableProject.DATE_FINAL				= obj.DATE_FINAL;
+				
+				DEPARTAMENT_.value						= obj.ID_DEPARTAMENT;
+				GROUP_.value 							= obj.ID_GROUP;
+				//CATEGORY_.value							= obj.ID_CATEGORY;
+				
+				STATUS_.value							= obj.ACTIVE;
+				_tableProject.VISIBLE					= obj.VISIBLE;
+				_tableProject.CONTROL					= obj.CONTROL;
+				
+				_gnncPopUp.__close();
+			}
+			
+			private function __close():void
+			{
+				_gnncPopUp.__close();
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __save():void
+			{
+				if(NAME_.text.length<3 || CLIENT_.value==0){
+					new gnncNotification().__show('Empreencha os Campos','Os campos Nome e Cliente são obrigatórios.');
+					return;
+				}
+				
+				_gnncPopUp.__loading();
+			
+				gnncData.__scapeText(null,[NAME_,DESCRIPTION_]);
+				
+				var _table:table_project 	= new table_project();
+				
+				_table.ID					= _tableProject.ID;
+				_table.ID_CLIENT			= CLIENT_.value;
+
+				_table.MIX					= _MIX;
+
+				_table.NAME					= NAME_.text.toUpperCase();
+				_table.DESCRIPTION			= DESCRIPTION_.text;
+				
+				_table.ID_DEPARTAMENT		= DEPARTAMENT_.value;
+				_table.ID_GROUP				= GROUP_.value;
+				//_table.ID_CATEGORY			= CATEGORY_.value;
+				
+				_table.DATE_START			= btnDateStart_.selectedDate == null ? '' : gnncDate.__date2String(btnDateStart_.selectedDate,false);
+				_table.DATE_END				= btnDateEnd_.selectedDate   == null ? '' : gnncDate.__date2String(btnDateEnd_.selectedDate,false);
+
+				_table.ACTIVE 				= STATUS_.value;
+				_table.CONTROL 				= _tableProject.CONTROL;
+				_table.VISIBLE 				= _tableProject.VISIBLE;
+				
+				var _sql:String 			= new gnncSql().__INSERT(_table,false,true,true);
+				
+				_connProject.__sql			(_sql,'','',__fResult,__fFault);
+
+				function __fResult(event:*):void
+				{
+					_change = true;
+					
+					_gnncPopUp.__close();
+					__close();
+				}
+
+				function __fFault(event:*):void
+				{
+					_gnncPopUp.__close();
+				}
+
+				
+			}
+			
+			private function __changeDate():void
+			{
+				if(btnDateStart_.selectedDate==null || btnDateEnd_.selectedDate==null){
+					dateLeft_.text = '';
+					return;
+				}
+				
+				if(btnDateEnd_.selectedDate.getTime() < btnDateStart_.selectedDate.getTime()){
+					btnDateEnd_.selectedDate = btnDateStart_.selectedDate;
+				}
+				
+				dateLeft_.text = DateUtils.dateDiff(DateUtils.DAY_OF_MONTH,btnDateStart_.selectedDate,btnDateEnd_.selectedDate) + '';
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<elements:elementStageBoxPopUp />
+	
+	<!-- s:HGroup gap="2" verticalAlign="middle" height="35" left="10" top="10">
+		<s:Image id="ICON_" source="{gnncEmbedImage.PROJECT_32}" /> 
+		<elements:elementLabelFont id="TITLE_" text="PROJETO" fontSize="20" fontWeight="normal" height="35" paddingLeft="10" />
+	</s:HGroup-->
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" />
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52" >
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:HorizontalLayout gap="1" paddingRight="15"/>
+			</s:layout>
+			
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:FormItem label="Nome" width="100%" required="true">
+					<s:TextInput id="NAME_" width="100%" height="35" fontSize="13" paddingLeft="10" prompt="Nome do Projeto" maxChars="50"
+								 restrict="[A-Z][a-z]ÇçÁáÀàÂâÃãÊêÉéÍíÎîÓóÔôÕõÚúÛû[0-9] \-\_\(\)@"
+								 />
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Cliente" width="100%" >
+					<select:conSelect_CLIENT id="CLIENT_" width="100%" height="30" _ADD="false" _search="false" />
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5"  />
+				<s:FormItem label="Situação" width="100%" >
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<s:Rect width="7"/>
+					<select:conSelect_STATUS id="STATUS_" _CLEAR="false" value="1" height="30" />
+				</s:FormItem>
+				<s:FormItem label="Agrupar" width="100%" >
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<s:Rect width="7"/>
+					<select:conSelect_GROUP id="GROUP_" height="30" _MIX="{_MIX}" />
+				</s:FormItem>
+				<s:FormItem label="Departamento" width="100%" >
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<s:Rect width="7"/>
+					<select:conSelect_DEPARTAMENT id="DEPARTAMENT_" height="30" 	/>
+				</s:FormItem>
+			</s:Form>
+						
+		</s:NavigatorContent>
+		<s:NavigatorContent label="DESCRIÇÃO" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="5" padding="15" />
+			</s:layout>
+			
+			<s:Label text="{'Descrição ('+(3000-uint(DESCRIPTION_.text.length))+')'}" width="100%" fontWeight="bold"/>
+			<s:TextArea id="DESCRIPTION_" width="100%" height="100%" prompt="" maxChars="3000" contentBackgroundAlpha="1" borderAlpha=".5"
+						paddingBottom="15" paddingLeft="15" paddingRight="15" paddingTop="15"
+						/>
+
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup id="buttomBar_" width="100%" height="39" gap="1" verticalAlign="middle" paddingLeft="5" paddingRight="5" bottom="0"
+			  >		
+		<gnncDateButton:gnncDateButton id="btnDateStart_" width="110" height="30" enabled="true" toolTip="Data prevista para o início do projeto" 
+									   mouseUp="{__changeDate()}"/>
+		<gnncDateButton:gnncDateButton id="btnDateEnd_" width="110" height="30" enabled="true" toolTip="Data prevista para o final do projeto" mouseUp="{__changeDate()}"/>
+
+		<s:Label id="dateLeft_" text="" fontWeight="bold" color="0x009900" toolTip="Tempo entre início e fim." paddingLeft="7" />
+		<s:Label text="dias" paddingLeft="7" />
+
+		<s:Rect width="100%" />
+		
+		<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" label="{'Cadastrar'}" click="{__save()}" fontWeight="bold" height="30" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" height="30" />	
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+		
+</s:Module>

@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				width="100%" height="100%" 
+				
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:gnncImage="GNNC.UI.gnncImage.*"
+				
+				creationComplete="{__start()}"
+				
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				doubleClickEnabled="true" 
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.file.gnncFilesRemote;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedExtension;
+
+			public const allowLoadExtensions:Array = ['jpg','jpeg','gif','png','pdf','ai','psd'];
+
+			private function __start():void
+			{
+			}
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+
+			private function __typeFileIcon(ext_:String,size_:String):Object
+			{
+				//e.currentTarget.source = 
+				var OBJ:Object = gnncEmbedExtension[ext_.toUpperCase()+'_'+size_];
+				
+				if(!OBJ)
+					OBJ = gnncEmbedExtension['ALL_'+size_];
+				
+				return OBJ; 
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="hoveredAndShowsCaret,hovered" >
+		<s:fill>
+			<s:SolidColor color="0xDDDDDD"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Ellipse width="10" height="10" horizontalCenter="0" verticalCenter="0">
+		<s:stroke>
+			<s:SolidColorStroke color="0x555555" alpha=".5"/>
+		</s:stroke>
+	</s:Ellipse>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+
+	<s:Group horizontalCenter="0" verticalCenter="0" left="1" top="1" right="1" bottom="1" >
+		<s:Image source="{__typeFileIcon(data.EXTENSION,'32')}" horizontalCenter="0" verticalCenter="0" />
+		<gnncImage:gnncImageCD data="{data}" width="100%" height="100%" 
+							   property="FILE_LINK" thumbnailCrop="false"
+							   />
+		<!-- s:BitmapImage id="IMG_" source="{__location(data)}" horizontalCenter="0" verticalCenter="0" smooth="true" smoothingQuality="high" contentLoader="{imgcache}" 
+		width="100%"
+		height="100%"
+		scaleMode="zoom"
+		scaleMode.selected="zoom"
+		scaleMode.selectedAndShowsCaret="zoom"
+		/ -->
+	</s:Group>
+	<s:Image source="{__typeFileIcon(data.EXTENSION,'16')}" top="4" left="3" visible="{(allowLoadExtensions.indexOf(String(data.EXTENSION).toLowerCase())==-1)?false:true}" />
+
+	<s:Rect left="30" right="30" height="25" verticalCenter="0" 
+			fill="{new SolidColor(0xeeeeee,1)}" 
+			fill.hovered="{new SolidColor(0xffffff,1)}" 
+			fill.hoveredAndShowsCaret="{new SolidColor(0xffffff,1)}" 
+			includeIn="selected,selectedAndShowsCaret,hovered,hoveredAndShowsCaret"
+			radiusX="4" radiusY="4"
+			/>
+	<s:HGroup height="25" left="30" right="30" paddingLeft="4" paddingRight="4" verticalCenter="0"  gap="3" verticalAlign="middle" 
+			  color.selected="0x444444" color.selectedAndShowsCaret="0x777777" 
+			  includeIn="selected,selectedAndShowsCaret,hovered,hoveredAndShowsCaret">
+		<s:Label text="{String(data.NAME).toLowerCase()}" showTruncationTip="true" maxDisplayedLines="1" fontSize="10" width="100%" paddingTop="1" paddingLeft="2" />
+		<s:Label text="{gnncFilesRemote.__bytes2Legend(data.SIZE)}" maxDisplayedLines="1" showTruncationTip="true" fontSize="9" paddingTop="1" paddingRight="2" />
+	</s:HGroup>
+	
+</s:ItemRenderer>

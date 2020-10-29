@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 
+		 width="100%" height="25"
+		 
+		 creationComplete="{__start()}"
+		 
+		 >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.data.data.gnncDataArray;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.gnncEmbedBlackWhite;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.graphics.SolidColor;
+			import mx.graphics.Stroke;
+			
+			import spark.components.Image;
+			import spark.primitives.Rect;
+			
+			private var _colorValue:String 	= 'FFFFFF';
+			public  var _change:Boolean		= false;
+			public  var _widthBox:Number 	= 25;
+			public  var _heightBox:Number 	= 25;
+			
+			public function set value(value_:String):void		{ _colorValue = value_; __selectColor(value_);	}
+			public function get value():String					{ return _colorValue 							}
+
+			private var selectedAlpha:Number 	= 1;
+			private var unselectedAlpha:Number 	= 0.9;
+
+			private var _c:ArrayCollection 	= gnncGlobalArrays._colors;
+			private var _bgColor:Array 		= new Array();
+			private var _color:Array 		= new Array();
+			private var _bgDark:Array 		= new Array();
+
+			private function __start():void
+			{
+				__preInitialize();
+			}
+
+			private function __preInitialize():void
+			{
+				var p:Object;
+				var n:int = _c.length;
+
+				group_.removeAllElements();
+
+				for( var i:uint=0; i<n; i++ )
+				{
+					p = _c.getItemAt(i);
+
+					//creation of colors buttons
+					__addColor(p.bgColor,p.color,p.bgDark);
+					
+					_bgColor	.push( gnncDataNumber.__toHexColor( p.bgColor ,false) );
+					_color		.push( gnncDataNumber.__toHexColor( p.color   ,false) );
+					_bgDark		.push( p.bgDark	);
+				}
+				
+				group_.getElementAt(0).dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+			}
+
+			private function __selectColor(value_:String,property_:String='bgColor'):void
+			{
+				var a:Array 	= new Array();
+				var idx:int		= gnncDataArray.__getItemIndex(this['_'+property_] as Array,value_); 
+				
+				if(idx < 0)
+					return;
+
+				//new gnncAlert().__alert(a.toString(),"@"+value_+'|'+idx);
+				try
+				{
+					group_.getElementAt(idx).dispatchEvent(new MouseEvent(MouseEvent.CLICK));
+				}
+				catch(e:*)
+				{
+				}
+			}
+			
+			public function __addColor(bgColor_:uint,color_:uint,bgDark_:Boolean):void
+			{
+				var x:Group			= new Group();
+				x.height			= _heightBox;
+				x.width				= _widthBox;
+				x.maxWidth			= 30;
+				x.minWidth			= 10;
+				x.buttonMode		= true;
+				x.alpha				= unselectedAlpha;
+				x.addEventListener	(MouseEvent.CLICK,__click);
+				x.setStyle			('background-color',bgColor_);
+				x.setStyle			('color',color_);
+				x.addEventListener	(FlexEvent.UPDATE_COMPLETE	,__changeAlpha);
+				x.addEventListener	(FlexEvent.VALUE_COMMIT		,__changeAlpha);
+				x.addEventListener	(MouseEvent.MOUSE_OVER		,__over);
+				x.addEventListener	(MouseEvent.MOUSE_OUT		,__out);
+
+				var z:Rect 			= new Rect();
+				z.percentHeight		= 100;
+				z.percentWidth		= 100;
+				z.fill				= new SolidColor(bgColor_);
+				z.stroke			= new Stroke(0xDDDDDD);
+
+				var i:Image		 	= new Image();
+				i.source			= bgDark_ ? gnncEmbedBlackWhite.bw_ok_16_white : gnncEmbedBlackWhite.bw_ok_16 ;
+				i.horizontalCenter	= 0;
+				i.verticalCenter	= 0;
+				i.width				= 8;
+				i.height			= 8;
+				i.visible			= false;
+				
+				x.addElement		(z);
+				x.addElement		(i);
+				
+				group_.addElement	(x);
+				
+				function __changeAlpha(e:FlexEvent):void
+				{
+					if(x.alpha < selectedAlpha)
+						i.visible = false;
+					else
+						i.visible = true;
+				}
+				
+				function __click(e:MouseEvent):void
+				{
+					var n:uint = _c.length;
+					
+					for( var u:uint=0; u<n; u++ )
+						group_.getElementAt(u).alpha = unselectedAlpha;
+					
+					e.currentTarget.alpha = selectedAlpha;
+					value = gnncDataNumber.__toHexColor(e.currentTarget.getStyle('background-color'));
+					i.visible = false;
+				}
+				
+				function __over(e:*):void
+				{
+					z.stroke			= new Stroke(0x000000);
+				}
+				
+				function __out(e:*):void
+				{
+					z.stroke			= new Stroke(0xDDDDDD);
+				}
+				
+			}
+
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+
+	<s:HGroup id="group_" width="100%" height="25" gap="1">
+	</s:HGroup>
+	
+</s:Group>

@@ -1,0 +1,651 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  creationComplete="{__start()}"
+		  width="100%" height="100%" 
+		  
+		  xmlns:itemRender	= "GNNC.modules.calendar.itemRender.*" 
+		  xmlns:stage		= "GNNC.elements.stage.*" 
+		  xmlns:gnncLoading	= "GNNC.UI.gnncLoading.*" 
+		  xmlns:elements="GNNC.UI.elements.*"
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.elements.elementLabelBackgroudColor;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.calendar.formNew.newCalendar;
+			import GNNC.sqlTables.table_calendar;
+			
+			import mx.collections.ArrayCollection;
+			import mx.graphics.SolidColor;
+			
+			private var connCalendar:gnncAMFPhp = new gnncAMFPhp();
+			private var connJobs:gnncAMFPhp = new gnncAMFPhp();
+			
+			private var _today:Date = new Date();
+			private var _month:uint = new Date().month; 	//JAN --> 0
+			private var _year:uint 	= new Date().fullYear; 	//2012
+			
+			private var _hasEvent:Boolean = false;
+			
+			public var _getCalendar:Boolean 		  = true;
+			public var _getCalendarCourseCron:Boolean = false;
+			public var _getCalendarProcess:Boolean 	  = false;
+			public var _getJobs:Boolean 		      = false;
+			public var _getFinancial:Boolean 		  = false;
+			
+			private const _columLeft:uint = 66;//345;
+			
+			private function __start():void
+			{
+				__calendarCreation();
+				setEvent();
+				//gnncDataBindable.__loginSession(__calendarRefresh);
+			}
+
+			private function setEvent():void
+			{
+				var len:uint = 42;
+				var i:uint = 1;
+				for( i=1; i<=len; i++ )
+					this['X'+i].addEventListener('zoom',eventZoom);
+			}
+
+			private function eventZoom(e:gnncEventGeneral):void
+			{
+				clearDay();
+				calendarList_.dataProvider = Object(e.currentTarget).dataProvider;
+				day_date.text = gnncDate.__date2Legend(Object(e.currentTarget)._date);
+				//DAY_.dataProvider = Object(e.currentTarget).dataProvider;
+				panelCenter_.selectedIndex = 0;
+				//new gnncAlert().__alert(':'+Object(e.currentTarget).id,'t');
+			}
+
+			private function selectedItem():void
+			{
+				var objDat:Object         = calendarList_.selectedItem;
+				var idxDat:int            = calendarList_.selectedIndex;
+				//var idxArr:int            = connListStep.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = calendarList_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(idxDat < 0){
+					clearDay();
+					return;
+				}
+				
+				day_date_start.text = gnncDate.__date2Legend(objDat.DATE_START);
+				day_date_end.text   = gnncDate.__date2Legend(objDat.DATE_END);
+				day_title.text      = objDat.TITLE;
+			}
+			
+			private function clearDay():void
+			{
+				day_date_start.text = '';
+				day_date_end.text   = '';
+				day_title.text      = '';
+			}
+
+			
+			private function panel(open:Boolean,effect:Boolean=true):void
+			{
+				if(!effect)
+					panelList_.setStyle('moveEffect',null);
+				else
+					panelList_.setStyle('moveEffect',movie);
+				
+				if(!open){
+					//listPanelTitle_.text = 'Listagem';
+					//listPanel_.dataProvider = new ArrayCollection();
+					//FINANCIAL_.setFocus();
+				}
+				
+				panelList_.visible = true;
+				panelList_.left = open ? 0 : -310 ;
+				//listPanel_.enabled = open;
+				//panelButtons_.enabled = !open; 
+			}
+			
+			private var waitGlobal:elementLabelBackgroudColor = null
+			private function loading(show:Boolean):void
+			{
+				if(waitGlobal==null){
+					waitGlobal = new elementLabelBackgroudColor();
+					waitGlobal._label = 'Aguarde, estamos recolhendo dados...';
+					waitGlobal.width = 400;
+					waitGlobal._fontSize = 11;
+					waitGlobal.height = 30;
+					waitGlobal._paddingLeftText = 10;
+					waitGlobal.horizontalCenter = 0;
+					waitGlobal.verticalCenter = 0;
+					waitGlobal._colorBackground = 0x333333;
+					waitGlobal.setStyle('textAlign','center');
+					addElement(waitGlobal);
+				}
+				
+				waitGlobal.visible = show;
+			}
+
+			public function __calendarToday():void
+			{
+				_month = _today.month;
+				_year = _today.fullYear;
+				__calendarRefresh();
+			}
+			
+			public function __calendarRefresh(e:*=null):void
+			{
+				DOM_.text = String(gnncGlobalArrays._MONTH.getItemAt(_month).NICK_NAME).toUpperCase() + ' ' + _year;
+				__calendarList();
+				__calendarCreation();
+			}
+			
+			public function __calendarNew(obj:Object=null):void
+			{
+				_today 						= new Date();
+				
+				var t:table_calendar 	= new table_calendar();
+				t.DATE_START			= obj == null ? '' : obj.DATE_START ;
+				t.DATE_END				= obj == null ? '' : obj.DATE_START ;
+				
+				var p:newCalendar 		= new newCalendar();
+				p._tableCalendar 		= t;
+
+				new gnncPopUp().__creation(p,true,false,fRemove);
+				
+				function fRemove(e:*):void
+				{ 
+					if(!p._change)
+						return;
+				}
+			}
+
+			public function __calendarEdit(obj:Object=null):void
+			{
+				if(obj==null)
+					return;
+				
+				var t:table_calendar = new table_calendar();
+				t.ID = obj == null ? 0 : obj.ID ;
+				
+				var p:newCalendar = new newCalendar();
+				p._tableCalendar  = t;
+				
+				new gnncPopUp(parentApplication).__creation(p,true,false,fRemove);
+				function fRemove(e:*):void{ 
+					if(!p._change)
+						return;
+				}
+			}
+			
+			public function __calendarList(text_:String=''):void
+			{
+				var sqlArr:Array = new Array();
+				var _where:String 	= '';
+				var _search:String 	= '';
+				var _user:String 	= '';
+				var _sql:String 	= '';
+				
+				var _sqlCalendar:String = '';
+				var _sqlCalendarCourseCron:String = '';
+				var _sqlProcess:String 	= '';
+				var _sqlJob:String = '';
+				var _sqlFinancial:String = '';
+
+				//-------------------------------------------- new ---------------------------------------------------
+				//-------------------------------------------- new ---------------------------------------------------
+				//-------------------------------------------- new ---------------------------------------------------
+				
+				var calDate:String = _year+'-'+gnncDataNumber.__setZero(_month+1)+'-'+gnncDataNumber.__setZero(_today.date);
+
+				if(_getCalendar==true)
+				{
+					_sqlCalendar	= " ( " +
+						" select j.ID as ID, j.TITLE, j.DATE as DATE, j.DATE_START as DATE_START, j.DATE_END as DATE_END, j.DATE_CANCELED, j.DATE_FINAL, j.ACTIVE, j.COLOR as COLOR, 'calendar' as TYPE, 5 as ORDER_ITEM " +
+						" from dbd_calendar as j " +
+						" where " +
+						" j.MIX = 'CALENDAR' AND " +
+						" ( LEFT(j.DATE_START,7) like LEFT('"+calDate+"',7) OR LEFT(j.DATE_END,7) like LEFT('"+calDate+"',7) ) " +
+						" ) ";
+					
+					sqlArr.push(_sqlCalendar);
+				}
+				
+				if(_getCalendarCourseCron==true)
+				{
+					_sqlCalendarCourseCron	= " ( " +
+						" select j.ID as ID, IF(p.NAME_CALENDAR<>'',p.NAME_CALENDAR,j.TITLE) as TITLE, j.DATE as DATE, j.DATE_START as DATE_START, j.DATE_END as DATE_END, j.DATE_CANCELED, j.DATE_FINAL, j.ACTIVE, p.COLOR_CALENDAR as COLOR, 'coursecron' as TYPE, 3 as ORDER_ITEM " +
+						" from dbd_calendar as j left join dbd_project as p ON (p.ID = j.ID_COURSE)" +
+						" where " +
+						" j.MIX = 'COURSE_CRON' AND " +
+						" ( LEFT(j.DATE_START,7) like LEFT('"+calDate+"',7) OR LEFT(j.DATE_END,7) like LEFT('"+calDate+"',7) ) " +
+						" ) ";
+					
+					sqlArr.push(_sqlCalendarCourseCron);
+				}
+				
+				if(_getCalendarProcess==true)
+				{
+					_sqlProcess	= " ( " +
+						" select j.ID as ID, 'Agendamento Process' as TITLE, j.DATE as DATE, j.DATE_START as DATE_START, j.DATE_END as DATE_END, j.DATE_CANCELED, j.DATE_FINAL, j.ACTIVE, 'ffffff' as COLOR, 'process' as TYPE, 5 as ORDER_ITEM " +
+						" from dbd_process_calendar as j " +
+						" where " +
+						//" j.MIX <> '' AND " +
+						" ( LEFT(j.DATE_START,7) like LEFT('"+calDate+"',7) OR LEFT(j.DATE_END,7) like LEFT('"+calDate+"',7) ) " +
+						" ) "; 
+
+					sqlArr.push(_sqlProcess);
+				}
+
+				if(_getJobs==true){
+					_sqlJob = " ( " +//inicio
+						" select j.ID as ID, j.TITLE, j.DATE as DATE, j.DATE_START as DATE_START, j.DATE_END as DATE_END, j.DATE_CANCELED, j.DATE_FINAL, j.ACTIVE, 'ffffff' as COLOR, 'job' as TYPE, 5 as ORDER_ITEM " +
+						" from dbd_job as j left join dbd_project_team as t ON ( t.ID_CLIENT = j.ID_CLIENT ) " +
+						" where " +
+						" ( j.MIX = 'JOB' OR j.MIX = '' ) AND " +
+						" ( LEFT(j.DATE_START,7) like LEFT('"+calDate+"',7) OR LEFT(j.DATE_END,7) like LEFT('"+calDate+"',7) ) ";
+
+					if(gnncGlobalStatic._userAdmin == false || gnncGlobalStatic._userClient == true)
+					{
+						_sqlJob += " AND (" +
+							" (t.ID_CLIENT_TEAM = "+gnncGlobalStatic._userIdClient+" AND t.ID_PROJECT = 0 ) OR "+
+							" (t.ID_CLIENT_TEAM = "+gnncGlobalStatic._userIdClient+" AND t.ID_PROJECT = j.ID_PROJECT AND t.ID_STEP = 0) OR "+
+							" (t.ID_CLIENT_TEAM = "+gnncGlobalStatic._userIdClient+" AND t.ID_PROJECT = j.ID_PROJECT AND t.ID_STEP = j.ID_STEP) "+
+							" ) "+
+							" ";
+					}
+
+					if(gnncGlobalStatic._userClient == true)
+						_sqlJob += " AND j.PUBLIC = 1 ";
+
+					_sqlJob += " group by j.ID ";
+					_sqlJob += " ) " ; //final
+					
+					sqlArr.push(_sqlJob);
+				}
+
+				//'33cc00' as COLOR
+				if(gnncGlobalStatic._userAdmin==true)
+					_getFinancial = true;
+				else
+					_getFinancial = false;
+					
+				if(_getFinancial==true){
+					_sqlFinancial = " ( " +//inicio
+						" select '1' as ID, CONCAT('Contas pagar/receber (',COUNT(j.ID),')') as TITLE, j.DATE as DATE, LEFT(j.DATE_START,10) as DATE_START, LEFT(j.DATE_END,10) as DATE_END, '' as DATE_CANCELED, '' as DATE_FINAL, 0 as ACTIVE, 'ffffff' as COLOR, 'financial' as TYPE, 9 as ORDER_ITEM " +
+						" from dbd_financial as j " +
+						" where " +
+						" j.MIX = 'FINANCIAL' AND j.DATE_CANCELED < 1 AND " +
+						" ( LEFT(j.DATE_END,7) like LEFT('"+calDate+"',7) ) " + 
+						" group by j.DATE_END " +
+						" ) " ; //final
+					
+					sqlArr.push(_sqlFinancial);
+					
+					_sqlFinancial = " ( " +//inicio
+						" select '1' as ID, CONCAT('Contas programadas (',COUNT(j.ID),')') as TITLE, j.DATE as DATE, LEFT(j.DATE_START,10) as DATE_START, LEFT(j.DATE_END,10) as DATE_END, '' as DATE_CANCELED, '' as DATE_FINAL, 0 as ACTIVE, 'ffffff' as COLOR, 'financial' as TYPE, 9 as ORDER_ITEM " +
+						" from dbd_financial as j " +
+						" where " +
+						" j.MIX = 'FINANCIAL' AND j.DATE_CANCELED < 1 AND " +
+						" ( LEFT(j.DATE_START,7) like LEFT('"+calDate+"',7) ) " +
+						" group by j.DATE_START " +
+						" ) " ; //final
+					
+					sqlArr.push(_sqlFinancial);
+				}
+
+				_sql = sqlArr.join(' UNION ');
+				_sql += " order by DATE_FINAL asc, ORDER_ITEM desc, DATE_START asc, DATE_END asc, DATE desc ";
+				
+				loading(true);
+				connCalendar.__sql (_sql,'','',fResult,fFault);
+				
+				function fResult(e:*=null):void{
+					__calendarCreation();
+					loading(false);
+					panelCenter_.selectedIndex = 1;
+				}
+				function fFault(e:*=null):void{
+					loading(false);
+				}
+
+			}
+
+			public function __calendarCreation(e:*=null):void
+			{
+				var x:uint;
+				var day:uint = 1;
+				var obj:Object= null;
+				var ups:String = _year+'-'+gnncDataNumber.__setZero((_month+1));
+				var upd:String = '';
+				
+				//var ups:String 				= ((_month+1)<10)?_year+"-0"+(_month+1):_year+"-"+(_month+1);
+				var firstDayWeek:Number 	= DateUtils.dayOfWeek	(gnncDate.__string2Date(ups+"-01",false));
+				var daysInWeek:Number 		= DateUtils.weeksInMonth(gnncDate.__string2Date(ups+"-01",false));
+				var daysInMonth:Number 		= DateUtils.daysInMonth	(gnncDate.__string2Date(ups+"-01",false));
+				
+				LAST_WEEK_.height = 0;
+				
+				if(daysInWeek<6)
+					LAST_WEEK_.height = 5;
+				else
+					LAST_WEEK_.percentHeight = 100;
+					
+				for(x = 1; x < 43; x ++)//43
+				{
+					upd = ups+'-'+gnncDataNumber.__setZero(day);
+					obj = this['X'+x];
+
+					if(x > firstDayWeek && day <= daysInMonth)
+					{
+						obj.dataProvider = filter(connCalendar.DATA_ARR,upd);
+						obj._dateFilter = upd;
+						day++;
+					}
+					else
+					{
+						obj.dataProvider = new ArrayCollection();
+						obj._dateFilter = "2000-00-00";
+					}
+				} 				
+			}
+			
+			private function filter(arr:ArrayCollection,value:Object):ArrayCollection
+			{
+				var a:ArrayCollection = new ArrayCollection();
+				var i:uint = 0;
+				var len:uint = arr.length;
+				var o:Object;
+				
+				for(i=0;i<len;i++){
+					o = arr.getItemAt(i);
+					if(String(o['DATE_END']).substr(0,10)===String(value).substr(0,10))
+						a.addItem(o);
+					else if(String(o['DATE_START']).substr(0,10)===String(value).substr(0,10))
+						a.addItem(o);
+				}
+				
+				return a;
+			}
+
+			public function __monthNext():void
+			{
+				if(_month==11){
+					_month = 0;
+					_year++;
+				}else{
+					_month++;
+				}
+				__calendarRefresh();
+			}
+
+			public function __monthPrev():void
+			{
+				if(_month==0){
+					_month = 11;
+					_year--;
+				}else{
+					_month--;
+				}
+				__calendarRefresh();
+			}
+			
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Move id="movie" duration="200"/>
+	</fx:Declarations>
+	
+	<s:Rect width="100%" height="100%">
+		<s:fill>
+			<s:SolidColor color="0xf9f9f9"/>
+		</s:fill>
+	</s:Rect>
+	
+	<elements:elementBarStatus width="{_columLeft+1}" height="100%"/>
+	<elements:elementVLine left="{_columLeft+1}" width="1"/>
+	<elements:elementHLine left="{_columLeft+1}" right="0" top="30"/>
+	
+	<s:VGroup width="{_columLeft+1}" height="100%" gap="1">
+
+		<s:Button width="100%" height="60" toolTip="Atualizar" click="{__calendarRefresh()}"
+				  icon="{gnncEmbedBlackWhite.bw_refresh_32}" iconPlacement="top"
+				  skinClass="GNNC.skin.button.skin_buttonLink"/>
+		
+		<s:Button width="100%" height="60" 
+				  icon="{gnncEmbedBlackWhite.bw_calendar_32_new}" iconPlacement="top" click="{panel(true)}"
+				  skinClass="GNNC.skin.button.skin_buttonLink" toolTip="Novo"/>
+			
+	</s:VGroup>
+				
+	<s:VGroup left="{_columLeft+2}" height="100%" right="0" gap="1">
+
+		<mx:ViewStack id="panelCenter_" width="100%" height="100%" contentBackgroundAlpha="0" selectedIndex="1" >
+			<s:NavigatorContent width="100%" height="100%" label="DIA">
+				
+				<s:Rect width="250" top="30" bottom="0" right="0">
+					<s:fill>
+						<s:SolidColor color="0xFFFFFF"/>
+					</s:fill>
+				</s:Rect>
+				<elements:elementVLine right="250" top="30" bottom="0" />
+				
+				<s:List id="calendarList_" top="30" right="250" bottom="0" left="0" borderVisible="false"
+						contentBackgroundAlpha="0" focusAlpha="0" horizontalScrollPolicy="off"
+						itemRenderer="GNNC.modules.calendar.itemRender.itemRender_calendar_forList"
+						mouseUp="{selectedItem()}" click="{selectedItem()}" keyUp="{selectedItem()}"
+						>
+					<s:layout>
+						<s:VerticalLayout gap="0" padding="40"/>
+					</s:layout>
+				</s:List>
+				
+				<s:VGroup  width="250" top="30" bottom="0" right="0" gap="5" padding="20" paddingTop="25">
+					
+					<s:Label id="day_date" text="Hoje" fontSize="25" width="100%" textAlign="right" />
+					<elements:elementHLine height="7"/>
+					<s:HGroup width="100%">
+						<s:Label id="day_date_start" text="" fontSize="13" width="100%"/>
+						<s:Label id="day_date_end" text="" fontSize="13" width="100%" textAlign="right"/>
+					</s:HGroup>
+					<elements:elementHLine height="7"/>
+					<s:Label id="day_title" text="" width="100%" fontSize="15"/>
+					<s:Rect height="100%"/>
+
+					<s:Button label="Voltar ao Calendário" click="{panelCenter_.selectedIndex = 1}" height="30" width="100%"/>
+					
+				</s:VGroup>
+				
+			</s:NavigatorContent>
+			<s:NavigatorContent width="100%" height="100%" label="MÊS" >
+
+				<elements:elementBarStatus height="30" alpha=".5"/>
+				<elements:elementBarStatus height="30" width="45" fill="{new SolidColor(0x394152)}" alpha="1"/>
+				<elements:elementBarStatus height="30" width="45" right="0"/>
+				
+				<s:HGroup width="100%" height="30" gap="0" fontSize="12" top="0" verticalAlign="middle" paddingLeft="40" paddingRight="40">
+					<s:Group width="95%" height="30">
+						<elements:elementBarStatus height="30" fill="{new SolidColor(0x394152)}" alpha="1"/>
+						<elements:elementLabelFont id="DOM_" text="MÊS" width="100%" height="30" textAlign="center" paddingTop="2" color="0xFFFFFF"/>
+					</s:Group>
+					<s:Group width="100%" height="30">
+						<elements:elementLabelFont text="SEGUNDA" width="100%" height="30" textAlign="center" paddingTop="2"/>
+						<s:Button width="30" height="30" icon="{gnncEmbedImage.DIRECTION_LEFT_16}" skinClass="GNNC.skin.button.skin_buttonLink" click="{__monthPrev()}"/>
+					</s:Group>
+					<elements:elementLabelFont text="TERÇA" width="100%" height="30" textAlign="center" paddingTop="2"/>
+					<elements:elementLabelFont text="QUARTA" width="100%" height="30" textAlign="center" paddingTop="2"/>
+					<elements:elementLabelFont text="QUINTA" width="100%" height="30" textAlign="center" paddingTop="2"/>
+					<s:Group width="100%" height="30">
+						<elements:elementLabelFont text="SEXTA" width="100%" height="30" textAlign="center" paddingTop="2"/>
+						<s:HGroup gap="0" right="0">
+							<!-- s:Button width="30" height="30" icon="{gnncEmbedImage.DIRECTION_LEFT_16}" skinClass="GNNC.skin.button.skin_buttonLink" click="{__monthPrev()}"/ -->
+							<s:Button width="30" height="30" right="0" icon="{gnncEmbedImage.DIRECTION_RIGHT_16}" skinClass="GNNC.skin.button.skin_buttonLink" click="{__monthNext()}"/>
+						</s:HGroup>
+					</s:Group>
+					<s:Group width="100%" height="30">
+						<elements:elementBarStatus height="30"/>
+						<elements:elementLabelFont text="SÁBADO" width="100%" height="30" textAlign="center" paddingTop="2"/>
+					</s:Group>
+				</s:HGroup>
+				
+				<s:Scroller top="30" bottom="0" width="100%" horizontalScrollPolicy="off">
+					<s:VGroup width="100%" height="100%" gap="5" padding="40">
+
+						<s:HGroup id="line1" width="100%" height="100%" gap="5">
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X1" width="95%" height="100%" _colorBg="0xf3f4f8"/>
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X2" width="100%" height="100%"  />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X3" width="100%" height="100%"  />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X4" width="100%" height="100%"  />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X5" width="100%" height="100%"  />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X6" width="100%" height="100%"  />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X7" width="100%" height="100%" _colorBg="0xf9f9fb"/>
+						</s:HGroup>
+						
+						<!-- elements:elementHLine top="20" _COLOR="0xEEEEEE"/ -->
+						
+						<s:HGroup id="line2" width="100%" height="100%" gap="5">
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X8" width="95%" height="100%" _colorBg="0xf3f4f8"/>
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X9" width="100%" height="100%"  />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X10" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X11" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X12" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X13" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X14" width="100%" height="100%" _colorBg="0xf9f9fb" />
+						</s:HGroup>
+						
+						<!-- elements:elementHLine top="20" _COLOR="0xEEEEEE"/ -->
+						
+						<s:HGroup width="100%" height="100%" gap="5">
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X15" width="95%" height="100%" _colorBg="0xf3f4f8"/>
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X16" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X17" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X18" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X19" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X20" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X21" width="100%" height="100%" _colorBg="0xf9f9fb" />
+						</s:HGroup>
+						
+						<!-- elements:elementHLine top="20" _COLOR="0xEEEEEE"/ -->
+						
+						<s:HGroup width="100%" height="100%" gap="5">
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X22" width="95%" height="100%" _colorBg="0xf3f4f8"/>
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X23" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X24" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X25" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X26" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X27" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X28" width="100%" height="100%" _colorBg="0xf9f9fb"  />
+						</s:HGroup>
+						
+						<!-- elements:elementHLine top="20" _COLOR="0xEEEEEE"/ -->
+						
+						<s:HGroup width="100%" height="100%" gap="5">
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X29" width="95%" height="100%" _colorBg="0xf3f4f8"/>
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X30" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X31" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X32" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X33" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X34" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X35" width="100%" height="100%" _colorBg="0xf9f9fb"  />
+						</s:HGroup>
+						
+						<!-- elements:elementHLine top="20" _COLOR="0xEEEEEE"/ -->
+						
+						<s:HGroup id="LAST_WEEK_" width="100%" height="100%" gap="5">
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X36" width="95%" height="100%" _colorBg="0xf3f4f8"/>
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X37" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X38" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X39" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X40" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X41" width="100%" height="100%" />
+							<!-- elements:elementVLine _COLOR="0xEEEEEE"/ -->
+							<itemRender:itemRender_calendarDayForMonth_forGroup id="X42" width="100%" height="100%" _colorBg="0xf9f9fb"  />
+						</s:HGroup>
+
+					</s:VGroup>
+				</s:Scroller>
+			</s:NavigatorContent>
+		</mx:ViewStack>
+	
+</s:VGroup>
+	
+	
+	<s:Group id="panelList_" left="-310" top="0" bottom="0" width="300" visible="false">
+		
+		<s:RectangularDropShadow distance="0" width="100%"  height="100%" 
+								 alpha=".5"
+								 blurX="15"
+								 blurY="15" />
+		
+		<s:Rect width="100%" height="100%">
+			<s:fill>
+				<s:SolidColor color="0xf9f9f9"/>
+			</s:fill>
+			<s:stroke>
+				<s:SolidColorStroke color="0xcccccc"/>
+			</s:stroke>
+		</s:Rect>
+		
+		<s:VGroup width="100%" height="100%" paddingTop="12" paddingBottom="20" paddingLeft="20" paddingRight="20" gap="1">
+			
+
+		</s:VGroup>
+		
+		<s:Button label="Fechar" click="{panel(false)}" top="10" right="10" width="10" height="10" />
+		
+	</s:Group>
+
+	<!--stage:UI_hDropShadow top="30" alpha=".5" left="0" right="0"/>
+	<stage:UI_hDropShadow top="59" alpha=".5" left="0" right="0"/-->
+
+</s:Module>

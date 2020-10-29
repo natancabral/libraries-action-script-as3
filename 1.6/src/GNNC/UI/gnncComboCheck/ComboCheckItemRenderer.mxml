@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" width="100%" height="100%"
+				
+				minHeight="22"
+				
+				enabled="{!data.hasOwnProperty('ACTIVE')?true:data.ACTIVE==0?true:data.ACTIVE==1?false:false}"
+				
+				click			= "{__click()}"
+				mouseDown		= "{__mouseDown()}"
+				mouseUp			= "{__mouseUp()}"
+				rightMouseDown	= "{__rightClick()}" xmlns:stage="GNNC.elements.stage.*"
+				
+				
+				>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			
+			import mx.events.FlexEvent;
+			import mx.events.ItemClickEvent;
+			protected function onClick(event:MouseEvent):void {
+				var e:ItemClickEvent = new ItemClickEvent(ItemClickEvent.ITEM_CLICK, true);
+				e.item = data;
+				owner.dispatchEvent(e);
+			}
+			
+			override public function set data(value:Object):void {
+				//renderer.width = owner.width - 21;
+				super.data = value;
+			}
+			
+			private function __click():void
+			{
+				if(!this.enabled)
+					this.renderer.selected = false;
+					
+				this.renderer.selected = !this.renderer.selected;
+				onClick(null);
+				Object(owner).dispatchEvent(new Event('MOUSE_CLICK'));
+			}
+			
+			private function __mouseDown():void
+			{
+				Object(owner).dispatchEvent(new Event('MOUSE_DOWN'));
+			}
+			
+			private function __mouseUp():void
+			{
+				Object(owner).dispatchEvent(new Event('MOUSE_UP'));
+			}
+			
+			private function __rightClick():void
+			{
+				var id:ContextMenuItem 		= new ContextMenuItem("Id: "+data.ID, false, false);
+				//view.addEventListener			(Event.SELECT,__f);
+				
+				var cm:ContextMenu 				= new ContextMenu();
+				cm.hideBuiltInItems				();
+				cm.customItems 					= [id];
+				
+				this.contextMenu 				= cm;
+			}
+		]]>
+	</fx:Script>
+	<fx:Style>
+		.DG 
+		{
+			/*selection-color: #444444;*/
+		}
+	</fx:Style>
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Group left="{!data.hasOwnProperty('LEVEL')?0:data.LEVEL==0?0:data.LEVEL==1?5:data.LEVEL==2?10:data.LEVEL==3?15:data.LEVEL==4?20:25}" top="0" right="0" bottom="0">
+		<s:Rect left="0" top="0" right="0" bottom="0" radiusX="2">
+			<s:fill>
+				<s:SolidColor color="0xFFFFFF" color.hovered="0xEEEEEE" color.hoveredAndShowsCaret="0xEEEEEE"/>
+			</s:fill>
+		</s:Rect>
+		<s:Rect left="0" top="0" right="0" bottom="0" includeIn="hoveredAndShowsCaret,hovered" radiusX="0">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0xFAFAFA" />
+					<s:GradientEntry color="0xEDEDED" />
+				</s:LinearGradient>
+			</s:fill>
+			<s:stroke>
+				<s:SolidColorStroke color="0xBBBBBB" />
+			</s:stroke>
+		</s:Rect>
+		
+		<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" radiusX="3">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0x3785e2"/>
+					<s:GradientEntry color="0x2170cf"/>
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+		
+		
+		<s:Label text="{gnncData.__firstLetterUpperCase(label)}" fontSize="{!data.hasOwnProperty('LEVEL')?12:data.LEVEL==0?12:12}"
+				 
+				 color="0x222222" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" 
+				 
+				 fontWeight="{!data.hasOwnProperty('ID_FATHER')?'bold':data.ID_FATHER==0?'bold':'normal'}" 
+				 textDecoration="{!data.hasOwnProperty('LEVEL')?'none':data.LEVEL==2?'underline':'none'}" 
+				 fontStyle="{!data.hasOwnProperty('LEVEL')?'normal':data.LEVEL==3?'italic':'normal'}" 
+				 
+				 paddingTop="1" paddingLeft="2" verticalAlign="middle"
+				 
+				 left="5" top="1" right="25" bottom="0"
+				 showTruncationTip="true" maxDisplayedLines="1"
+				 />
+	
+		<s:CheckBox id="renderer" selected="@{data.selected}" label="" 
+					right="5" verticalCenter="0"
+					click="__click()"
+					/>
+
+		
+	</s:Group>
+	
+	<!-- elements:elementVLine left="{!data.hasOwnProperty('LEVEL')?0:data.LEVEL==0?0:data.LEVEL==1?5:data.LEVEL==2?10:data.LEVEL==3?15:data.LEVEL==4?20:25}" width="1" color="0xBBBBBB"
+					visible="{!data.hasOwnProperty('LEVEL')?false:data.LEVEL==0?false:true}"
+					/ -->	
+	
+	<s:Line left="{!data.hasOwnProperty('LEVEL')?0:data.LEVEL==0?0:data.LEVEL==1?5:data.LEVEL==2?10:data.LEVEL==3?15:data.LEVEL==4?20:25}" 
+			visible="{!data.hasOwnProperty('LEVEL')?false:data.LEVEL==0?false:true}"
+			height="100%" width="1" horizontalCenter="0" rotation="90">
+		<s:stroke>
+			<s:SolidColorStroke id="stroke" weight="1" color="0xBBBBBB" />
+		</s:stroke>
+	</s:Line>
+	
+	<!--- SIMBOL OF TITLE -->
+	<s:Rect width="6" height="6" right="3" radiusX="2" verticalCenter="0" visible="{!data.hasOwnProperty('ACTIVE')?false:data.ACTIVE==0?false:data.ACTIVE==1?true:true}">
+		<s:fill>
+			<s:SolidColor color="0x333333"/>
+		</s:fill> 
+	</s:Rect>
+	<!--- SIMBOL OF TITLE / END -->
+	
+	
+</s:ItemRenderer>

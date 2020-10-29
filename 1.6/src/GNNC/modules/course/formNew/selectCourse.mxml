@@ -1,0 +1,340 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="750" height="520" 
+		  
+		  creationComplete="{__start()}"
+		  
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*"
+		  
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_project;
+			import GNNC.sqlTables.table_star;
+			
+			[Bindable] private var _gnncGlobal:gnncGlobalStatic = new gnncGlobalStatic(true);
+			
+			private var _connList:gnncAMFPhp = new gnncAMFPhp();
+			public var _idCourse:uint = 0;
+			public var _nameCourse:String = '';
+			public var _dateStart:String = '';
+			public var _dateEnd:String = '';
+			public var _nameTeacherTheMan:String = '';
+			public var _price:Number = 0;
+			public var _discountPunctuality:Number = 0;
+
+			private function __start():void
+			{
+				list_.addEventListener(gnncEventGeneral._star,__starSave);
+			}
+
+			private function __starSave(e:gnncEventGeneral):void
+			{
+				if(!list_.dataProvider.length)
+					return;
+				
+				var OBJDATP:Object		= list_.selectedItem;
+				var IDXDATP:int			= list_.selectedIndex;
+				var IDXARRA:int			= _connList.DATA_ARR.getItemIndex(OBJDATP);
+
+				if(!OBJDATP.hasOwnProperty('STAR') || !OBJDATP.hasOwnProperty('ID_STAR'))
+					return;
+
+				function __fFault(event:*):void
+				{
+					list_.enabled = true;
+				}
+				
+				function __fResult(event:*):void
+				{
+					//_connList.DATA_ARR.itemUpdated(OBJDATP,'STAR',null,_value);
+					//list_.dataProvider.itemUpdated(OBJDATP,'STAR',null,_value);
+					
+					var _obj:Object = OBJDATP;
+					_obj.STAR = _value;
+					
+					_connList.DATA_ARR.setItemAt(OBJDATP,IDXDATP);
+					list_.dataProvider.setItemAt(OBJDATP,IDXDATP);
+					
+					list_.validateDisplayList();
+					list_.validateNow();
+					
+					list_.enabled = true;
+				}
+				
+				list_.enabled = false;
+				
+				var _value:uint			= OBJDATP.STAR == 1 ? 0 : 1;
+				var _table:table_star	= new table_star();
+				
+				_table.ID				= OBJDATP.ID_STAR
+				_table.ID_USER			= gnncGlobalStatic._userId;
+				_table.ID_CLIENT		= gnncGlobalStatic._userIdClient;
+				
+				_table.MIX				= 'COURSE';
+				_table.ID_MIX			= OBJDATP.ID;
+				_table.ENABLED			= _value;
+				
+				//new gnncAlert().__alert(_sql);
+				new gnncAMFPhp().__sql(new gnncSql().__INSERT(_table,false,true,true),'','',__fResult,__fFault);
+			}
+
+			private function __select(showMessage_:Boolean=true):void
+			{
+				if(list_.selectedIndex  < 0 ){
+					_idCourse = 0;
+					_nameCourse = '';
+					_dateStart = '';
+					_dateEnd = '';
+					_nameTeacherTheMan = '';
+					_price = 0;
+					_discountPunctuality = 0;
+				}else{
+					var o:Object = list_.selectedItem;
+					_idCourse = o.ID;
+					_nameCourse = o.NAME;
+					_dateStart = o.DATE_START;
+					_dateEnd = o.DATE_END;
+					_nameTeacherTheMan = o.NAME_TEACHER_THEMAN;
+					_price = o.PRICE;
+					_discountPunctuality = o.DISCOUNT_PUNCTUALITY;
+				}
+				
+				if(_idCourse>0)
+					new gnncPopUp().__close(this);
+				else
+					if(showMessage_)
+						new gnncAlert().__alert('Selecione uma turma na listagem. Ou clique em fechar.');
+			}
+
+			private function __close():void
+			{
+				_idCourse = 0;
+				_nameCourse = '';
+				_dateStart = '';
+				_dateEnd = '';
+				_nameTeacherTheMan = '';
+				_price = 0;
+				new gnncPopUp().__close(this);
+			}
+
+			private function __alertNoCourse():Boolean
+			{
+				_idCourse = uint(new gnncDataArrayCollection().__search(_gnncGlobal._SETTINGS.DATA_ARR,'NAME','ID_COURSE','VALUE'));
+				var _value:Boolean = _idCourse > 0 ? true : false;
+				
+				if(!_value)
+				{
+					_idCourse = 0;
+					_nameCourse = '';
+					__close();
+					new gnncAlert().__error('Você precisa configurar um cliente e um projeto para as turmas. Entre em contato com o Administrador do programa ou a empresa responsável.');
+				}
+				
+				return _value;
+			}
+			
+			private function __list(text_:String='',active_:String='',datefinal_:Boolean=false,star_:Boolean=false):void
+			{
+				var _value:Boolean = __alertNoCourse();
+				
+				if(!_value)
+					return;
+					
+				list_.enabled = false;
+				
+				var _column:Array = [
+					
+					//columns 
+					"dbd_project.ID ",
+					"dbd_project.NAME ",
+					"dbd_project.DATE_END ",
+					"dbd_project.DATE_START ",
+					"dbd_project.DATE_FINAL ",
+					//"dbd_project.DATE_CANCELED ",
+					"dbd_project.ACTIVE ",
+					"dbd_project.PRICE ",
+					"dbd_project.DISCOUNT_PUNCTUALITY ",
+					//"dbd_project.VISIBLE ",
+					
+					//names
+					//"coalesce((SELECT NAME FROM dbd_group 					where dbd_group.ID          = dbd_project.ID_GROUP									),'-') NAME_GROUP",
+					//"coalesce((SELECT NAME FROM dbd_product 				where dbd_product.ID        = dbd_project.ID_PRODUCT								),'-') NAME_PRODUCT",
+					//"coalesce((SELECT NAME FROM dbd_category 				where dbd_category.ID       = dbd_project.ID_CATEGORY								),'-') NAME_CATEGORY",
+					"coalesce((SELECT c.NAME from dbd_client c, dbd_course_teacher j where j.ID_PROJECT = dbd_project.ID AND c.ID = j.ID_CLIENT AND j.THEMAN = '1' LIMIT 0,1),'-') NAME_TEACHER_THEMAN",
+					
+					//--
+					//"coalesce((SELECT COLOR FROM dbd_group 					where dbd_group.ID   = dbd_project.ID_GROUP											),0xEEEEEE) COLOR_GROUP",
+					//"coalesce((SELECT TIME_HOUR FROM dbd_product 			where dbd_product.ID = dbd_project.ID_PRODUCT										),0) TIME_HOUR",
+					
+					//rows
+					//"coalesce((SELECT COUNT(ID) FROM dbd_course_teacher 	where dbd_course_teacher.ID_PROJECT = dbd_project.ID								),0) ROWS_TEACHER",
+					//"coalesce((SELECT COUNT(ID) FROM dbd_course_student 	where dbd_course_student.ID_PROJECT = dbd_project.ID	AND ACTIVE = 1				),0) ROWS_STUDENT_ACTIVE_1",
+					//"coalesce((SELECT COUNT(ID) FROM dbd_course_student 	where dbd_course_student.ID_PROJECT = dbd_project.ID	AND ACTIVE = 2				),0) ROWS_STUDENT_ACTIVE_2",
+					//"coalesce((SELECT COUNT(ID) from dbd_course_frequency f where dbd_project.ID = f.ID_PROJECT GROUP BY f.ID_CLIENT LIMIT 0,1					),0) ROWS_FREQUENCY",
+					//"(LEFT(DATE_START,4)) YEAR",
+
+					//star
+					"coalesce((select ID 		from dbd_star s where s.ID_MIX = dbd_project.ID AND s.ID_USER = '"+gnncGlobalStatic._userId+"' AND s.MIX like 'COURSE' LIMIT 0,1 ),0) ID_STAR",
+					"coalesce((select ENABLED 	from dbd_star s where s.ID_MIX = dbd_project.ID AND s.ID_USER = '"+gnncGlobalStatic._userId+"' AND s.MIX like 'COURSE' LIMIT 0,1 ),0) STAR"
+				];
+				
+				var _where:Array = new Array();
+				
+				if(active_)//Return active
+					_where.push(" ACTIVE = '"+active_+"' ");
+				if(active_=='2')//If active 2, return course no final(datefinal)
+					_where.push(" LEFT(DATE_FINAL,4) like LEFT('0000-',4) ");
+				if(datefinal_)
+					_where.push(" LEFT(DATE_FINAL,4) <> LEFT('0000-',4) ");
+				if(star_)
+					_where.push(" STAR = '1' ");
+				
+					_where.push(" dbd_project.ID_CLIENT = '"+_idCourse+"' ");
+					_where.push(" NAME like '%"+text_+"%' ");
+					//_where.push(" VISIBLE like '' ");
+				
+				var _table:table_project 	= new table_project(0);
+				_table.VISIBLE				= 0;
+				//_table.ID_PRODUCT 		= (PRODUCT_.selectedIndex > -1)?PRODUCT_.selectedItem.ID:0;
+				
+				var _sql:String = new gnncSql().__SELECT(_table,false,_column,null,null,_where,null,['DATE_FINAL','NAME'],false,null,['NAME'],null);
+
+				//new gnncAlert().__alert('1>>'+_sql);
+
+				if(star_)
+					_sql = gnncData.__replace(_sql," WHERE ( STAR like '1' "," join dbd_star s WHERE ( s.ID_MIX = dbd_project.ID "); //AND s.ENABLED = 1
+				
+				//new gnncAlert().__alert('>>'+_idCourse);
+				//new gnncAlert().__alert('2>>'+_sql);
+
+				btns.enabled = false;
+				_connList.__sql(_sql,'','',__fResul,__fFault);
+				
+				function __fResul(e:*):void
+				{
+					list_.dataProvider = _connList.DATA_ARR;
+					list_.enabled = true;
+					
+					//search_.text = '';
+					btns.enabled = true;
+				};
+				
+				function __fFault():void
+				{
+					list_.enabled = true;
+					btns.enabled = true;
+				};
+
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp />
+	<elements:elementLabelFont id="titlePopUp_" text="SELECIONAR TURMA" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<!--s:TabBar dataProvider="{panel_}" height="30" /-->
+		<s:Rect width="100%"/>
+		<elements:elementInputSearch id="search_" width="200" _FUNCTION_Event_="{function(e:*):void{__list(search_.text)}}" _RESTRICT="[a-z][A-Z][0-9]\-;., "/>
+	</s:HGroup>
+	
+	<s:HGroup left="20" right="20" top="55" bottom="52" gap="5" >
+		
+		<s:Group id="btns" width="140" height="100%">
+			
+			<s:Scroller width="100%" height="100%">
+				<s:VGroup width="100%" height="100%" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" gap="1" verticalAlign="middle">
+					
+					<s:Button label="Todas" 			height="100%" icon="{gnncEmbedBlackWhite.bw_all_16}" 	click="{__list(search_.text)}" 			skinClass="GNNC.skin.button.skin_buttonLink" iconPlacement="top" width="100%"/>
+					<s:Rect width="100%" height="1">
+						<s:fill>
+							<s:SolidColor color="0x555555"/>
+						</s:fill>
+					</s:Rect>
+
+					<s:Button label="Em Processo" 		height="100%" icon="{gnncEmbedBlackWhite.check_16_bw_ok}"  click="{__list(search_.text,'0')}" 		skinClass="GNNC.skin.button.skin_buttonLink" iconPlacement="top" width="100%"/>
+					<s:Rect width="100%" height="1">
+						<s:fill>
+							<s:SolidColor color="0xff6699"/>
+						</s:fill>
+					</s:Rect>
+					
+					<s:Button label="Pré-Inscrição" 	height="100%" icon="{gnncEmbedBlackWhite.check_16_yellow_ok}" 	click="{__list(search_.text,'1')}" 		skinClass="GNNC.skin.button.skin_buttonLink" iconPlacement="top" width="100%"/>
+					<s:Rect width="100%" height="1">
+						<s:fill>
+							<s:SolidColor color="0xffcc66"/>
+						</s:fill>
+					</s:Rect>
+
+					<s:Button label="Em Andamento" 		height="100%" icon="{gnncEmbedBlackWhite.check_16_blue_ok}" 	click="{__list(search_.text,'2')}" 		skinClass="GNNC.skin.button.skin_buttonLink" iconPlacement="top" width="100%"/>
+					<s:Rect width="100%" height="1">
+						<s:fill>
+							<s:SolidColor color="0x00ccff"/>
+						</s:fill>
+					</s:Rect>
+
+					<s:Button label="Concluídas" 		height="100%" icon="{gnncEmbedBlackWhite.check_16_green_ok}" 	click="{__list(search_.text,'',true)}" 	skinClass="GNNC.skin.button.skin_buttonLink" iconPlacement="top" width="100%"/>
+					<s:Rect width="100%" height="1">
+						<s:fill>
+							<s:SolidColor color="0x33cc00"/>
+						</s:fill>
+					</s:Rect>
+
+					<s:Button label="Favoritas" 		height="100%" icon="{gnncEmbedBlackWhite.bw_favorite_16}" 		click="{__list('','',false,true)}" 		skinClass="GNNC.skin.button.skin_buttonLink" iconPlacement="top" width="100%"/>
+					
+				</s:VGroup>
+			</s:Scroller>
+			
+		</s:Group>
+		
+		<s:VGroup width="100%" height="100%">
+
+			<!--s:HGroup width="100%" gap="1">
+				<elements:elementInputSearch id="search2_" width="100%" _FUNCTION_Event_="{function(e:*):void{__list(search_.text)}}" />
+				<s:Button label="Todas" 			height="25" icon="{gnncEmbedImage.ALL_16}" 			click="{__list(search_.text)}"/>
+				<s:Button label="Pré-Inscrição" 	height="25" icon="{gnncEmbedImage.WRITER_16_GREEN}" click="{__list(search_.text,'1')}"/>
+				<s:Button label="Andamento" 		height="25" icon="{gnncEmbedImage.WRITER_16_BLUE}" 	click="{__list(search_.text,'2')}"/>
+				<s:Button label="Finalizado" 		height="25" icon="{gnncEmbedImage.OK_16}" 			click="{__list(search_.text,'3',true)}"/>
+				<s:Button label="Indefinido" 		height="25" icon="{gnncEmbedImage.WRITER_16_YELLOW}" click="{__list(search_.text,'0')}"/>
+			</s:HGroup-->
+			
+			<s:List id="list_" width="100%" height="100%" itemRenderer="GNNC.modules.project.itemRender.itemRender_course_forList" borderAlpha=".5" 
+					borderVisible="true" borderColor="0xAAAAAA" horizontalScrollPolicy="off" doubleClick="{__select(false)}"  keyDown="{if(new gnncKeyboard()._ENTER(event)) __select(false); }" doubleClickEnabled="true" >
+				<s:layout>
+					<s:VerticalLayout gap="0" rowHeight="60"/>
+				</s:layout>
+			</s:List>
+
+		</s:VGroup>
+		
+	</s:HGroup>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="10" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%"/>
+		<s:Button label="Selecionar Turma (enter)" height="25" icon="{gnncEmbedBlackWhite.bw_ok_16}" click="{__select()}" fontWeight="bold" enabled="{list_.selectedIndex>-1?true:false}"/>
+		<s:Button label="Fechar" height="25" icon="{gnncEmbedBlackWhite.app_close_16_clean}" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink"/>
+	</s:HGroup>
+
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+
+</s:Module>

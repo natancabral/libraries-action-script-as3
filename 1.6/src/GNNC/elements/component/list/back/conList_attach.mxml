@@ -1,0 +1,432 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 
+		 width="100%" height="100%"
+		 
+		 creationComplete="{__start()}"
+		 >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncClipBoard;
+			import GNNC.data.file.gnncFilesRemote;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.modules.attach.formNew.newAttach;
+			import GNNC.modules.attach.formView.viewAttach;
+			import GNNC.sqlTables.table_attach;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.IList;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+			
+			import spark.components.Image;
+
+			[Bindable] 
+			public var _length:uint = 0;
+			
+			public var _connAttach:gnncAMFPhp 		= new gnncAMFPhp();
+			public var _connExec:gnncAMFPhp 		= new gnncAMFPhp();
+			public var _tableAttach:table_attach 	= new table_attach();
+			public var _menuContext:ArrayCollection	= new ArrayCollection();
+			
+			private var _gnncPopUp:gnncPopUp		= new gnncPopUp();
+			
+			/** Menu Context **/
+			public var _view:Boolean 		= true;
+			public var _new:Boolean 		= true;
+			public var _edit:Boolean 		= true;
+			public var _delete:Boolean 		= true;
+			public var _refresh:Boolean 	= true;
+			public var _copyUrl:Boolean 	= true;
+
+			/** Sql **/
+			public var _sqlConsult:String 	= '';
+			public var _sqlColumns:Array	= null;
+			public var _sqlOrderBy:Array	= ['ID'];
+			public var _sqlWhere:Array		= null;
+			public var _sqlOrderDesc:Boolean= false;
+			
+			public function set dataProvider(v:IList):void 				{ list_.dataProvider = v as IList }
+			public function get dataProvider():IList 					{ return list_.dataProvider as IList }
+
+			public function set selectedItem(v:Object):void 			{ list_.selectedItem = v }
+			public function get selectedItem():Object 					{ return list_.selectedItem }
+
+			public function set selectedIndex(v:int):void 				{ list_.selectedIndex = v }
+			public function get selectedIndex():int 					{ return list_.selectedIndex }
+
+			public function set _autoLoad(v:Boolean):void 				{ if(v) __select() }
+
+			public function set _allowMultipleSelection(v:Boolean):void { list_.allowMultipleSelection = v }
+			public function get _allowMultipleSelection():Boolean		{ return list_.allowMultipleSelection }
+
+			public function set _dragMoveEnabled(v:Boolean):void 		{ __dragEnabled(v) }
+			public function get _dragMoveEnabled():Boolean 				{ return __dragEnabled(list_.dragEnabled) }
+
+			public function set _borderVisible(v:Boolean):void 			{ list_.setStyle('borderVisible',v) }
+			public function set _borderColor(v:uint):void 				{ list_.setStyle('borderColor',v) }
+			public function set _backgroundAlpha(v:Number):void 		{ list_.setStyle('contentBackgroundAlpha',v) }
+			public function set _backgroundColor(v:uint):void 			{ list_.setStyle('contentBackgroundColor',v) }
+						
+			private function __start():void
+			{
+				__menuContext();
+				__dispatchEvent();
+				__classFactory();
+				__length();
+			}
+			
+			private function __dragEnabled(enabled_:Boolean):Boolean
+			{
+				list_.dragEnabled		= enabled_; 
+				list_.dragMoveEnabled	= enabled_;
+				list_.dropEnabled		= enabled_;
+				
+				return list_.dragEnabled;
+			}
+			
+			private function __length(e:*=null):void
+			{
+				_length = list_.dataProvider.length;
+			}
+			
+			private function __classFactory():void
+			{
+				//list_.itemRenderer = new ClassFactory("GNNC.modules.attach.itemRender.itemRender_attach_forList");
+			}
+
+			private function __dispatchEvent():void
+			{
+				this.addEventListener(MouseEvent.MOUSE_DOWN					,__menuRightList);
+				this.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN			,__menuRightList);
+				
+				list_.addEventListener(MouseEvent.MOUSE_DOWN				,__menuRightList);
+				list_.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN			,__menuRightList);
+				list_.addEventListener(FlexEvent.VALUE_COMMIT				,__length);
+				list_.addEventListener(FlexEvent.UPDATE_COMPLETE			,__length);
+				
+				list_.addEventListener(gnncEventGeneral._complete			,__null);
+				list_.addEventListener(gnncEventGeneral._control			,__null);
+				list_.addEventListener(gnncEventGeneral._delete 			,__null);
+				list_.addEventListener(gnncEventGeneral._edit  				,__null);
+				list_.addEventListener(gnncEventGeneral._error				,__null);
+				list_.addEventListener(gnncEventGeneral._free				,__null);
+				list_.addEventListener(gnncEventGeneral._loading			,__null);
+				list_.addEventListener(gnncEventGeneral._rightMouseUp		,__null);
+				list_.addEventListener(gnncEventGeneral._rightMouseDown		,__menuRightList);
+				list_.addEventListener(gnncEventGeneral._rightMouseClick	,__null);
+				list_.addEventListener(gnncEventGeneral._mouseDoubleClick	,__fView);
+				list_.addEventListener(gnncEventGeneral._mouseClick			,__null);
+				list_.addEventListener(gnncEventGeneral._mouseDown			,__menuRightList);
+				list_.addEventListener(gnncEventGeneral._mouseUp			,__null);
+				list_.addEventListener(gnncEventGeneral._new				,__null);
+				list_.addEventListener(gnncEventGeneral._paste				,__null);
+				list_.addEventListener(gnncEventGeneral._refresh			,__null);
+				list_.addEventListener(gnncEventGeneral._removeItemList		,__null);
+				list_.addEventListener(gnncEventGeneral._update				,__null);
+				list_.addEventListener(gnncEventGeneral._view				,__null);
+			}
+
+			private function __null(e:*=null):void
+			{
+			}
+			
+			private function __menuContext():void
+			{
+				_menuContext = new ArrayCollection(
+					[
+						{label:'Visualizar',	enabled:_view,		separator:true,		visible:true,	fName:__fView},
+						{label:'Novo',			enabled:_new,		separator:true,		visible:true,	fName:__fNew},
+						{label:'Editar',		enabled:_edit,		separator:false,	visible:true,	fName:__fEdit},
+						{label:'Excluir',		enabled:_delete,	separator:false,	visible:true,	fName:__fDelete},
+						{label:'Atualizar',		enabled:_refresh,	separator:true,		visible:true,	fName:__fRefresh},
+						{label:'Copiar URL',	enabled:_copyUrl,	separator:true,		visible:true,	fName:__fCopyUrl}
+					]
+				);
+			}
+
+			private function __menuRightList(e:*=null):void
+			{
+				var OBJ:Object					= list_.selectedItem;
+				var IDXDATP:int 				= list_.selectedIndex;
+				var IDXARRA:int 				= _connAttach.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+
+				var _i:uint;
+				var _menuArray:Array 	= new Array();
+				var cm:ContextMenu 		= new ContextMenu();
+				var j:ContextMenuItem	= null;
+				
+				_menuArray.push			(new ContextMenuItem('Arquivo: ' + String(OBJ.NAME).substr(0,15) + '... ('+String(OBJ.EXTENSION).toLowerCase()+')',false,false,true));
+
+				for(_i=0; _i<_menuContext.length; _i++) 
+				{
+					var o:Object 			= _menuContext.getItemAt(_i);
+					j						= new ContextMenuItem(o.label,o.separator,o.enabled,o.visible);
+					j.addEventListener		(Event.SELECT,o.fName); //function(e:*):void{ _function() });
+					_menuArray.push			(j);
+				}
+				
+				cm.hideBuiltInItems		();
+				cm.customItems 			= _menuArray;
+				this.contextMenu		= cm;
+			}
+			
+			public function __fView(event:*=null):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connAttach.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+				
+				function __fRemove(e:*):void
+				{ 
+				}
+
+				var _table:table_attach = new table_attach();
+				_table.ID	 			= OBJ.ID;
+				_table.NAME 			= OBJ.NAME;
+				_table.FILE_HTTP		= OBJ.FILE_HTTP;
+				_table.FILE_LINK		= OBJ.FILE_LINK;
+				_table.URL_LINK			= OBJ.URL_LINK;
+				_table.SIZE				= OBJ.SIZE;
+				_table.EXTENSION		= OBJ.EXTENSION;
+				
+				var _page:viewAttach 	= new viewAttach();
+				_page._TABLE_ATTACH 	= _table;
+				
+				new gnncPopUp(parentApplication).__creation(_page,true,false,__fRemove);
+			}
+			
+			public function __fNew(event:Event):void
+			{
+				function __fRemove(e:*):void
+				{
+					__select();
+				}
+				
+				var _table:table_attach 	= new table_attach();
+				
+				_table.ID_CLIENT 			= _tableAttach.ID_CLIENT;
+				_table.ID_PROJECT 			= _tableAttach.ID_PROJECT;
+				_table.ID_STEP 				= _tableAttach.ID_STEP;
+
+				_table.MIX 					= _tableAttach.MIX;
+				_table.ID_MIX				= _tableAttach.ID_MIX;
+
+				var _page:newAttach 		= new newAttach();
+				_page._tableAttach 		= _table;
+				_page._MIX					= _tableAttach.MIX;
+				
+				new gnncPopUp(parentApplication).__creation(_page,true,false,__fRemove);
+
+			}
+			
+			public function __fEdit(event:Event):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connAttach.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+				
+				function __fRemove(e:*):void
+				{ 
+					__select();
+				}
+				
+				var _page:newAttach		= new newAttach();
+				_page._tableAttach			= new table_attach(OBJ.ID);
+				
+				new gnncPopUp(parentApplication).__creation(_page,true,false,__fRemove);
+			}
+			
+			public function __fDelete(event:Event):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connAttach.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+
+				Alert.show("Você deseja excluir este arquivo definitivamente? [ID:"+OBJ.ID+"]",'Excluir...',3,null,__closeAlert);
+			}
+			
+			private function __closeAlert(event:CloseEvent):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connAttach.DATA_ARR.getItemIndex(OBJ);
+				
+				if(event.detail != Alert.YES)
+					return;
+				
+				_gnncPopUp.__loading('excluindo...');
+				
+				function __fFault(e:*):void
+				{ 
+					_gnncPopUp.__close();
+				}
+
+				function __fResult(e:*):void
+				{ 
+					__removeFile(String(OBJ.FILE_LINK));
+					list_.dataProvider.removeItemAt(IDXDATP);
+				}
+
+				if(OBJ.ID)
+					_connExec.__sql(new gnncSql().__DELETE(new table_attach(),[OBJ.ID],true),'','',__fResult,__fFault);
+			}
+			
+			private function __removeFile(fileLinkName_:String):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connAttach.DATA_ARR.getItemIndex(OBJ);
+
+				function __fFault(e:*):void
+				{ 
+					_gnncPopUp.__close();
+				}
+				
+				function __fResult(e:*):void
+				{ 
+					_gnncPopUp.__close();
+				}
+				
+				var _params:Object 	= new Object();
+				_params._fileName						= fileLinkName_;
+				_params._dataBaseName					= gnncGlobalStatic._dataBase;
+				
+				var a:gnncFilesRemote = new gnncFilesRemote();
+				a._allowGlobalError = false;
+				a.__loadUrl('filePhpUploadDelete',__fResult,__fFault,_params,'POST',true);
+			}
+			
+			public function __fRefresh(event:Event):void
+			{
+				__select();
+			}
+			
+			private function __fCopyUrl(event:Event):void
+			{
+				var OBJ:Object		= list_.selectedItem;
+				var IDXDATP:int 	= list_.selectedIndex;
+				var IDXARRA:int 	= _connAttach.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+				
+				gnncClipBoard.__copyText(OBJ.FILE_HTTP+'ATTACH/'+gnncGlobalStatic._dataBase.toUpperCase()+'/'+OBJ.FILE_LINK+'?'+Math.random());
+			}
+
+			public function __select():void
+			{
+				if(!_tableAttach)
+					return;
+				
+				function __fFault(event:*):void
+				{
+					list_.enabled 		= true;
+				}
+				
+				function __fResult(event:*):void
+				{			
+					list_.dataProvider 	= _connAttach.DATA_ARR;
+					list_.enabled 		= true;
+				}
+
+				list_.enabled 		= false;
+				
+				var _sql:String 		= _sqlConsult ? _sqlConsult : new gnncSql().__SELECT(_tableAttach,false,_sqlColumns,null,null,_sqlWhere,null,_sqlOrderBy,_sqlOrderDesc);
+				_connAttach.__sql		(_sql,'','',__fResult,__fFault);
+			}
+			
+			public function __fSaveOrder(fResult_:Function=null,fFault_:Function=null):void
+			{
+				if(!_length)
+					return;
+				
+				var _i:uint 			= 0;
+				var _sql:String 		= '';
+				var _obj:Object;
+				
+				//var _tem:Vector.<Object> = new Vector.<Object>;
+				
+				function __fFault(event:*):void
+				{
+					if(fResult_!=null)
+						fResult_.call(null);
+					list_.enabled 		= true;
+				}
+				
+				function __fResult(event:*):void
+				{
+					if(fFault_!=null)
+						fFault_.call(null);
+					list_.enabled 		= true;
+				}
+				
+				list_.enabled 			= false;
+				
+				for(_i=0; _i<_length; _i++)
+				{
+					_obj 				= new Object();
+					_obj._TABLE			= new table_attach()._TABLE;
+					_obj.ID				= list_.dataProvider.getItemAt(_i).ID;
+					_obj.ORDER_ITEM		= _i;
+					
+					_sql += new gnncSql().__UPDATE(_obj,null,true,null) + gnncGlobalStatic._breakSql;
+				}
+				
+				_connExec.__sql(_sql,'','',__fResult,__fFault);
+			}
+			
+			public function __fileLocation(index_:int,propertyNamePhoto_:String='PHOTO_CLIENT',setInImage_:Image=null):Object
+			{
+				if(index_ < 0 || index_ == length || !length)
+					return null;
+				
+				var _obj:Object = list_.dataProvider.getItemAt(0);
+				
+				if(!_obj.hasOwnProperty(propertyNamePhoto_))
+					return null;
+				
+				var _http:String = gnncGlobalStatic._httpHost+'ATTACH/'+String(gnncGlobalStatic._dataBase).toUpperCase()+'/'+_obj[propertyNamePhoto_];
+				
+				if(setInImage_!=null)
+					setInImage_.source = _http;
+				
+				return _http;
+				
+			}
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:List id="list_" dataProvider="{new ArrayCollection()}" width="100%" height="100%" bottom="0" 
+			borderVisible="false" borderColor="0x999999" focusAlpha="0"
+			contentBackgroundAlpha="0" contentBackgroundColor="0xFFFFFF" horizontalScrollPolicy="off" 
+			itemRenderer="GNNC.modules.attach.itemRender.itemRender_attach_forList" >
+		<s:layout>
+			<s:VerticalLayout gap="0" paddingLeft="1" paddingBottom="1" paddingRight="1" paddingTop="1"/>
+		</s:layout>
+	</s:List>
+	
+</s:Group>

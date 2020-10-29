@@ -1,0 +1,10 @@
+myProject GNNC
+	- Properties
+		- Flex Compiler
+			- Addtional Arguments
+			
+				-locale pt_BR -services "GNNC/SERVER/services-config.xml"
+				
+				In Labrary DAYBYDAY v1.5
+				
+				-locale pt_BR -services "GNNC/dataConnection/AMFPhp/xml/services-config.xml"

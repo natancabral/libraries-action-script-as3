@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false"  
+				
+				height="30" width="100%" minWidth="500"
+				
+				doubleClickEnabled="true" 
+				doubleClick="{__view()}" 
+				rightMouseDown="{__menuRight(event)}" 
+				
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:elements="GNNC.UI.elements.*" 
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.data.gnncDataNumberConvert;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			import mx.events.FlexEvent;
+			
+			import spark.core.ContentCache;
+			
+			private function __view(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._view,data));
+			}
+			
+			private function __list(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._loading,data));
+			}
+			
+			private function __viewFinancial(e:*=null):void
+			{
+				if(data.FINANCIAL_ID)
+				Object(owner).dispatchEvent(new gnncEventGeneral('VIEW_FINANCIAL',data));
+			}
+			
+			private function __menuRight(e:MouseEvent):void
+			{ /*
+				var IN_OR_OUT:String 				= Number(data.VALUE_IN)>0?'(Receita)':Number(data.VALUE_OUT)>0?'(Despesa)':'(Movimentação)';
+				var itemValue:ContextMenuItem  		= new ContextMenuItem('R$ '+Number(data.VALUE_IN+data.VALUE_OUT).toFixed(2).replace('.',',')+' '+IN_OR_OUT,false,false);
+				var itemView:ContextMenuItem 		= new ContextMenuItem('Visualizar',true,true);
+				itemView.addEventListener			(Event.SELECT,__view);
+				
+				// Create custom context menu. 
+				var cm:ContextMenu 	= new ContextMenu();
+				cm.hideBuiltInItems	();
+				cm.customItems 		= [itemValue,itemView];
+				
+				this.contextMenu 	= cm;
+				*/
+			}
+
+			private function getColorRaw(d:Object,type:uint):uint
+			{
+				var sIn:uint  = uint(d.ROWS_IN);
+				var sOut:uint = uint(d.ROWS_OUT)+uint(d.ROWS_OUT_STOCK);
+				var c:uint = 0x777777;
+				
+				switch(type)
+				{
+					case 0: //raw material / matéria prima
+						if(sIn>0){
+							c = 0x33cc00;
+						}
+						break;
+					case 1://produção
+						if(sIn>0){
+							if(sOut>0){
+								c = 0x33cc00;
+							}else{
+								c = 0xff9900;
+							}
+						}else{
+							//c = 0x33cc00;
+						}
+						break;
+				}
+				
+				return c;
+			}
+
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<elements:elementHLine bottom="0" left="3" right="3" alpha="1" color="0xeeeeee" />
+
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha="1" includeIn="hoveredAndShowsCaret,hovered"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret"
+			radiusX="4" radiusY="4"
+			>
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	
+	<!--- ################# --> 
+	<!--- color --> 
+	
+	<s:HGroup left="0" top="0" right="0" bottom="0" gap="1" verticalAlign="middle" 
+			  color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+			  paddingLeft="6" paddingRight="6"
+			  >
+
+		<s:Image source="{gnncEmbedBlackWhite.bw_label_16}" toolTip="{'Lote, Id: '+data.ID}" />
+		
+		<s:Label text="{(data.NAME_DYNAMIC)}" fontSize="11" fontWeight="bold" width="120" 
+				 maxDisplayedLines="1" showTruncationTip="true" paddingLeft="5" paddingRight="5"/>
+
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME)}" fontSize="11" fontWeight="normal" width="100%" 
+				 maxDisplayedLines="1" showTruncationTip="true" paddingLeft="5" paddingRight="5"/>
+
+		<elements:elementLabelBackgroudColor text="{gnncDataNumberConvert.getUnit(data,true,true,false,2,'UNIT_MANUAL_PRECISION')+''}" width="55" height="20" verticalAlign="middle" _colorBackground="0xEEEEEE" textAlign="right" 
+											 _color="0x333333" _color.selected="0xFFFFFF" _color.selectedAndShowsCaret="0xFFFFFF" _colorBackgroundAlpha=".2"
+											 toolTip="Unidade de produção inserida manualmente. Precisão fabricada."
+											 visible="{Number(data.UNIT_MANUAL_PRECISION)>0?true:false}"
+											 />
+
+		<elements:elementLabelBackgroudColor text="{gnncDataNumberConvert.getUnit(data,true,true,false,2,'UNIT_PRODUCTION','UNIT_TYPE_PRODUCTION')+''}" width="55" height="20" verticalAlign="middle" _colorBackground="0xEEEEEE" textAlign="right" 
+											 _color="0x333333" _color.selected="0xFFFFFF" _color.selectedAndShowsCaret="0xFFFFFF" _colorBackgroundAlpha=".2"
+											 toolTip="Unidade produzida inserida no estoque."
+											 visible="{Number(data.UNIT_PRODUCTION)>0?true:false}"
+											 />
+		
+		<s:Rect width="3"/>
+		
+		<s:Image source="{gnncEmbedBlackWhite.bw_calendar_16}" toolTip="Data de Fabricação" />
+		<s:Label text="{gnncDate.__date2Legend(data.DATE_FABRICATION,null,true,false,'',true)}" 
+				 fontSize="11" fontWeight="bold" width="60" maxDisplayedLines="1" showTruncationTip="true" paddingLeft="5" paddingRight="1"
+				 toolTip="Data de Fabricação"
+				 />
+		<s:Image source="{gnncEmbedBlackWhite.bw_calendar_16}" toolTip="Data de ValidadeW" />
+		<s:Label text="{gnncDate.__date2Legend(data.DATE_EXPIRATION,null,true,false,'',true)}" 
+				 fontSize="11" fontWeight="bold" width="60" maxDisplayedLines="1" showTruncationTip="true" paddingLeft="5" paddingRight="1" 
+				 toolTip="Data de Validade"
+				 />
+
+		<s:Rect width="2"/>
+		
+		<elements:elementLabelBackgroudColor height="20" _fontSize="10"
+											 _paddingLeftText="10" _paddingRightText="10"
+											 _color="{0x777777}" 
+											 _colorBackground="{0xeeeeee}"
+											 _label="{'M-Prima'}" _fontWeight="bold" 
+											 verticalAlign="middle"/>
+		<elements:elementLabelBackgroudColor width="30" height="20" _fontSize="10" textAlign="center"
+											 _paddingLeftText="10" _paddingRightText="10"
+											 _color="{0xffffff}" 
+											 _colorBackground="{getColorRaw(data,0)}"
+											 _label="{''+uint(data.ROWS_IN)}" _fontWeight="bold" 
+											 verticalAlign="middle"/>
+		<elements:elementLabelBackgroudColor height="20" _fontSize="10"
+											 _paddingLeftText="10" _paddingRightText="10"
+											 _color="{0x777777}" 
+											 _colorBackground="{0xeeeeee}"
+											 _label="{'Produção'}" _fontWeight="bold" 
+											 verticalAlign="middle"/>
+		<elements:elementLabelBackgroudColor width="30" height="20" _fontSize="10" textAlign="center"
+											 _paddingLeftText="10" _paddingRightText="10"
+											 _color="{0xffffff}" 
+											 _colorBackground="{getColorRaw(data,1)}"
+											 _label="{''+(uint(data.ROWS_OUT)+uint(data.ROWS_OUT_STOCK))}" _fontWeight="bold" 
+											 verticalAlign="middle"/>
+		
+		<s:Rect width="2"/>
+		<s:Image source="{gnncEmbedBlackWhite.bw_description_16}" toolTip="{data.DESCRIPTION}" alpha="{data.DESCRIPTION?1:.2}" width="16" height="16"/>
+		<s:Rect width="2"/>
+		<s:Button icon="{gnncEmbedBlackWhite.bw_all_16}" height="20" width="22" toolTip="Itens" skinClass="GNNC.skin.button.skin_buttonLink" click="{__list()}" />
+		<s:Button icon="{gnncEmbedBlackWhite.bw_view_16}" width="20" height="20" toolTip="Visualizar" skinClass="GNNC.skin.button.skin_buttonLink" click="{__view()}" />
+
+	</s:HGroup>
+	
+	
+</s:ItemRenderer>

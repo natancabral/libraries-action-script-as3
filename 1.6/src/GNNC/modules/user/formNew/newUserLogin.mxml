@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="550" height="550" 
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:select="GNNC.elements.component.select.*" 
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.encrypt.gnncMD5;
+			import GNNC.data.encrypt.gnncWSSEUsernameToken;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_;
+			import GNNC.sqlTables.table_financial_account;
+			import GNNC.sqlTables.table_login;
+			
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			private var connLogin:gnncAMFPhp = new gnncAMFPhp();
+			public var _tableLogin:table_login = new table_login();
+			
+			public const _MIX:String = 'USER';
+			
+			public var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			public var _change:Boolean = false;
+
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+						if(gnncKeyboard.__CONTROL_ENTER(event)) __save();
+					}
+				);
+
+				__check();
+				callLater(__firstInput);
+				
+				if(gnncGlobalStatic._userAdmin===true)
+					isAdmin.enabled = true;
+			}
+			
+			public function __firstInput():void 
+			{ 
+				this.CLIENT_.list_.textInput.setFocus();
+			}
+			
+			private function __check():void
+			{
+				if(_tableLogin != null){
+					if(Number(_tableLogin.ID)>0){
+						_gnncPopUp.__close();
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var a:Array = new Array();
+						a.push('*');
+						a.push('( select c.NAME from dbd_client c where c.ID = dbd_login.ID_CLIENT limit 1 ) as NAME_CLIENT ');
+						var t:table_login = new table_login(_tableLogin.ID);
+						t.ACTIVE = 0;
+						var sql:String = new gnncSql().__SELECT(t,false,a);
+						connLogin.__sql(sql,'','',__fResultCheck,__fFaultCheck);
+					}
+				} else {
+					_tableLogin = new table_login();
+				}
+			}
+			
+			protected function __fFaultCheck(event:FaultEvent):void
+			{
+				gnncPopUp.__close();
+				__close()
+			}
+			
+			protected function __fResultCheck(event:ResultEvent):void
+			{
+				gnncPopUp.__close();
+				
+				if(!connLogin.DATA_ROWS){
+					new gnncAlert().__alert('Usuário não encontrado.');
+					__close();
+					return;
+				}
+				
+				var o:Object				= connLogin.DATA_ARR.getItemAt(0);
+				
+				_tableLogin.ID				= _tableLogin.ID;
+				CLIENT_.setValue            (o.NAME_CLIENT,o.ID_CLIENT);
+				GROUP_.value				= o.ID_GROUP;
+				
+				USER_.text					= String(o.USER);
+				EMAIL_.text                 = String(o.USER_EMAIL);
+				PASSW_.text 				= String(o.PASSW);
+				PASSW_REPEAT_.text 			= String(o.PASSW);
+				
+				PASSW_CHANGE_NEXT_TIME_.selected = o.PASSW_CHANGE?true:false;
+				
+				UTC_.selectedIndex			= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._UTC,'data',o.UTC);
+				SUMMER_TIME_.selected		= o.SUMMER_TIME ? true : false;
+
+				//_tableLogin.TOKEN 		    = gnncMD5.hash(o.USER+new Date().time);
+				
+				isAdmin.selected    = uint(o.IS_ADMIN)  == 1 ? true : false ;
+				isClient.selected   = uint(o.IS_CLIENT) == 1 ? true : false ;
+				
+				ACTIVE_.selected            = Number(o.ACTIVE)==1?true:false;
+				
+				USER_CHANGE_.selected = false;				
+				PASSW_CHANGE_.selected = false;				
+
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+
+			private function __save():void
+			{
+				if(CLIENT_.value==0){
+					new gnncNotification().__show('Cadastro','Selecione um cliente (cadastro)',gnncEmbedBlackWhite.bw_client_32_v2);
+					return;
+				}
+
+				if(gnncData.__trimText(USER_.text) == ''){
+					new gnncNotification().__show('Usuário','Insira um usário com 6 dígitos',gnncEmbedBlackWhite.bw_client_32_v2);
+					return;
+				}
+				if(USER_.text.length < 6){
+					new gnncNotification().__show('Usuário','Deve conter mais de 6 dígitos',gnncEmbedBlackWhite.bw_client_32_v2);
+					return;
+				}
+				if(GROUP_.value==0){
+					new gnncNotification().__show('Permissão','Selecione um grupo de permissão',gnncEmbedBlackWhite.bw_permission_32);
+					return;
+				}
+				
+				if(gnncData.__trimText(PASSW_.text)==''){
+					new gnncNotification().__show('Senha','Insira uma senha',gnncEmbedBlackWhite.bw_permission_32);
+					return;
+				}
+				if(!PASSW_REPEAT_.text || PASSW_REPEAT_.text!=PASSW_.text){
+					new gnncNotification().__show('Senha','Repita a senha corretamente',gnncEmbedBlackWhite.bw_permission_32);
+					return;
+				}
+				if(gnncData.__trimText(EMAIL_.text) == '' || EMAIL_.text.indexOf('@') < 0){
+					new gnncNotification().__show('E-mail','Insira um e-mail válido',gnncEmbedBlackWhite.bw_email_32);
+					return;
+				}
+				
+				userConfirm();
+			}
+
+			private function userConfirm():void
+			{
+				gnncData.__scapeText(null,[USER_]);
+				_gnncPopUp.__loading('Conferindo usuário...');
+				
+				var max:uint = Number(_tableLogin.ID)>0 ? 1 : 0 ; 
+				
+				var sql:String = "" +
+					"select " +
+					"(select COUNT(u1.USER)       from dbd_login u1 where u1.USER       like '"+gnncData.__trimText(USER_.text)+"') as UU, " +
+					"(select COUNT(u2.ID_CLIENT)  from dbd_login u2 where u2.ID_CLIENT  like '"+CLIENT_.value+"') as CC, " +
+					"(select COUNT(u3.USER_EMAIL) from dbd_login u3 where u3.USER_EMAIL like '"+gnncData.__trimText(EMAIL_.text)+"') as EE " +
+					"from dbd_login x " +
+					"where " +
+					"x.ID > 0 limit 0,1 "; 
+
+				connLogin.__sql(sql,'','',__fResult,__fFault);
+
+				function __fResult(e:*):void
+				{
+					_gnncPopUp.__close(); 
+					if(connLogin.DATA_ROWS>0){
+						var o:Object = connLogin.DATA_ARR.getItemAt(0);
+						if(Number(o.UU) > max){
+							USER_.setFocus();
+							new gnncAlert().__alert('Usuário já existe, tente outro nome.'); 
+						}else if(Number(o.CC) > max){
+							CLIENT_.list_.selectedIndex = -1;
+							new gnncAlert().__alert('Cliente já existe, troque o cadastro.'); 
+						}else if(Number(o.EE) > max){
+							EMAIL_.setFocus();
+							new gnncAlert().__alert('E-mail já existe, é preciso um e-mail único para recuperação de senhas.'); 
+						}else{
+							saveData();
+						}
+					}else{
+						saveData();
+					}
+				}
+				function __fFault(e:*):void{
+					_gnncPopUp.__close(); 
+				}
+			}
+			
+			private function saveData():void
+			{
+				_gnncPopUp.__loading();
+				gnncData.__scapeText(null,[USER_,PASSW_]);
+				
+				var U:String = gnncData.__trimText(USER_.text);
+				var P:String = gnncData.__trimText(PASSW_.text);
+				
+				U = gnncData.__replace(U,'"','+');
+				P = gnncData.__replace(P,'"','+');
+				
+				U = gnncData.__replace(U,"'","+");
+				P = gnncData.__replace(P,"'","+");
+				
+				if(U.indexOf("+") > -1 || P.indexOf("+") > -1)
+				{
+					_gnncPopUp.__close();
+					new gnncAlert().__alert('Você está utilizando caractéres inapropriados. Tente letras, números, hífem, underline, ponto e arroba.');
+					return;
+				}
+
+				var t:table_login 	= new table_login();
+				t.ID				= _tableLogin.ID;
+				t.ID_CLIENT			= CLIENT_.value;
+				t.ID_GROUP			= GROUP_.value;
+				
+				t.USER 				= U;
+				t.USER_EMAIL        = gnncData.__trimText(EMAIL_.text);
+				t.PASSW 			= P;
+				t.PASSWSUPER 		= gnncMD5.hash(gnncMD5.hash(PASSW_.text)+'GNNC'); //http://md5cracker.org/ | http://md5.rednoize.com/
+				
+				t.PASSW_CHANGE 		= PASSW_CHANGE_NEXT_TIME_.selected?1:0;
+
+				t.UTC				= UTC_.selectedIndex>-1 ? UTC_.selectedItem.data : '';
+				t.SUMMER_TIME	    = SUMMER_TIME_.selected ? 1 : 0;
+
+				t.IS_ADMIN          = isAdmin.selected ? 1 : 0;
+				t.IS_CLIENT         = isClient.selected ? 1 : 0;
+				
+				t.TOKEN 			= gnncMD5.hash(gnncWSSEUsernameToken.getUsernameToken(USER_.text,PASSW_.text,null,new Date())+new Date().time);
+				t.ACTIVE			= ACTIVE_.selected == true ? 1 : 0 ;
+				
+				var sql:String 		= new gnncSql().__INSERT(t,false,true,true);
+				connLogin.__sql		(sql,'','',__fResult,__fFault);
+				
+				function __fResult(event:ResultEvent):void
+				{
+					_change = true;
+					gnncPopUp.__close();
+					__close();
+				}
+				
+				function __fFault(event:FaultEvent):void{
+					gnncPopUp.__close();
+				}
+				
+			}
+
+		]]>
+	</fx:Script>
+	
+	<elements:elementStageBoxPopUp />
+	<elements:elementLabelFont id="titlePopUp_" text="USUÁRIO" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+		<s:Rect width="100%"/>
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-15" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+				<s:FormItem label="Status">
+					<s:CheckBox id="ACTIVE_" label="Usuário Ativo" fontWeight="bold" selected="true"/>
+					<s:Rect width="100%" />
+					<s:Image source="{ACTIVE_.selected==false?gnncEmbedImage.STATUS_RED_16:gnncEmbedImage.STATUS_GREEN_16}" toolTip="Status" width="16" height="16" />
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Cliente (cadastro)" required="true">
+					<select:conSelect_CLIENT id="CLIENT_" width="100%" height="30" _EMAIL="false"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Usuário" required="true" visible="{CLIENT_.list_.selectedIndex>-1}">
+					<s:layout>
+						<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="USER_" width="200" height="30" fontSize="15" maxChars="30" paddingLeft="5" prompt="Nome do usuário" restrict="[a-z][A-Z][0-9]áàâãóôõéêíúç_.@\-" enabled="{USER_CHANGE_.selected}" />
+					<s:Button width="30" height="30" click="{USER_.text=''}" toolTip="Limpar nome do usuário" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" skinClass="GNNC.skin.button.skin_buttonLink" enabled="{USER_CHANGE_.selected}"/>
+					<s:Rect width="100%"/>
+					<s:CheckBox id="USER_CHANGE_" label="Alterar" fontWeight="bold" selected="true"/>
+				</s:FormItem>
+				<s:FormItem label="{'Senha ('+(PASSW_.text.length-6)+'/'+(15-PASSW_.text.length)+')'}" required="true" visible="{CLIENT_.list_.selectedIndex>-1}" >
+					<s:layout>
+						<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="PASSW_" width="200" height="30" maxChars="15" paddingLeft="5" prompt="Senha" restrict="[a-z][A-Z][0-9]áàâãóôõéêíúç!;,%¨()\-._@*\$#" displayAsPassword="true" enabled="{PASSW_CHANGE_.selected}" />
+					<s:Button width="30" height="30" click="{PASSW_.text=''}" toolTip="Limpar campo..." icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" skinClass="GNNC.skin.button.skin_buttonLink" enabled="{PASSW_CHANGE_.selected}"/>
+					<s:Image source="{PASSW_.text.length>5?gnncEmbedBlackWhite.check_16_green_ok:gnncEmbedBlackWhite.check_16_bw_ok}"/>
+					<s:Rect width="100%"/>
+					<s:CheckBox id="PASSW_CHANGE_" label="Alterar"  fontWeight="bold" selected="true"/>
+				</s:FormItem>
+				<s:FormItem label="Repetir senha" required="true" visible="{CLIENT_.list_.selectedIndex>-1}">
+					<s:layout>
+						<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="PASSW_REPEAT_" width="200" height="30" maxChars="15" paddingLeft="5" prompt="Senha" restrict="[a-z][A-Z][0-9]áàâãóôõéêíúç!;,%¨()\-._@*\$#" displayAsPassword="true" enabled="{PASSW_CHANGE_.selected}" />
+					<s:Button width="30" height="30" click="{PASSW_REPEAT_.text=''}" toolTip="Limpar campo..." icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" skinClass="GNNC.skin.button.skin_buttonLink" enabled="{PASSW_CHANGE_.selected}"/>
+					<s:Image source="{PASSW_REPEAT_.text.length==0?gnncEmbedBlackWhite.check_16_bw_ok:PASSW_.text==PASSW_REPEAT_.text?gnncEmbedBlackWhite.check_16_green_ok:gnncEmbedBlackWhite.check_16_bw_ok}"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" visible="{CLIENT_.list_.selectedIndex>-1}" />
+				<s:FormItem label="E-mail Usuário" required="true" visible="{CLIENT_.list_.selectedIndex>-1}">
+					<s:TextInput id="EMAIL_" width="200" height="30" maxChars="30" paddingLeft="5" prompt="E-mail" restrict="[a-z][A-Z][0-9][\-\.\_\@\]"  />
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" visible="{CLIENT_.list_.selectedIndex>-1}" />
+				<s:FormItem label="" required="true" visible="{CLIENT_.list_.selectedIndex>-1}">
+					<s:layout>
+						<s:VerticalLayout gap="1"/>
+					</s:layout>
+					<s:CheckBox label="Usuário Cliente" height="25" id="isClient" />
+					<s:CheckBox label="Administrador" height="25" id="isAdmin" enabled="false" />
+					<s:CheckBox id="PASSW_CHANGE_NEXT_TIME_" label="Pedir alteração de senha no próximo acesso."  height="25" selected="false" enabled="false" />
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" visible="{CLIENT_.list_.selectedIndex>-1}" />
+				<s:FormItem label="" required="true" visible="{CLIENT_.list_.selectedIndex>-1}">
+					<s:Label text="Escolha atentamente o grupo de permissão." fontWeight="bold" fontSize="12" height="25" verticalAlign="middle"/>
+				</s:FormItem>
+				<s:FormItem label="Permissão" required="true" visible="{CLIENT_.list_.selectedIndex>-1}">
+					<select:conSelect_GROUP id="GROUP_" width="228" _MIX="PERMISSION" _ADD="false" _ICON="false" height="30" />
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="OPÇÕES" width="100%" height="100%" autoLayout="true" creationPolicy="all" >
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+				<s:FormItem label="Local UTC-GMT">
+					<s:DropDownList id="UTC_" height="25" selectedIndex="0" dataProvider="{gnncGlobalArrays._UTC}" width="200" />
+					<s:Label text="{(UTC_.selectedIndex>-1)?UTC_.selectedItem.GMT:''}" fontWeight="bold"/>
+					<s:CheckBox id="SUMMER_TIME_" label="Horário de verão." selected="true" height="25"  />
+				</s:FormItem>
+			</s:Form>
+			<s:TextArea text="{CLIENT_.log}" width="100%" height="100%"/>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+
+		<s:HGroup width="100%" height="34" bottom="0" gap="2" verticalAlign="middle" paddingLeft="5" paddingRight="5" >
+			<s:Rect width="100%" />
+			<s:Button id="btnSave_" icon="{gnncEmbedBlackWhite.bw_new_16}" label="Cadastrar" click="{__save()}" fontWeight="bold" height="25" >
+				<s:keyDown>
+					<![CDATA[
+					if( gnncKeyboard.__ENTER(event) && !gnncKeyboard.__CONTROL_ENTER(event) ) 
+					__save()
+					]]>
+				</s:keyDown>
+			</s:Button>
+			<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" />	
+		</s:HGroup>
+
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+
+</s:Module>

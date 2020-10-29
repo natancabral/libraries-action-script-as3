@@ -1,0 +1,455 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="100%" height="100%"
+		  
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:UI="GNNC.UI.*" 
+		  >
+	
+	<fx:Declarations>
+		<s:RadioButtonGroup id="UPD" enabled="true" />
+		<s:RadioButtonGroup id="PAC" enabled="true" />
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncImport.gnncImport;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.application.gnncAppOS;
+			import GNNC.application.gnncAppUpdateRuntime;
+			import GNNC.application.gnncApplication;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.file.gnncFileCookie;
+			import GNNC.data.file.gnncFilePdf;
+			import GNNC.data.file.gnncFilesNative;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.securityService.gnncSocket;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.gnncEmbedLogo;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.others.gnncUrlNavegator;
+			
+			private var _SETTINGS:gnncAMFPhp = new gnncAMFPhp();
+			public var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			public var _change:Boolean = false;
+			private var _gnncfiles:gnncFilesNative = new gnncFilesNative();
+			
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+					}
+				);
+				
+				AppName_.text 		= gnncGlobalStatic._programName;
+				
+				__deleteAutoDocuments();
+				__updateCheckValues();
+				__packageCheckValues();
+				
+				__documentPdfLocalSalveSet();
+			}
+			
+			private function __CLOSE():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __appUpdate():void
+			{
+				new gnncAppUpdateRuntime(this).checkUpdate(true);
+			}
+
+			private function __appUpdateForce():void
+			{
+				new gnncAppUpdateRuntime(this).checkUpdate(false,true);
+			}
+
+			private function __viewPdf():void
+			{
+				pdf_.text = gnncFilePdf.__getSystemCapability();
+			}
+
+			private function __goDownload():void
+			{
+				gnncUrlNavegator.__navegatorUrl('https://gnnc.com.br/daybyday/download/')
+			}
+			
+			private function __goWebSite():void
+			{
+				gnncUrlNavegator.__navegatorUrl('https://www.gnnc.com.br/')
+			}
+			
+			private function __goDownloadPDF():void
+			{
+				gnncUrlNavegator.__navegatorUrl('http://get.adobe.com/br/reader/')
+			}
+			
+			private function __proxyConnect():void
+			{
+				new gnncSocket().__connectSocket('www.gnnc.com.br',80);
+			}
+			
+			private function __updateSet():void
+			{
+				gnncFileCookie.__set('DAYBYDAY','UPDATE',UPD.selection.value.toString());
+			}
+
+			private function __updateCheckValues():void
+			{
+				if(gnncFileCookie.__get('DAYBYDAY','UPDATE'))
+					if(this.hasOwnProperty('UPDATE_'+gnncFileCookie.__get('DAYBYDAY','UPDATE')+'_'))
+						this['UPDATE_'+gnncFileCookie.__get('DAYBYDAY','UPDATE')+'_'].selected = true;
+				/** 
+				 * E 	= Executable Open
+				 * P 	= Path Open
+				 * EP 	= Executable and Path Open
+				 * N 	= None
+				 * **/
+			}
+
+			private function __packageSet():void
+			{
+				gnncFileCookie.__set('DAYBYDAY','PACK',PAC.selection.value.toString());
+			}
+
+			private function __packageCheckValues():void
+			{
+				if(gnncFileCookie.__get('DAYBYDAY','PACK'))
+					if(this.hasOwnProperty(gnncData.__replace(String('PACK_'+gnncFileCookie.__get('DAYBYDAY','PACK').toString().toUpperCase()+'_'),'.','')))
+						this[gnncData.__replace(String('PACK_'+gnncFileCookie.__get('DAYBYDAY','PACK').toString().toUpperCase()+'_'),'.','')].selected = true;
+				/** 
+				 * E 	= Executable Open
+				 * P 	= Path Open
+				 * EP 	= Executable and Path Open
+				 * N 	= None
+				 * **/
+			}
+			
+			private function __import():void
+			{
+				new gnncPopUp().__creation(new gnncImport());
+			}
+			
+			private function __export():void
+			{
+				//new gnncPopUp().__creation(new gnncImport());
+				new gnncAlert().__error('Acesso limitado neste momento. Tenta mais tarde...');
+			}
+			
+			private function __documentPdfLocalSalve():void
+			{
+				gnncFileCookie.__set('FILE_PDF'			,'PATH'	,String(DOCUMENT_PDF_SAVE_.selectedItem.data));
+				gnncFileCookie.__set('FILE_UPDATE'		,'PATH'	,String(DOCUMENT_UPDATE_SAVE_.selectedItem.data));
+				gnncFileCookie.__set('FILE_PRINTSCREEN'	,'PATH'	,String(DOCUMENT_PRINTSCREEN_SAVE_.selectedItem.data));
+			}
+			
+			private function __documentPdfLocalSalveSet():void
+			{
+				DOCUMENT_PDF_SAVE_.selectedIndex 			= gnncFileCookie.__get('FILE_PDF'			,'PATH') ? new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._localSaveFiles,'data',gnncFileCookie.__get('FILE_PDF'			,'PATH')) : 2;
+				DOCUMENT_UPDATE_SAVE_.selectedIndex 		= gnncFileCookie.__get('FILE_UPDATE'		,'PATH') ? new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._localSaveFiles,'data',gnncFileCookie.__get('FILE_UPDATE'		,'PATH')) : 2;
+				DOCUMENT_PRINTSCREEN_SAVE_.selectedIndex 	= gnncFileCookie.__get('FILE_PRINTSCREEN'	,'PATH') ? new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._localSaveFiles,'data',gnncFileCookie.__get('FILE_PRINTSCREEN'	,'PATH')) : 2;
+			}
+			
+			private function __documentPdfLocalDelete():void
+			{
+				if(!fileDeleteReport.selected && !fileDeleteUpdate.selected && !fileDeletePrintScreen.selected)
+					new gnncAlert().__alert('Para excluir pastas de armazenamento selecione no mínimo uma opção acima.');
+				
+				if(fileDeleteReport.selected)
+					new gnncFilesNative().__removePath(DOCUMENT_PDF_SAVE_.selectedItem.data,'GNNC/Export');
+				
+				if(fileDeleteUpdate.selected)
+					new gnncFilesNative().__removePath(DOCUMENT_UPDATE_SAVE_.selectedItem.data,'GNNC/AppUpdate');
+				
+				if(fileDeletePrintScreen.selected)
+					new gnncFilesNative().__removePath(DOCUMENT_PRINTSCREEN_SAVE_.selectedItem.data,'GNNC/PrintScreen');
+			}
+			
+			private function __deleteAutoDocuments(change_:Boolean=false):void
+			{
+				if(change_)
+					gnncFileCookie.__set('DAYBYDAY','DELETE_ALL_DOCS',DELETEALLDOCS_.selected?'true':'false');
+
+				var value:Boolean = gnncFileCookie.__get('DAYBYDAY','DELETE_ALL_DOCS') == 'true' ? true : false; 
+				DELETEALLDOCS_.selected = value;
+			}
+
+			//new gnncFilesNative().__removePath(DOCUMENT_PDF_SAVE_.selectedItem.data,'GNNC/Export');
+
+			/*private function __getPassHour():void
+			{
+				PASSW_.enabled = false;
+				
+				var _params:paramsFilePhpAccess = new paramsFilePhpAccess();
+				_params._hour			= 'true';
+				_params._passWord		= PASSW_.text;
+				
+				_gnncfiles.__loadUrl(_params._hostName,__fResult,__fFault,_params,'POST',true);
+				
+				function __fResult(e:*):void
+				{
+					PASSW_.enabled = true;
+					
+					if(_gnncfiles._DATA_UTF != 'true')
+					{
+						new gnncAlert().__error('Senha incorreta.');
+						return;
+					}
+					
+					btnExport_.enabled = true;
+					PASSW_.text = '';
+				}
+				
+				function __fFault(e:*):void
+				{
+					PASSW_.enabled = true;
+					btnExport_.enabled = false;
+					PASSW_.text = '';
+				}
+			}*/
+
+
+		]]>
+	</fx:Script>
+	
+	<s:Rect width="100%" height="100%">
+		<s:fill>
+			<s:SolidColor color="0xFAFAFA"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Group height="30" top="10" left="10" right="10" >
+		<s:Rect width="100%" height="30">
+			<s:fill>
+				<s:SolidColor color="0xF5F5F5"/>
+			</s:fill>
+		</s:Rect>
+		<s:TabBar height="28" dataProvider="{panelCenter_}" top="1" left="1"/>
+	</s:Group>
+	
+	<mx:ViewStack id="panelCenter_" top="45" left="10" right="10" bottom="42">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" autoLayout="true" creationPolicy="all">
+			<s:Image source="{gnncEmbedLogo.LOGO_GNNC_128}" left="30" bottom="0" toolTip="GNNC - Estratégia Empresarial" />
+			<s:Image source="{gnncEmbedLogo.LOGO_DAYBYDAY_COLLECTION}" left="230" bottom="30" toolTip="Daybyday Collection" />
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Aplicativo" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="OS" >
+					<s:Label text="{gnncAppOS.__getOSNameComplete()}"/>
+				</s:FormItem>
+				<s:FormItem label="Aplicativo" >
+					<s:Label id="AppName_" text=""/>
+				</s:FormItem>
+				<s:FormItem label="Versão" >
+					<s:Label text="{gnncApplication.__getVersionNumber()}"/>
+				</s:FormItem>
+				<s:FormItem label="Fabricante" >
+					<s:Label text="{gnncApplication.__getCopyright()+' | GNNC - Estratégia Empresarial'}"/>
+				</s:FormItem>
+				<s:FormItem label="WebSite" >
+					<s:Label text="www.gnnc.com.br" color="0x3366ff" textDecoration="underline" buttonMode="true" click="{__goWebSite()}"/>
+				</s:FormItem>
+				<s:FormItem label="Download" >
+					<s:Label text="www.gnnc.com.br" color="0x3366ff" textDecoration="underline" buttonMode="true" click="{__goDownload()}"/>
+				</s:FormItem>
+				
+
+				<!--- LINEW -->
+				<!--s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group-->
+				<!--- END LINEW -->
+			</s:Form>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="ARQUVOS" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1"/>
+			</s:layout>
+
+			<s:Form width="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<!--
+				##################################
+				##################################
+				##################################
+				CRIAR UM ARQUIVO EM APP STORAGE ou DOC para estas config serem utilizadas em todo o pacote DAYBYDAY
+				##################################
+				Criar uma pergunta: Deseja que seja para todos os programas DAYBYDAY?
+				##################################
+				##################################
+				-->
+				<s:Label text="Salvar" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Relatório em" >
+					<s:DropDownList id="DOCUMENT_PDF_SAVE_" 		width="200" height="25" dataProvider="{gnncGlobalArrays._localSaveFiles}" selectedIndex="1" change="{__documentPdfLocalSalve()}" />
+					<s:CheckBox label="Abrir diretório após" selected="false" enabled="false"/>
+				</s:FormItem>
+				<s:FormItem label="Atualização em" >
+					<s:DropDownList id="DOCUMENT_UPDATE_SAVE_" 		width="200" height="25" dataProvider="{gnncGlobalArrays._localSaveFiles}" selectedIndex="1" change="{__documentPdfLocalSalve()}" />
+					<s:CheckBox label="Abrir diretório após" selected="false" enabled="false"/>
+				</s:FormItem>
+				<s:FormItem label="PrintScreen em" >
+					<s:DropDownList id="DOCUMENT_PRINTSCREEN_SAVE_" width="200" height="25" dataProvider="{gnncGlobalArrays._localSaveFiles}" selectedIndex="1" change="{__documentPdfLocalSalve()}" />
+					<s:CheckBox label="Abrir diretório após" selected="false" enabled="false"/>
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+				<s:FormItem label="Aplicar em" enabled="false" >
+					<s:RadioButton label="Apenas neste aplicativo"/>
+					<s:Rect width="10"/>
+					<s:RadioButton label="Todos os aplicativos DAYBYDAY"/>
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+				<s:Label text="Excluir" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Armazenamento" >
+					<s:CheckBox id="fileDeleteReport" label="Relatórios" fontWeight="bold" />
+					<s:Rect width="10"/>
+					<s:CheckBox id="fileDeleteUpdate" label="Atualizações" fontWeight="bold"/>
+					<s:Rect width="10"/>
+					<s:CheckBox id="fileDeletePrintScreen" label="PrintScreens" fontWeight="bold"/>
+				</s:FormItem>
+				<s:FormItem label="" >
+					<s:Button label="Excluir arquivos" height="25" width="100%" icon="{gnncEmbedImage.REMOVE_16}" fontWeight="bold" click="{__documentPdfLocalDelete()}"/>
+				</s:FormItem>
+
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+
+				<s:FormItem label="Auto limpeza" >
+					<s:ToggleButton id="DELETEALLDOCS_" label="Limpar automaticamente na inicialização" height="25" width="100%" icon="{gnncEmbedImage.REMOVE_16}" fontWeight="bold" click="(__deleteAutoDocuments(true))" />
+				</s:FormItem>
+				
+			</s:Form>
+
+		</s:NavigatorContent>
+		<s:NavigatorContent label="ATUALIZAÇÃO" width="100%" height="100%" autoLayout="true" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Atualização" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Atualizador" width="100%" >
+					<s:layout>
+						<s:VerticalLayout gap="5"/>
+					</s:layout>	
+					<s:RadioButton id="UPDATE_E_" 	label="Executar automaticamente." 	value="E" 	group="{UPD}"	selected="true" 	click="{__updateSet()}"/>
+					<s:RadioButton id="UPDATE_P_" 	label="Abrir a pasta armazenada." 	value="P" 	group="{UPD}"	selected="false" 	click="{__updateSet()}"/>
+					<s:RadioButton id="UPDATE_EP_" 	label="Executar e abrir a pasta." 	value="EP" 	group="{UPD}"	selected="false" 	click="{__updateSet()}"/>
+					<s:RadioButton id="UPDATE_N_" 	label="Nenhum, apenas o link." 		value="N"	group="{UPD}"	selected="false" 	click="{__updateSet()}"/>
+				</s:FormItem>
+				<s:FormItem label="Pacote" width="100%" enabled="false">
+					<s:layout>
+						<s:VerticalLayout gap="5"/>
+					</s:layout>	
+					<s:RadioButton id="PACK__" 		label="Padrão (recomendado)." 		value="" 		group="{PAC}"	selected="true" 	click="{__packageSet()}"/>
+					<s:RadioButton id="PACK_MSI_" 	label="MSI" 						value=".msi" 	group="{PAC}"	selected="false" 	click="{__packageSet()}"/>
+					<s:RadioButton id="PACK_EXE_" 	label="EXE" 						value=".exe" 	group="{PAC}"	selected="false" 	click="{__packageSet()}"/>
+					<s:RadioButton id="PACK_AIR_" 	label="RIA" 						value=".air" 	group="{PAC}"	selected="false" 	click="{__packageSet()}"/>
+				</s:FormItem>
+				<s:FormItem label="Download" >
+					<s:Button label="Buscar atualizações" width="100%" height="25" click="{__appUpdate()}" fontWeight="bold" />
+				</s:FormItem>
+				<s:FormItem label="" >
+					<s:Button label="Verificar conexão" width="100%" height="25" click="{__proxyConnect()}" />
+				</s:FormItem>
+				<s:FormItem label="" >
+					<s:Button label="Forçar download" width="100%" height="25" click="{__appUpdateForce()}" fontWeight="bold" icon="{gnncEmbedBlackWhite.bw_download_16}" />
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>	
+		<s:NavigatorContent label="PDF" width="100%" height="100%" autoLayout="true" creationPolicy="all" >
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Acrobat/Pdf" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Teste">
+					<s:Button label="Verificar instalação" width="100%" click="{__viewPdf()}" fontWeight="bold" icon="{gnncEmbedBlackWhite.bw_document_16_pdf}"/>
+				</s:FormItem>
+				<s:FormItem label="" width="100%">
+					<s:Label  id="pdf_" text="Clique no botão acima para testar." maxDisplayedLines="2" width="100%" />
+				</s:FormItem>
+				<s:FormItem label="">
+					<s:Button label="Download" width="100%" click="{__goDownloadPDF()}" fontWeight="bold" icon="{gnncEmbedBlackWhite.bw_download_16}"/>
+				</s:FormItem>
+				<s:FormItem label="" width="100%">
+					<s:Label text="Última versão: http://get.adobe.com/br/reader/" buttonMode="true"  click="{__goDownloadPDF()}"/>
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="IMPORTAR / EXPORTAR" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Importar" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Banco" >
+					<s:Button label="Importar dados" height="25" width="100%" enabled="true" click="{__import()}" fontWeight="bold"/>
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+				<s:Label text="Exportar" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Banco" >
+					<s:Button id="btnExport_" label="Exportar dados" height="25" width="100%" enabled="false" click="{__export()}" fontWeight="bold"/>
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+
+	</mx:ViewStack>
+	
+</s:Module>

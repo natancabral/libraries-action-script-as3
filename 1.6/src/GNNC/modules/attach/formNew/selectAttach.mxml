@@ -1,0 +1,189 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="650" height="500"
+		  creationComplete="__start()"
+		  
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:stage="GNNC.elements.stage.*" xmlns:list="GNNC.elements.component.list.*" 
+		  
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_attach;
+			
+			import flash.events.*;
+			
+			import mx.collections.ArrayCollection;
+			
+			
+			private var _connAttach:gnncAMFPhp					= new gnncAMFPhp();
+			public var _tableAttach:table_attach	= new table_attach();
+			
+			public var _MIX:String 								= 'ATTACH';
+			
+			public  var _urlAttach:String						= '';
+			public  var _htmlAlign:String						= '';
+			public  var _htmlCssStyle:String					= '';
+			public  var _htmlTitle:String						= '';
+			
+			//private var _gnncPop:gnncPopUp 						= new gnncPopUp();
+			public  var _change:Boolean							= false;
+			
+			private const _typeSizeImage:ArrayCollection 		= new ArrayCollection([
+				{label:'Normal' 			, data:0},
+				{label:'Redimencionado' 	, data:1},
+				{label:'Quadrado 1x1'		, data:2}
+			]);
+			
+			private function __start():void
+			{
+				__config();
+			}
+
+			public function __config():void 
+			{ 
+				//<s:TileLayout columnWidth="150" rowHeight="150" horizontalGap="2" verticalGap="2" paddingLeft="5" paddingTop="5" paddingRight="5" paddingBottom="5" orientation="rows"/>
+				attach_.__layoutTile(150,150,2,2,[0]);
+				callLater(__attachList);
+			}
+			
+			public function __close():void 
+			{ 
+				attach_.__loading(false);
+				new gnncPopUp().__close(this);
+			}
+
+			private function __enter(e:KeyboardEvent):void
+			{
+				if(gnncKeyboard.__ENTER(e))
+					__save();
+			}
+			
+			private function __attachList():void
+			{
+				attach_.__loading(true);
+
+				var _sql:String = new gnncSql().__SELECT(new table_attach(),false,["*,(SELECT SUM(SIZE) from dbd_attach) SIZE_TOTAL"],null,null,["MIX LIKE '"+_MIX+"'"],null,['NAME'],false);
+				_connAttach.__sql(_sql,'','',_fResult,_fFault);
+				
+				function _fResult(e:*):void
+				{
+					attach_.__loading(false);
+					attach_.dataProvider = _connAttach.DATA_ARR;
+				}
+
+				function _fFault(e:*):void
+				{
+					attach_.__loading(false);
+					__close();
+				}
+			}
+
+			private function __save():void
+			{
+				var OBJ:Object			= attach_.selectedItem;
+				var IDXDATP:int 		= attach_.selectedIndex;
+				var IDXARRA:int 		= _connAttach.DATA_ARR.getItemIndex(OBJ);
+
+				if(IDXDATP < 0)
+					return;
+				
+				_tableAttach.ID 		=  OBJ.ID;
+				_tableAttach.ID_KEY 	=  OBJ.ID_KEY;
+				_tableAttach.MIX 		=  OBJ.MIX;
+				
+				_urlAttach 				= OBJ.FILE_HTTP+'ATTACH/'+gnncGlobalStatic._dataBase.toUpperCase()+'/'+webSize_.selectedValue+OBJ.FILE_LINK+'?'+Math.random();
+				_htmlAlign				= webAlign_.selectedValue.toString();
+				_htmlCssStyle			= ' margin: 2px; ';
+				_htmlTitle				= htmlTitle_.text;
+
+				_change = true;
+
+				__close();
+			}
+			
+			private function __uploads():void
+			{
+				var _TABLE:table_attach 	= new table_attach();
+				_TABLE.MIX 					= _MIX;
+				_TABLE.ID_USER				= gnncGlobalStatic._userId;
+				
+				var _PAGE:newAttach 		= new newAttach();
+				_PAGE._tableAttach 		= _TABLE;
+				_PAGE._MIX					= _MIX;
+				
+				new gnncPopUp(parentApplication).__creation(_PAGE,false,true,__fRemove);
+
+				function __fRemove(e:*=null):void
+				{
+					if(_PAGE._change)
+						__attachList();
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<s:RadioButtonGroup id="webAlign_" />
+		<s:RadioButtonGroup id="webSize_" />
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp/>
+	<elements:elementLabelFont id="titlePopUp_" text="SELEÇÃO DE ARQUIVO" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+	</s:HGroup>
+
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%">
+			<list:conList_attach id="attach_" width="100%" height="100%" itemRenderIndex="1" keyDown="{__enter(event)}" _backgroundAlpha="0" />
+		</s:NavigatorContent>
+		<s:NavigatorContent label="IMAGEM WEB" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:FormItem label="Alinhar" >
+					<s:RadioButton label="Normal" 				value="normal"	group="{webAlign_}" selected="true" fontWeight="bold"/>
+					<s:RadioButton label="Centralizado" 		value="center"	group="{webAlign_}"/><!-- middle -->
+					<s:RadioButton label="Esquerda" 			value="left"	group="{webAlign_}"/>
+					<s:RadioButton label="Direita" 				value="right"	group="{webAlign_}"/>
+					<s:RadioButton label="Topo" 				value="top"		group="{webAlign_}"/>
+				</s:FormItem>
+				<elements:elementHLine height="20" />
+				<s:FormItem label="Tamanho" >
+					<s:RadioButton label="Original" 			value=""				group="{webSize_}" selected="true" fontWeight="bold"/>
+					<s:RadioButton label="Menor" 				value="thumbnail/"		group="{webSize_}"/><!-- middle -->
+					<s:RadioButton label="Menor e Cortado" 		value="thumbnailCrop/"	group="{webSize_}"/>
+				</s:FormItem>
+				<elements:elementHLine height="20" />
+				<s:FormItem label="Título / Tag" >
+					<s:TextInput width="100%" height="25" id="htmlTitle_" fontSize="12" enabled="false" />
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Button label="Enviar arquivos..." height="25" click="{__uploads()}" icon="{gnncEmbedBlackWhite.bw_image_16}"/>
+		<s:Button label="Atualizar" height="25" click="{__attachList()}" icon="{gnncEmbedBlackWhite.bw_refresh_16}"/>
+		<s:Rect width="100%"/> 
+		<s:Button id="btnSave_" label="Selecionar" height="25" click="{__save()}" fontWeight="bold" icon="{gnncEmbedBlackWhite.bw_ok_16}"/>
+		<s:Button label="Fechar" icon="{gnncEmbedBlackWhite.app_close_16_clean}" bottom="0" left="0" right="0" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink"/>
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+
+</s:Module>

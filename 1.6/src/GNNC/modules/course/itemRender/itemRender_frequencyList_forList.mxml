@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				width="100%" height="30" 
+				
+				creationComplete="{__start()}" 
+				
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				
+				doubleClickEnabled="true" 
+				
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.gnncDate;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			
+			private function __start():void
+			{
+			}
+
+			private function __selectComplete():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._complete));
+			}
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret" />
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<!-- s:Rect left="0" top="0" right="0" bottom="0" radiusX="3">
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF"/>
+		</s:fill>
+	</s:Rect-->
+	
+	<!--- LINE DIVISION LINES -->
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha=".8" includeIn="hoveredAndShowsCaret,hovered" radiusX="3" radiusY="3">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+		
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" radiusX="3" radiusY="3" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<elements:elementHLine left="2" right="2" bottom="0" alpha=".5"/>
+	
+	<s:HGroup left="0" right="0" top="1" bottom="1" gap="1" verticalAlign="middle" paddingLeft="4" paddingTop="1" paddingBottom="1" paddingRight="4" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+			   toolTip="{'Frequência Id : '+data.ID }" 
+			  >
+
+		<!-- s:Image source="{gnncEmbedBlackWhite.bw_project_step_16}" width="16" height="16" toolTip="{'Frequência Id : '+data.ID }" /-->
+
+		<s:Label text="{gnncDate.__date2Legend(data.DATE_START)}" width="100" fontWeight="bold" verticalAlign="middle"
+				 paddingLeft="5" maxDisplayedLines="1" paddingRight="5" 
+				 />
+		<s:Label text="{data.PERIOD==1?'Matutino':data.PERIOD==2?'Vespertino':data.PERIOD==3?'Noturno':'-'}" 
+				 width="100%" verticalAlign="middle" />
+
+		<s:Label text="{data.IDS}" width="100" fontWeight="normal" verticalAlign="middle" fontSize="9" color="0xcccccc"
+				 toolTip="{'Frequências, Id:\n'+data.IDS}" paddingLeft="3" maxDisplayedLines="1" paddingRight="3" showTruncationTip="true"/>
+
+		<s:Image source="{uint(data.ID_STEP)>0?gnncEmbedBlackWhite.bw_project_step_16:gnncEmbedBlackWhite.bw_all_16}" />
+		<s:Label text="{uint(data.ID_STEP)>0?gnncData.__firstLetterUpperCase(data.NAME_DISCIPLINE):'Frequência Geral'}" width="100" fontWeight="normal" verticalAlign="middle"
+				 toolTip="{'Disciplina Id : '+data.ID_STEP }" paddingLeft="3" maxDisplayedLines="1" paddingRight="2" showTruncationTip="true"/>
+		
+		<!-- s:Image source="{gnncEmbedBlackWhite.bw_series_group_16}" />
+		<s:Label text="{uint(data.ID_GROUP)>0?gnncData.__firstLetterUpperCase(data.NAME_GROUP):'-'}" width="100%" fontWeight="normal" verticalAlign="middle"
+				 toolTip="{'Grupo Id : '+data.ID }" paddingLeft="3" maxDisplayedLines="1" paddingRight="2" showTruncationTip="true"/ -->
+		
+	</s:HGroup>
+	
+</s:ItemRenderer>

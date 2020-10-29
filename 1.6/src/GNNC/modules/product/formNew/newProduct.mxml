@@ -1,0 +1,910 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	width="750" height="420"
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:select="GNNC.elements.component.select.*" 
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*"
+	xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.data.gnncDataNumberConvert;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalLog;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.others.gnncUrlNavegator;
+			import GNNC.others.gnncViewStackCommand;
+			import GNNC.sqlTables.table_product;
+			
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+
+			public const _MIX:String = "PRODUCT";
+			public var _tableProduct:table_product = new table_product();
+			
+			private var _connProduct:gnncAMFPhp = new gnncAMFPhp();
+			private var _connExec:gnncAMFPhp = new gnncAMFPhp();
+			
+			public var _change:Boolean = false;
+			public var _allowEnterBreak:Boolean = false;
+
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			private var _checkedCode:Boolean = false;
+			
+			private function __start():void
+			{
+				
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(_allowEnterBreak)
+							return;
+						
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+					}
+				);
+				
+				UNIT_TYPE_.addEventListener(IndexChangeEvent.CARET_CHANGE,__changeUnit);
+				
+				__serviceOrProduct(true);
+				__check();
+				
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void 
+			{ 
+				NAME_.setFocus();
+			}
+
+			public function __serviceOrProduct(check_:Boolean=false):void 
+			{ 
+				if(_tableProduct!=null && check_)
+				{
+					SERVICE_TYPE_.selected 	= _tableProduct.SERVICE == 1 ? true : false;
+					PRODUCT_TYPE_.selected 	= _tableProduct.SERVICE == 1 ? false : true;
+				}
+				
+				if(SERVICE_TYPE_.selected == true)
+				{
+					_tableProduct.SERVICE == 1;
+					TYPE_OUT_.enabled = TYPE_IN_.visible = false;
+					typeIconIn_.visible = false;
+					UNIT_.text = '1';
+					STOCK_MIN_.text = '0';
+				}
+				else if(PRODUCT_TYPE_.selected == true)
+				{
+					_tableProduct.SERVICE == 0;
+					TYPE_OUT_.enabled = TYPE_IN_.visible = true;
+					typeIconIn_.visible = true;
+				}
+				
+				TYPE_OUT_.selected = true;
+				titlePopUp_.text = SERVICE_TYPE_.selected ? 'SERVIÇO' : 'PRODUTO';
+				
+				ID_SERIES_MAKER_.enabled 
+					//= WEIGHT_.enabled = WEIGHT_TYPE_.enabled
+					//= SIZE_.enabled = SIZE_TYPE_.enabled
+					= UNIT_.enabled = UNIT_TYPE_.enabled
+					//= ID_CLIENT_PROVIDER_.enabled
+					= STOCK_MIN_.enabled
+					= SERVICE_TYPE_.selected ? false : true;
+
+				if(!_tableProduct.ID || !UNIT_.text){
+				  UNIT_.text = '1';
+				  //SIZE_.text = '0';
+				  STOCK_MIN_.text = '0';
+				  UNIT_TYPE_.selectedIndex = 0;
+				}
+				
+				changeType();
+			}
+			
+			private function __check():void
+			{
+				if(_tableProduct != null){
+					if(_tableProduct.ID){
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						var _SQL:String 		= new gnncSql().__SELECT(new table_product(_tableProduct.ID));
+						_connProduct.__sql		(_SQL,'','',__fResultEdit,__fFaultEdit);
+					}
+					else{
+						ACTIVE_.value = 1;
+					}
+				} 
+				else {
+					_tableProduct = new table_product();
+					ACTIVE_.value = 1;
+				}
+			}
+
+			protected function __fFaultEdit(event:*):void
+			{
+				_gnncPopUp.__close();
+				new gnncPopUp().__close(this);
+			}
+
+			protected function __fResultEdit(event:*):void
+			{
+				if(_connProduct.DATA_ROWS==0){
+					new gnncNotification().__show('Erro','Nenhum produto encontrado.');
+					return;
+				}
+				
+				var _object:Object 					= _connProduct.DATA_ARR.getItemAt(0);
+				
+				_tableProduct.ID					= _object.ID; 
+				_tableProduct.ID_KEY                = _object.ID_KEY;
+				ID_CLIENT_PROVIDER_.value			= _object.ID_CLIENT_PROVIDER
+				NAME_.text							= _object.NAME; 
+				NICK_NAME_.text						= _object.NICK_NAME;
+				COLOR_.value						= _object.COLOR; 
+				DESCRIPTION_.text					= _object.DESCRIPTION; 
+				
+				_tableProduct.SERVICE				= _object.SERVICE; 
+				
+				TYPE_IN_.selected  = _object.TYPE=='IN'  ? true : false ;
+				TYPE_OUT_.selected = _object.TYPE=='OUT' ? true : false ;
+
+				VALUE_.text							= _object.VALUE?gnncDataNumber.__safeReal(_object.VALUE,2,''):''; 
+				VALUE_OUT_.text						= _object.VALUE_OUT?gnncDataNumber.__safeReal(_object.VALUE_OUT,2,''):''; 
+				//RETURN_PERCENT_.text				= Number(_object.RETURN_PERCENT)?_object.RETURN_PERCENT:''; 
+				//MAX_DISCOUNT_PERCENT_.text			= Number(_object.MAX_DISCOUNT_PERCENT)?_object.MAX_DISCOUNT_PERCENT:''; 
+				//PAY_COMMISSION_PERCENT_.text		= Number(_object.PAY_COMMISSION_PERCENT)?_object.PAY_COMMISSION_PERCENT:''; 
+				
+				//WEIGHT_.text						= _object.WEIGHT?_object.WEIGHT:''; 
+				//WEIGHT_TYPE_.selectedIndex			= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._WEIGHT_TYPE,'data',_object.WEIGHT_TYPE); 
+				//SIZE_TYPE_.selectedIndex			= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._SIZE_TYPE,'data',_object.SIZE_TYPE); 
+				//SIZE_.text							= _object.SIZE?_object.SIZE:''; 
+				TIME_TYPE_.selectedIndex			= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._TIME_TYPE,'data',_object.TIME_TYPE); 
+				TIME_.text							= Number(_object.TIME)?_object.TIME:''; 
+				UNIT_TYPE_.selectedIndex			= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._UNIT_TYPE2,'data',_object.UNIT_TYPE); 
+				
+				/*var unit:Number  = Number(_object.UNIT);
+				if(_object.UNIT_TYPE == 'KG'){
+					unit = Number(Number(gnncDataNumber.__safeClear(unit,2)*1000).toFixed(2));
+				}else if(_object.UNIT_TYPE == 'GG'){
+					unit = unit;
+				}else{
+					unit = unit;
+				}*/
+				
+				//new gnncAlert().__alert(String(setUnit(_object,true,3))+'|'+String(setUnit(_object,false,3))+'|'+getUnit(_object,true,false,false)+'|'+getUnit(_object,true,false,true));
+				
+				UNIT_.text = String(gnncDataNumberConvert.getUnit(_object,true,false,true)); 
+				
+				STOCK_MIN_.text                     = _object.STOCK_MIN;
+				
+				CODE_.text							= String(_object.CODE).toUpperCase(); 
+				CODE_ORIGINAL_.text					= String(_object.CODE_ORIGINAL).toUpperCase(); 
+				
+				//_object.TIME_HOUR; //<-- COURSE ACO
+				WEBSITE_.text						= _object.WEBSITE;
+				
+				STATUS_PROMOTION_.selected			= _object.STATUS_PROMOTION?true:false; 
+				STATUS_NEW_.selected 				= _object.STATUS_NEW?true:false;
+				STATUS_UNIQUE_.selected				= _object.STATUS_UNIQUE?true:false; 
+				
+				//ID_MAKER;
+				
+				//DEPARTAMENT_.value					= _object.ID_DEPARTAMENT; 
+				GROUP_.value						= _object.ID_GROUP; 
+				CATEGORY_.value						= _object.ID_CATEGORY; 
+				
+				ID_SERIES_MAKER_.value				= _object.ID_SERIES_MAKER;
+				
+				ACTIVE_.value						= _object.ACTIVE; 
+				_tableProduct.VISIBLE				= _object.VISIBLE; 
+				_tableProduct.CONTROL				= _object.CONTROL; 
+
+				__serviceOrProduct(true);
+				__price();
+				__changeUnit();
+				
+				_gnncPopUp.__close();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __NEXT():void
+			{
+				gnncViewStackCommand.__next(panelCenter_);
+			}
+			
+			private function __PREV():void
+			{
+				gnncViewStackCommand.__prev(panelCenter_);
+			}
+
+			/*private function setUnit(d:Object,returnHightWeight:Boolean=true,zeros:uint=2):Object
+			{
+				var t:String = String(d.UNIT_TYPE).toLowerCase();
+				var n:Number = Number(d.UNIT);
+				var x:Object = n;
+				if(returnHightWeight==true)
+				{
+					x = n/1000;
+					if(t=='gg')
+						return Number(Number(gnncDataNumber.__safeClear(x,1)).toFixed(zeros));
+					else if(t=='ml')
+						return gnncDataNumber.__safeReal(x,2,'');
+				}
+				else if(returnHightWeight==false)
+				{
+					if(t=='gg')
+						return Number(Number(gnncDataNumber.__safeClear(x,1)).toFixed(zeros));
+					else if(t=='ml')
+						return Number(Number(gnncDataNumber.__safeClear(x,1)).toFixed(zeros));
+				}
+				return String(d.UNIT);
+			}*/
+
+			/*private function getUnit(d:Object,returnHightWeight:Boolean=true,setUnitMetric:Boolean=true,returnNumber:Boolean=false):Object
+			{
+				var t:String = String(d.UNIT_TYPE).toLowerCase();
+				var n:Number = Number(d.UNIT);
+				var x:Object = n;
+				if(returnHightWeight==true)
+				{
+					x = n/1000;
+					if(t=='gg')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,1,'')+(!setUnitMetric?'':'Kg');
+					else if(t=='ml')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,2,'')+(!setUnitMetric?'':'L');
+				}
+				else if(returnHightWeight==false)
+				{
+					if(t=='gg')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,0,'')+(!setUnitMetric?'':'g');
+					else if(t=='ml')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,0,'')+(!setUnitMetric?'':'ml');
+				}
+				return String(d.UNIT);
+			}*/
+			
+			private function __save():void
+			{
+				if(!NAME_.text || gnncData.__trimText(NAME_.text).length < 4){
+					panelCenter_.selectedIndex = 0;
+					NAME_.setFocus();
+					return;
+				}
+				/*if(GROUP_.selectedIndex < 0){
+					panelCenter_.selectedIndex = 0;
+					GROUP_.LIST_.openDropDown();
+					return;
+				}*/
+				if(gnncDataNumber.__safeClear(UNIT_.text) < 0.001){
+					panelCenter_.selectedIndex = 1;
+					new gnncNotification().__show('Unidade de Medida','A unidade de medida precisa ser maior que zero.');
+					return;
+				}				
+				if((CODE_.text || CODE_ORIGINAL_.text) && !_checkedCode){
+					__checkCode(true);
+					return;
+				}
+
+				_gnncPopUp.__loading();
+				//gnncData.__scapeText([],[NAME_,NICK_NAME_,DESCRIPTION_]);
+				
+				
+				var _object:table_product 	= new table_product();
+
+				_object.ID					= _tableProduct.ID; 
+				_tableProduct.ID_KEY        = _tableProduct.ID_KEY ? _tableProduct.ID_KEY : gnncDataRand.__key() ;
+				
+				_object.ID_KEY              = _tableProduct.ID_KEY;
+				_object.ID_CLIENT_PROVIDER	= ID_CLIENT_PROVIDER_.value; 
+				_object.NAME				= NAME_.text; 
+				_object.NICK_NAME			= NICK_NAME_.text; 
+				_object.COLOR				= COLOR_.value; 
+				_object.DESCRIPTION			= DESCRIPTION_.text;
+				
+				_object.SERVICE				= SERVICE_.selectedValue as uint; 
+				_object.TYPE                = String(TYPE_.selectedValue);
+				
+				_object.VALUE					= gnncDataNumber.__safeClear(VALUE_.text); 
+				_object.VALUE_OUT				= gnncDataNumber.__safeClear(VALUE_OUT_.text); 
+				//_object.RETURN_PERCENT			= gnncDataNumber.__safeClear(RETURN_PERCENT_.text); 
+				//_object.MAX_DISCOUNT_PERCENT	= gnncDataNumber.__safeClear(MAX_DISCOUNT_PERCENT_.text); 
+				//_object.PAY_COMMISSION_PERCENT	= gnncDataNumber.__safeClear(PAY_COMMISSION_PERCENT_.text); 
+				
+				//_object.WEIGHT				= Number(WEIGHT_.text); 
+				//_object.WEIGHT_TYPE			= WEIGHT_TYPE_.selectedIndex>-1 	? WEIGHT_TYPE_.selectedItem.data 	: ''; 
+				//_object.SIZE_TYPE			= SIZE_TYPE_.selectedIndex>-1 		? SIZE_TYPE_.selectedItem.data 		: ''; 
+				//_object.SIZE				= gnncDataNumber.__safeClear(SIZE_.text); 
+				_object.TIME_TYPE			= TIME_TYPE_.selectedIndex>-1 		? TIME_TYPE_.selectedItem.data 		: ''; 
+				_object.TIME				= gnncDataNumber.__safeClear(TIME_.text); 
+				_object.UNIT_TYPE			= UNIT_TYPE_.selectedIndex>-1 		? UNIT_TYPE_.selectedItem.data 		: '';  
+
+				var unit:Number  = 0;
+				if(UNIT_TYPE_.selectedItem.data == 'GG' || UNIT_TYPE_.selectedItem.data == 'ML'){
+					unit = Number(gnncData.__replace(UNIT_.text,',',''));
+					//unit = gnncDataNumber.__safeClearString(unit,3);
+					unit = gnncDataNumber.__weight(unit,3);
+				}else{
+					unit = gnncDataNumber.__safeClear(UNIT_.text,2);
+					unit = gnncDataNumber.__safeClear(unit,0);
+				}
+				
+				//new gnncAlert().__alert(''+unit);
+
+				_object.UNIT				= unit; 
+
+				_object.STOCK_MIN           = gnncDataNumber.__safeClear(STOCK_MIN_.text,2);
+				
+				_object.CODE				= gnncData.__trimText(gnncData.__replace(CODE_.text,";",",")).toUpperCase(); 
+				_object.CODE_ORIGINAL	 	= gnncData.__trimText(gnncData.__replace(CODE_ORIGINAL_.text,";",",")).toUpperCase(); 
+				
+				//_object.TIME_HOUR; 
+				_object.WEBSITE				= WEBSITE_.text; 
+				
+				_object.STATUS_PROMOTION	= STATUS_PROMOTION_.selected 	? 1 : 0; 
+				_object.STATUS_NEW			= STATUS_NEW_.selected 			? 1 : 0;  
+				_object.STATUS_UNIQUE		= STATUS_UNIQUE_.selected 		? 1 : 0; 
+				
+				_object.ID_SERIES_MAKER		= ID_SERIES_MAKER_.enabled ? ID_SERIES_MAKER_.value : 0;
+				
+				//_object.ID_DEPARTAMENT		= DEPARTAMENT_.value; 
+				_object.ID_GROUP			= GROUP_.value; 
+				_object.ID_CATEGORY			= CATEGORY_.value;
+				
+				_object.ACTIVE				= ACTIVE_.value; 
+				_object.VISIBLE				= _tableProduct.VISIBLE; 
+				_object.CONTROL				= _tableProduct.CONTROL; 
+				
+				var _sql:String 	= new gnncSql().__INSERT(_object,false,true,true);
+				_connProduct.__sql	(_sql,'','',__fResult,__fFault);
+			}
+			
+			protected function __fResult(event:ResultEvent):void
+			{
+				_change = true;
+				_gnncPopUp.__close();
+				__close();
+			}
+
+			protected function __fFault(event:FaultEvent):void
+			{
+				_gnncPopUp.__close();
+			}
+
+			protected function __goUrl():void
+			{
+				var _url:String = WEBSITE_.text.indexOf('htt')>-1?WEBSITE_.text:'http://'+WEBSITE_.text;
+				gnncUrlNavegator.__navegatorUrl(_url);
+			}
+
+			protected function __textAreaFocus():void
+			{
+				_allowEnterBreak = true;
+			}
+
+			protected function __textAreaFocusOut():void
+			{
+				_allowEnterBreak = false;
+			}
+
+			protected function __keyboard(e:KeyboardEvent):void
+			{
+				/*if(gnncKeyboard.__CONTROL_ENTER(e))
+				{
+					DESCRIPTION_.selectRange(DESCRIPTION_.selectionAnchorPosition,DESCRIPTION_.selectionActivePosition);
+					DESCRIPTION_.text += "\n";
+					DESCRIPTION_.setFocus();
+					e.stopImmediatePropagation();
+					e.stopPropagation();
+					DESCRIPTION_.setFocus();
+				}*/
+			}
+			
+			public function __price():void
+			{
+				VALUE_CONVERT_.text 		= gnncDataNumber.__safeReal(gnncDataNumber.__safeClear(VALUE_.text));
+				VALUE_CONVERT_OUT_.text 	= gnncDataNumber.__safeReal(gnncDataNumber.__safeClear(VALUE_OUT_.text));
+				//VALUE_PERCENT_.text 		= gnncDataNumber.__safeReal(Number(Number(gnncData.__replace(VALUE_CONVERT_.text,',','.'))*Number(gnncData.__replace(RETURN_PERCENT_.text,',','.'))/100));
+			}
+			
+			private function __changeUnit(e:*=null):void
+			{
+				if(UNIT_TYPE_.selectedIndex < 0){
+					return;
+				}
+				
+				if(UNIT_TYPE_.selectedItem.data == 'GG' || UNIT_TYPE_.selectedItem.data == 'ML'){
+					DECIMAL_.text = '3';
+					UNIT_.text = gnncDataNumber.__safeClearString(UNIT_.text,3);
+					STOCK_MIN_.text = gnncDataNumber.__safeClearString(STOCK_MIN_.text,3);
+				}else{
+					DECIMAL_.text = '0';
+					UNIT_.text = gnncDataNumber.__safeClearString(UNIT_.text,0)+'';
+					STOCK_MIN_.text = gnncDataNumber.__safeClearString(STOCK_MIN_.text,0)+'';
+				}
+				UNIT_.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN));
+				STOCK_MIN_.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN));
+				callLater(function():void{
+					UNIT_.setFocus();
+				});
+			}
+
+			private var _checkedCodeWhithSave:Boolean = false;
+			private function __checkCode(save_:Boolean=false):void
+			{
+				var c:String = gnncData.__trimText(CODE_.text);
+				var o:String = gnncData.__trimText(CODE_ORIGINAL_.text);
+				var s:String = '';
+
+				if(!c && !o)
+				{
+					_checkedCode = true;
+					btnCode_         .setStyle('icon',gnncEmbedBlackWhite.check_16_green_ok);
+					btnCodeOriginal_ .setStyle('icon',gnncEmbedBlackWhite.check_16_green_ok);
+
+					if(_checkedCodeWhithSave)
+						__save();
+
+					return;
+				}
+				
+				c = c ? " CODE = '"+gnncData.__trimText(CODE_.text)+"' ":'';
+				o = o ? " CODE_ORIGINAL = '"+gnncData.__trimText(CODE_ORIGINAL_.text)+"' ":'';
+				
+				if(c && o)
+					s = "( "+c+" OR "+o+" )";
+				else if(c)
+					s = c;
+				else
+					s = o;
+				
+				if(_tableProduct.ID)
+					s = s+" AND ID <> '"+_tableProduct.ID+"' ";
+				
+				//_gnncPopUp.__loading('Conferindo códigos...');
+				_checkedCodeWhithSave = save_;
+
+				var sql:String = " select CODE, CODE_ORIGINAL from dbd_product where "+s;
+				_connExec = new gnncAMFPhp();
+				_connExec.__sql(sql,'','',_fResultCode,_fFaultCode);
+			}			
+
+			private function _fResultCode(e:*=null):void
+			{
+				gnncGlobalLog.__add('_fResultCode');
+				_gnncPopUp.__close();
+
+				var len:uint = _connExec.DATA_ROWS;
+				var err:uint = 0;
+				
+				_checkedCode = false;
+
+				if(!len)
+				{
+					btnCode_         .setStyle('icon',gnncEmbedBlackWhite.check_16_green_ok);
+					btnCodeOriginal_ .setStyle('icon',gnncEmbedBlackWhite.check_16_green_ok);
+					_checkedCode = true;
+
+					if(_checkedCodeWhithSave)
+						__save();
+
+					return;
+				}
+				
+				if(gnncData.__trimText(CODE_.text) && _connExec.DATA_ARR.getItemAt(0).CODE == gnncData.__trimText(CODE_.text)){
+					btnCode_         .setStyle('icon',gnncEmbedBlackWhite.check_16_red_ok);
+					panelCenter_.selectedIndex = 0;
+					CODE_.setFocus();
+					err++;
+				}else{
+					btnCode_         .setStyle('icon',gnncEmbedBlackWhite.check_16_green_ok);
+				}
+					
+				if(gnncData.__trimText(CODE_ORIGINAL_.text) && _connExec.DATA_ARR.getItemAt(0).CODE_ORIGINAL == gnncData.__trimText(CODE_ORIGINAL_.text)){
+					btnCodeOriginal_ .setStyle('icon',gnncEmbedBlackWhite.check_16_red_ok);
+					panelCenter_.selectedIndex = 0;
+					CODE_ORIGINAL_.setFocus();
+					err++;
+				}else{
+					btnCodeOriginal_ .setStyle('icon',gnncEmbedBlackWhite.check_16_green_ok);
+				}
+
+				if(err>0)
+					_checkedCode = false;
+				
+				if(_checkedCodeWhithSave)
+					__save();
+			}
+
+			private function _fFaultCode(e:*=null):void
+			{
+				gnncGlobalLog.__add('_fFaultCode');
+				_gnncPopUp.__close();
+			}
+			
+			private function changeType(e:*=null):void
+			{
+				if(TYPE_IN_.selected){
+					groupPriceSale_.enabled = false;
+					groupPriceCost_.enabled = true;
+					enableCoustPrice_.selected = true;
+				}else if(TYPE_OUT_.selected){
+					groupPriceSale_.enabled = true;
+					groupPriceCost_.enabled = true;
+					enableCoustPrice_.selected = false;
+				}
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:RadioButtonGroup id="SERVICE_" />
+		<s:RadioButtonGroup id="TYPE_" change="{changeType()}"/>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp/>
+	<elements:elementLabelFont id="titlePopUp_" text="PRODUTOS E SERVIÇOS" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+		<s:Rect width="100%"/>
+		<s:HGroup id="CHANGE_TYPE_" gap="10" paddingRight="10" verticalAlign="middle" >
+			<s:Image source="{gnncEmbedBlackWhite.bw_stock_16_product}"/>
+			<s:RadioButton id="PRODUCT_TYPE_" label="Produto" group="{SERVICE_}" click="{__serviceOrProduct()}" change="{__serviceOrProduct()}" value="0" selected="true"/>
+			<s:Rect width="5"/>
+			<s:Image source="{gnncEmbedBlackWhite.bw_stock_16_service}"/>
+			<s:RadioButton id="SERVICE_TYPE_" label="Serviço" group="{SERVICE_}" click="{__serviceOrProduct()}" change="{__serviceOrProduct()}" value="1" />
+		</s:HGroup>
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%">
+			<s:layout>
+				<s:HorizontalLayout gap="5" />
+			</s:layout>
+			<s:Form width="100%" height="100%" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-15" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+				<s:FormItem label="Nome" width="100%" fontSize="13">
+					<s:layout>
+						<s:HorizontalLayout gap="1"/>
+					</s:layout>
+					<s:TextInput id="NAME_" width="100%" height="35" fontSize="15" paddingLeft="7" prompt="Nome"
+								 restrict="[A-Z][a-z][Çç][ÁáÀàÂâÃã][ÊêÉé][ÍíÎî][ÓóÔôÕõ][ÚúÛû][0-9][ ]\-\_\(\)@\,\."
+								 />
+				</s:FormItem>
+				<s:FormItem label="Simplificado" width="100%" >
+					<s:TextInput id="NICK_NAME_" width="200" height="30" paddingLeft="7" prompt="Nome simplificado" maxChars="50"
+								 restrict="[A-Z][a-z][Çç][ÁáÀàÂâÃã][ÊêÉé][ÍíÎî][ÓóÔôÕõ][ÚúÛû][0-9][ ]\-\_\(\)@\,\."
+								 />
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Tipo de Registro" width="100%" >
+					<s:layout>
+						<s:HorizontalLayout gap="5" verticalAlign="middle"/>
+					</s:layout>
+					<s:Rect width="12" height="12" radiusX="4" radiusY="4" id="typeIconOut_">
+						<s:fill>
+							<s:SolidColor color="0x0099ff"/>
+						</s:fill>
+					</s:Rect>
+					<s:RadioButton id="TYPE_OUT_" value="OUT" group="{TYPE_}" label="Produção/Venda" toolTip="Produto Final de venda" 
+								   selected="true"/>
+					<s:Rect width="5"/>
+					<s:Rect width="12" height="12" radiusX="4" radiusY="4" id="typeIconIn_">
+						<s:fill>
+							<s:SolidColor color="0x00cc66"/>
+						</s:fill>
+					</s:Rect>
+					<s:RadioButton id="TYPE_IN_" value="IN"  group="{TYPE_}" label="Matéria-Prima" toolTip="Produto utilizado para a produção, a matéria-prima"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Código" width="100%">
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="CODE_" width="120" height="30" maxChars="50" restrict="[0-9][a-z][A-Z]\-\.\_" paddingLeft="7" />
+					<s:Button id="btnCode_" icon="{gnncEmbedBlackWhite.check_16_bw_ok}" width="30" height="30" toolTip="Conferir código" click="{__checkCode()}"/>
+					<s:Label text="Ex: PC-123" paddingLeft="5"/>
+				</s:FormItem>
+				<s:FormItem label="Código Original" width="100%">
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="CODE_ORIGINAL_" width="120" height="30" maxChars="50" restrict="[0-9][a-z][A-Z]\-\.\_" paddingLeft="7" />
+					<s:Button id="btnCodeOriginal_" icon="{gnncEmbedBlackWhite.check_16_bw_ok}" width="30" height="30" toolTip="Conferir código original" click="{__checkCode()}"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Fabricante">
+					<select:conSelect_SERIES id="ID_SERIES_MAKER_" _MIX="{_MIX}" _ICON="false" height="30" />
+				</s:FormItem>
+				<s:FormItem label="Fornecedor">
+					<select:conSelect_CLIENT id="ID_CLIENT_PROVIDER_" height="30" _search="false" />
+				</s:FormItem>
+			</s:Form>
+			<s:Group width="260" height="100%">
+				<elements:elementBarGray radiusX="4" top="15" bottom="0" alpha=".4"/>
+				<s:VGroup width="100%" height="100%" top="15" padding="20" gap="5" >
+
+					<s:Label text="Situação" fontWeight="bold" fontSize="11" color="0x777777"/>
+					<s:HGroup width="100%">
+						<select:conSelect_STATUS id="ACTIVE_" _CLEAR="false" value="1" height="30" />
+						<s:Spacer width="61"/>
+					</s:HGroup>
+
+					<!-- s:Label text="Centro de Custo (Departamento)" fontWeight="bold" fontSize="11"/>
+					<select:conSelect_DEPARTAMENT id="DEPARTAMENT_" / -->
+					<s:Label text="Grupo" fontWeight="bold" fontSize="11" color="0x777777"/>
+					<select:conSelect_GROUP id="GROUP_" _MIX="{_MIX}" height="30" />
+					<s:Label text="Categoria" fontWeight="bold" fontSize="11" color="0x777777"/>
+					<select:conSelect_CATEGORY id="CATEGORY_" _MIX="{_MIX}" height="30" />
+					
+					<elements:elementHLine height="10" alpha=".5" />
+
+					<s:CheckBox label="Promoção" id="STATUS_PROMOTION_"/>
+					<s:CheckBox label="Lançamento" id="STATUS_NEW_"/>
+					<s:CheckBox label="Exclusivo" id="STATUS_UNIQUE_"/>
+					
+				</s:VGroup>
+			</s:Group>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="UNIDADE" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-12" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+				
+				<elements:elementLabelFont text="MEDIDAS" fontSize="18" height="30" fontWeight="normal" paddingLeft="5" paddingTop="8" paddingBottom="5" />
+				<elements:elementHLine height="25" alpha=".5" />
+				
+				<s:FormItem label="Unid. de Medida">
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="UNIT_" text="" width="80" height="30" maxChars="50" 
+								 keyUp="{gnncDataNumber.__safeKeyEvent(event,true,null,Number(DECIMAL_.text))}" 
+								 keyDown="{gnncDataNumber.__safeKeyEvent(event,true,null,Number(DECIMAL_.text))}"
+								 restrict="[0-9][\.][\,]" fontSize="12" paddingLeft="10" paddingRight="5" />
+					<s:DropDownList id="UNIT_TYPE_" width="130" dataProvider="{gnncGlobalArrays._UNIT_TYPE2}" height="30" selectedIndex="0"/>
+					<s:TextInput id="DECIMAL_" text="0" height="30" width="10" visible="false"/>
+					<s:Rect width="100%"/>
+					<s:Label text="{(String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='ml')?gnncDataNumber.__safeClearString(UNIT_.text,1)+' litro(s)':(String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='gg')?gnncDataNumber.__safeClearString(UNIT_.text,1)+' kg':''}" paddingLeft="5" fontWeight="bold"/>
+					<s:Label text="/" paddingLeft="2" paddingRight="2"/>
+					<s:Label text="{gnncData.__replace(UNIT_.text,'.',',')+((String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='gg')?' g':String(UNIT_TYPE_.selectedItem.data).toLowerCase())}" paddingLeft="5" fontWeight="bold"/>
+				</s:FormItem>
+				<!-- s:FormItem label="Peso" >
+					<s:TextInput id="WEIGHT_" text="0" width="80" height="30" maxChars="50" restrict="[0-9][\.][\,]" fontSize="12" paddingLeft="10" paddingRight="5" />
+					<s:DropDownList id="WEIGHT_TYPE_" width="130" dataProvider="{gnncGlobalArrays._WEIGHT_TYPE}" height="30" selectedIndex="1"/>
+					<s:Label text="Ex: 0.96 kg" paddingLeft="5"/>
+				</s:FormItem -->
+				<s:FormItem label="Tempo/Duração">
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="TIME_" text="0" width="80" height="30" maxChars="50" restrict="[0-9][\.][\,]" fontSize="12" paddingLeft="10" paddingRight="5"
+								 enabled="{SERVICE_TYPE_.selected}"
+								 />
+					<s:DropDownList id="TIME_TYPE_" width="130" dataProvider="{gnncGlobalArrays._TIME_TYPE}" height="30" selectedIndex="2"
+									enabled="{SERVICE_TYPE_.selected}"
+									/>
+				</s:FormItem>
+				<!-- elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Tamanho" >
+					<s:TextInput id="SIZE_" text="0" width="80" height="30" maxChars="50" restrict="[0-9][\.][\,]" fontSize="12" paddingLeft="10" paddingRight="5" />
+					<s:DropDownList id="SIZE_TYPE_" width="130" dataProvider="{gnncGlobalArrays._SIZE_TYPE}" height="30" selectedIndex="3"/>
+					<s:Label text="Ex: 1.2 cm" paddingLeft="5"/>
+				</s:FormItem-->
+
+				<s:FormItem label="Estoque Mínimo">
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="STOCK_MIN_" text="" width="80" height="30" maxChars="50" 
+								 keyUp="{gnncDataNumber.__safeKeyEvent(event,true,null,Number(DECIMAL_.text))}" 
+								 keyDown="{gnncDataNumber.__safeKeyEvent(event,true,null,Number(DECIMAL_.text))}"
+								 restrict="[0-9][\.][\,]" fontSize="12" paddingLeft="10" paddingRight="5"
+								 />
+					<s:DropDownList width="130" dataProvider="{gnncGlobalArrays._UNIT_TYPE2}" height="30" selectedIndex="{UNIT_TYPE_.selectedIndex}" enabled="false"/>
+					<s:Rect width="100%"/>
+					<s:Label text="{(String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='ml')?gnncDataNumber.__safeClearString(STOCK_MIN_.text,1)+' litro(s)':(String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='gg')?gnncDataNumber.__safeClearString(STOCK_MIN_.text,1)+' kg':''}" paddingLeft="5" fontWeight="bold"/>
+					<s:Label text="/" paddingLeft="2" paddingRight="2"/>
+					<s:Label text="{gnncData.__replace(STOCK_MIN_.text,'.',',')+((String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='gg')?' g':String(UNIT_TYPE_.selectedItem.data).toLowerCase())}" paddingLeft="5" fontWeight="bold"/>
+				</s:FormItem>
+
+				<elements:elementHLine height="25" visible="false" />
+				<elements:elementLabelFont text="{'VALORES ('+gnncData.__replace(UNIT_.text,'.',',')+' '+String(UNIT_TYPE_.selectedItem.data).toLowerCase()+')'}" fontSize="18" height="30" fontWeight="normal" paddingLeft="5" paddingTop="8" paddingBottom="5" />
+				<elements:elementHLine height="25" alpha=".5" />
+				
+				<!-- s:FormItem label="Preço por Unid." width="100%" -->
+				<s:FormItem label="Preço de Venda" width="100%" id="groupPriceSale_" >
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<!-- s:Label text="R$" fontWeight="bold" width="30"/ -->
+					<s:HGroup gap="-1" height="30" verticalAlign="middle">
+						<s:Group width="30" height="30">
+							<s:Rect width="30" height="30" radiusX="3" radiusY="3">
+								<s:fill>
+									<s:SolidColor color="0xcccccc"/>
+								</s:fill>
+							</s:Rect>
+							<s:Label text="R$" fontWeight="normal" verticalAlign="middle" textAlign="center" width="30" height="30" paddingTop="1"/>
+						</s:Group>
+						<s:TextInput id="VALUE_" width="80" height="30" prompt="Valor" restrict="[0-9][\.][\,]" 
+									 keyUp="{gnncDataNumber.__safeKeyEvent(event,true);__price()}" 
+									 keyDown="{gnncDataNumber.__safeKeyEvent(event,true)}" 
+									 focusOut="{__price()}" 
+									 change="{__price()}" 
+									 fontSize="12" paddingLeft="10" paddingRight="5"
+									 />
+					</s:HGroup>
+					<s:Rect width="5"/>
+					<s:Label text="" width="100%"/>
+					<s:Label id="VALUE_CONVERT_" text="R$ 0,00" paddingLeft="5" fontWeight="bold"/>
+				</s:FormItem>
+				
+				<s:FormItem label="Preço de Custo" width="100%" id="groupPriceCost_" >
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+					</s:layout>
+					<!-- s:Label text="R$" fontWeight="bold" width="30"/ -->
+					<s:HGroup gap="-1" height="30" verticalAlign="middle">
+						<s:Group width="30" height="30">
+							<s:Rect width="30" height="30" radiusX="3" radiusY="3">
+								<s:fill>
+									<s:SolidColor color="0xcccccc"/>
+								</s:fill>
+							</s:Rect>
+							<s:Label text="R$" fontWeight="normal" verticalAlign="middle" textAlign="center" width="30" height="30" paddingTop="1"/>
+						</s:Group>
+						<s:TextInput id="VALUE_OUT_" width="80" height="30" prompt="Valor" restrict="[0-9][\.][\,]" 
+									 keyUp="{gnncDataNumber.__safeKeyEvent(event,true);__price()}" 
+									 keyDown="{gnncDataNumber.__safeKeyEvent(event,true)}"
+									 focusOut="{__price()}" 
+									 change="{__price()}" 
+									 enabled="{enableCoustPrice_.selected}"
+									 fontSize="12" paddingLeft="10" paddingRight="5" 
+									 />
+					</s:HGroup>
+					<s:Rect width="5"/>
+					<s:CheckBox id="enableCoustPrice_" label="Editar" fontWeight="bold" height="16"/>
+					<s:Rect width="5"/>
+					<s:Label text="(custo de fabricação ou do produdo do fornecedor)" width="100%"/>
+					<s:Label id="VALUE_CONVERT_OUT_" text="R$ 0,00" paddingLeft="5" fontWeight="bold"/>
+				</s:FormItem>
+				
+				<!-- s:FormItem label="Margem Lucro" width="100%" visible="false">
+					<s:Label text="%" fontWeight="bold" width="30"/>
+					<s:TextInput id="RETURN_PERCENT_" text="0" width="80" height="30" prompt="Lucro" restrict="[0-9][\.][\,]" keyUp="{__price()}" focusOut="{__price()}" change="{__price()}" fontSize="12" paddingLeft="10" paddingRight="5" />
+					<s:Label text="% (Lucro acima)" paddingLeft="5" width="100%"/>
+				</s:FormItem>
+				
+				<s:FormItem label="Desconto até" width="100%" visible="false" >
+					<s:Label text="%" fontWeight="bold" width="30"/>
+					<s:TextInput id="MAX_DISCOUNT_PERCENT_" text="0" width="80" height="30" prompt="Desconto" restrict="[0-9][\.][\,]" fontSize="12" paddingLeft="10" paddingRight="5" />
+					<s:Label text="% (Máximo desconto)" paddingLeft="5"/>
+				</s:FormItem>
+				
+				<s:FormItem label="Comissão (%)" width="100%" visible="false" >
+					<s:Label text="%" fontWeight="bold" width="30"/>
+					<s:TextInput id="PAY_COMMISSION_PERCENT_" text="0" width="80" height="30" prompt="Comissão" restrict="[0-9][\.][\,]" fontSize="12" paddingLeft="10" paddingRight="5" />
+					<s:Label text="% (Comissão por venda)" paddingLeft="5"/>
+				</s:FormItem -->
+				
+				<!--s:FormItem label="Duração \ Desenv." width="100%">
+				<s:TextInput id="TIME_HOUR_" width="130" maxChars="5" height="25" restrict="[0-9]" /> 
+				<s:Label text="Horas" paddingLeft="5" fontWeight="bold"/>
+				</s:FormItem-->
+				
+			</s:Form>
+		</s:NavigatorContent>
+		<!--  s:NavigatorContent label="PREÇO" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+			</s:Form>
+		</s:NavigatorContent -->
+		<!-- s:NavigatorContent label="TRIBUTAÇÃO" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+				
+				<elements:elementLabelFont text="TRIBUTAÇÃO" fontSize="18" height="30" fontWeight="normal" paddingLeft="5" paddingTop="8" paddingBottom="5" />
+				<elements:elementHLine height="25" alpha=".5" />
+				
+				<s:FormItem label="Grupo de Tributação" width="100%" enabled="false" >
+					<s:DropDownList width="130" dataProvider="{new ArrayCollection()}" height="30" selectedIndex="1"/>
+					<s:Label text="ICMS, IPI, PIS, COFINS etc" paddingLeft="5"/>
+				</s:FormItem>
+				<s:FormItem label="Gênero Fiscal" width="100%" enabled="false" >
+					<s:DropDownList width="130" dataProvider="{new ArrayCollection()}" height="30" selectedIndex="1"/>
+				</s:FormItem>
+				
+			</s:Form>
+		</s:NavigatorContent -->
+		<s:NavigatorContent label="OUTROS" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+
+				<elements:elementLabelFont text="OBSERVAÇÕES" fontSize="18" height="30" fontWeight="normal" paddingLeft="5" paddingTop="8" paddingBottom="5" />
+				<elements:elementHLine height="25" alpha=".5" />
+
+				<s:FormItem label="{'Descrição ('+(3000-uint(DESCRIPTION_.text.length))+')'}" width="100%" >
+					<s:TextArea id="DESCRIPTION_" width="100%" height="75" maxChars="3000" contentBackgroundAlpha=".5" keyDown="__keyboard(event)" keyUp="__keyboard(event)" focusIn="{__textAreaFocus()}" focusOut="{__textAreaFocus()}"
+								paddingBottom="15" paddingLeft="15" paddingRight="15" paddingTop="15"
+								/>
+				</s:FormItem>
+
+				<elements:elementLabelFont text="OUTROS" fontSize="18" height="30" fontWeight="normal" paddingLeft="5" paddingTop="8" paddingBottom="5" />
+				<elements:elementHLine height="25" alpha=".5" />
+
+				<s:FormItem label="WebSite" width="100%">
+					<s:TextInput id="WEBSITE_" text="" width="260" height="30" prompt="http://" paddingLeft="10" fontSize="12" />
+					<s:Button label="{WEBSITE_.text.indexOf('http://')>-1?WEBSITE_.text:'http://'+WEBSITE_.text}" textDecoration="underline" color="0x3366ff" visible="{WEBSITE_.text.length>7?true:false}" click="{__goUrl()}" height="25" skinClass="GNNC.skin.button.skin_buttonLink" showInAutomationHierarchy="true" buttonMode="true" />
+				</s:FormItem>
+				<s:FormItem label="Cor" >
+					<select:conSelect_COLOR id="COLOR_" width="120" />
+				</s:FormItem>
+
+			</s:Form>
+		</s:NavigatorContent>
+		<!-- s:NavigatorContent label="ADICIONAL" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:HorizontalLayout gap="5" />
+			</s:layout>
+			<s:Form width="100%" height="100%" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+				<s:FormItem label="Campos Adicionais" width="100%" required="true" enabled="false">
+					<s:TextInput width="100%" height="25" paddingLeft="5" prompt="" />
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent -->
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:ToggleButton label="Avançado" icon="{gnncEmbedBlackWhite.bw_setting_16}" fontWeight="bold" enabled="false" />
+		<s:Rect width="100%" />
+		<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" label="{'Cadastrar'}" click="{__save()}" fontWeight="bold" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" />
+	</s:HGroup>
+		
+	<s:Button top="10" right="10" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		
+		  minWidth="100"
+		  height="30"
+		  
+		  creationComplete="{__start()}"
+		  >
+	<s:layout>
+		<s:HorizontalLayout gap="-1"/>
+	</s:layout>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.elements.component.list.conList_client;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.client.formNew.selectClient;
+			import GNNC.modules.client.formView.viewClient;
+			import GNNC.skin.button.skin_button;
+			import GNNC.skin.button.skin_buttonBlue;
+			import GNNC.sqlTables.table_client;
+
+			private var _connClient:conList_client 				= new conList_client();
+			private var _valueId:uint							= 0;
+
+			public function set value(number_:uint)				:void{ _valueId = number_; __clientId() };
+			public function get value()							:uint{ return _valueId };
+
+			public function set nameClient(name_:String)		:void{ buttonSearch_.label = gnncData.__firstLetterUpperCase(name_) };
+			public function get nameClient()					:String{ return buttonSearch_.label  };
+
+			public var _changeEvent:Function 					= null;
+			
+			private function __start():void
+			{
+				buttonClear_.width  = this.height;
+				icon_.width 		= this.height;
+			}
+			
+			private function __clientId():void
+			{
+				if(!_valueId)
+					return;
+				
+				buttonSearch_.label				= 'Pesquisando...';
+				buttonSearch_.enabled			= false;
+				
+				_connClient.__selectId			(_valueId,false,__fResult,__fFault);
+				
+				function __fResult(e:*=null):void
+				{
+					if(_connClient._length)
+					{
+						var _obj:Object 		= _connClient.dataProviderArrayC.getItemAt(0);
+						
+						_valueId 				= _obj.ID;
+						
+						buttonSearch_.label 	= gnncData.__firstLetterUpperCase( _obj.NICK_NAME ? _obj.NICK_NAME : _obj.NAME ); 
+						buttonSearch_.enabled	= true;
+						
+						if(_changeEvent!=null)
+							callLater(_changeEvent);
+					}
+					else
+					{
+						__clear();
+					}
+					
+				}
+				
+				function __fFault(e:*=null):void
+				{
+					__clear();
+				}
+			}
+			
+			public function __clear():void
+			{
+				_valueId 						= 0;
+				
+				buttonSearch_.setStyle			("skinClass", skin_buttonBlue);
+				buttonSearch_.label 			= 'Selecionar cliente...';
+				buttonSearch_.enabled			= true;
+			}
+			
+			private function __view():void
+			{
+				if(!_valueId)
+					return;
+				
+				var _page:viewClient 		= new viewClient();
+				_page._tableClient 			= new table_client(_valueId);
+				
+				new gnncPopUp().__creation		(_page);
+			}
+			
+			private function __search():void
+			{
+				var _table:table_client 		= new table_client();
+				var _page:selectClient 			= new selectClient();
+				_page._tableClient 				= _table;
+				
+				new gnncPopUp().__creation		(_page,false,true,__fRemove);
+				
+				function __fRemove(e:*=null):void
+				{
+					if(!_page._tableClient.ID)
+					{
+						__clear();
+						return;
+					}
+					
+					buttonSearch_.setStyle("skinClass", skin_button);
+					buttonSearch_.label 	= gnncData.__firstLetterUpperCase(_page._tableClient.NICK_NAME ? _page._tableClient.NICK_NAME : _page._tableClient.NAME);
+					_valueId 				= _page._tableClient.ID;
+				}
+			}
+
+		]]>
+	</fx:Script>
+
+	<s:Button id="icon_" 			icon="{gnncEmbedBlackWhite.bw_view_16}" 			width="30" 		height="100%" maxHeight="30" click="{__view()}" 		toolTip="Visualizar cliente" />
+	<s:Button id="buttonSearch_" 	icon="{gnncEmbedBlackWhite.bw_client_16}" 			width="100%" 	height="100%" maxHeight="30" click="{__search()}" 	label="Selecionar cliente..." 	toolTip="Selecionar cliente..." skinClass="GNNC.skin.button.skin_buttonBlue" />
+	<s:Button id="buttonClear_"  	icon="{gnncEmbedBlackWhite.bw_clear_14_selection}"	width="30" 		height="100%" maxHeight="30" click="{__clear()}" 	label="Limpar Dados" 			 />
+	
+</s:Group>

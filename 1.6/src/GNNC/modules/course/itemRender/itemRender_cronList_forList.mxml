@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				width="100%" height="30" 
+				
+				creationComplete="{__start()}" 
+				
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				
+				doubleClickEnabled="true" 
+				
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.gnncDate;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			
+			[Embed(source='GNNC/modules/course/image/sun16.png')]
+			static public const M:Class;
+			[Embed(source='GNNC/modules/course/image/cloud16.png')]
+			static public const T:Class;
+			[Embed(source='GNNC/modules/course/image/moon16.png')]
+			static public const N:Class;
+
+			private function __start():void
+			{
+			}
+
+			private function __selectComplete():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._complete));
+			}
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret" />
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<!-- s:Rect left="0" top="0" right="0" bottom="0" radiusX="3">
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF"/>
+		</s:fill>
+	</s:Rect-->
+	
+	<!--- LINE DIVISION LINES -->
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha=".8" includeIn="hoveredAndShowsCaret,hovered" radiusX="3" radiusY="3">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+		
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" radiusX="3" radiusY="3" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<elements:elementHLine left="2" right="2" bottom="0" alpha=".5"/>
+	
+	<s:HGroup left="0" right="0" top="1" bottom="1" gap="1" verticalAlign="middle" paddingLeft="7" paddingTop="0" paddingBottom="0" paddingRight="4" 
+			  color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+			   toolTip="{'Cronograma Id : '+data.ID }" 
+			  >
+
+		<s:Image source="{gnncEmbedBlackWhite.bw_calendar_16}" />
+
+		<s:Label text="{gnncDate.__date2Legend(data.DATE_START)}" width="75" fontWeight="bold" verticalAlign="middle"
+				 paddingLeft="5" maxDisplayedLines="1" paddingRight="5" 
+				 />
+
+		<s:Label text="{String(data.DATE_START).substr(11,5)}" width="45" fontWeight="bold" verticalAlign="middle"
+				 paddingLeft="5" maxDisplayedLines="1" paddingRight="5" 
+				 />
+		<s:Label text="{String(data.DATE_END).substr(11,5)}" width="45" fontWeight="bold" verticalAlign="middle"
+				 paddingLeft="5" maxDisplayedLines="1" paddingRight="5" 
+				 />
+		
+		<s:Group width="2" height="100%">
+			<s:Rect width="2" height="{data.TAGS=='T'?30:10}" y="{data.TAGS=='N'?20:0}" >
+				<s:fill>
+					<s:SolidColor color="0xaaaaaa"/>
+				</s:fill>
+			</s:Rect>
+		</s:Group>
+		
+		<s:Rect width="5"/>
+		<s:Image source="{data.TAGS=='M'?M:data.TAGS=='T'?T:data.TAGS=='N'?N:null}"/>
+		<s:Rect width="5"/>
+		
+		<s:Label text="{data.TAGS=='M'?'Matutino':data.TAGS=='T'?'Vespertino':data.TAGS=='N'?'Noturno':'-'}" 
+				 width="100" verticalAlign="middle" paddingRight="3" />
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME_SERIES_ROOM)}" 
+				 width="100" verticalAlign="middle" paddingRight="3"
+				 showTruncationTip="true" maxDisplayedLines="1"
+				 />
+
+		<elements:elementLabelBackgroudColor  height="20" _label="{data.CONTROL==0?'à aprovar':'aprovado'}" verticalAlign="middle" _fontSize="10"
+										   _paddingLeftText="10" _paddingRightText="10" _fontWeight="bold" _color="0xffffff" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+										   _colorBackground="{data.CONTROL==0?0x999999:0x00cc00}" 
+										   />
+		
+		<s:Rect width="3"/>
+		
+		<elements:elementLabelBackgroudColor width="100" height="20" _label="{data.TITLE}"  fontWeight="normal" verticalAlign="middle"
+										   _paddingLeftText="10" _paddingRightText="10" _fontWeight="normal" _color="0x000000" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+										   _colorBackground="{0xaaaaaa}" _colorBackgroundAlpha=".2"
+										   toolTip="{data.COLOR+'-'+(uint('0x'+data.COLOR))}"
+										   />
+				
+	</s:HGroup>
+	
+</s:ItemRenderer>

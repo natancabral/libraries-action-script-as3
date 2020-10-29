@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="500" height="320" 
+		  xmlns:select="GNNC.elements.component.select.*"
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:stage="GNNC.elements.stage.*"
+		  
+		  creationComplete="{__start()}"
+		  >
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.sqlTables.table_project_team;
+			
+			import mx.collections.ArrayCollection;
+			
+			import spark.events.IndexChangeEvent;
+			
+			public var dataProviderClient:ArrayCollection  = new ArrayCollection();
+			public var dataProviderProject:ArrayCollection = new ArrayCollection();
+			public var dataProviderStep:ArrayCollection    = new ArrayCollection();
+
+			public var _change:Boolean = false;
+			
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			private var conn:gnncAMFPhp = new gnncAMFPhp();
+			
+			private var idClient:uint = 0;
+			private var nameClient:String = '';
+			
+			public var _tableProjectTeam:table_project_team = new table_project_team();
+			
+			private function __start():void
+			{
+				NAME_CLIENT._label = nameClient;
+				callLater(initialChange);
+			}
+			
+			public function setClient(name_:String,id_:uint):void
+			{
+				nameClient = gnncData.__firstLetterUpperCase(name_);
+				idClient = id_;
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function initialChange():void
+			{
+				if(idClient>0 || _tableProjectTeam.ID_CLIENT>0){
+					if(_tableProjectTeam.ID_CLIENT>0)
+						idClient = _tableProjectTeam.ID_CLIENT;
+					
+					SELECT_CLIENT.selectedIndex = 0;
+					
+					ID_CLIENT.dataProvider  = dataProviderClient;
+					ID_CLIENT.selectedIndex = new gnncDataArrayCollection().__getIndex(dataProviderClient,'ID',idClient,true);
+					ID_PROJECT.dataProvider = new gnncDataArrayCollection().__filterNumeric(dataProviderProject,'ID_CLIENT',idClient);
+					
+					callLater(function():void{
+						
+						if(uint(_tableProjectTeam.ID_PROJECT)>0){
+							ID_PROJECT.selectedIndex = new gnncDataArrayCollection().__getIndex( gnncDataArrayCollection.clone(new ArrayCollection(ID_PROJECT.dataProvider.toArray())), 'ID', _tableProjectTeam.ID_PROJECT, true );
+							ID_STEP.dataProvider = new gnncDataArrayCollection().__filterNumeric(dataProviderStep,'ID_PROJECT',_tableProjectTeam.ID_PROJECT);
+							
+							callLater(function():void{
+								if(uint(_tableProjectTeam.ID_STEP)>0)
+									ID_STEP.selectedIndex = new gnncDataArrayCollection().__getIndex( gnncDataArrayCollection.clone(new ArrayCollection(ID_STEP.dataProvider.toArray())), 'ID', _tableProjectTeam.ID_STEP, true );
+							});
+						}
+					});
+					
+				}else if(dataProviderClient.length>0){
+					SELECT_CLIENT.selectedIndex = 1;
+					ID_CLIENT.dataProvider  = dataProviderClient;
+				}else{
+					//__close();
+					new gnncNotification().__show('Permissão','Não foram encontrados clientes.');
+				}
+			}
+			
+			private function changeClientDropDown(e:IndexChangeEvent=null):void
+			{
+				if(ID_CLIENT.selectedIndex<0)
+					return;
+				
+				var objDat:Object = ID_CLIENT.selectedItem;
+				
+				idClient = objDat.ID;
+				nameClient = gnncData.__firstLetterUpperCase(objDat.NAME);
+				
+				ID_PROJECT.dataProvider = new gnncDataArrayCollection().__filterNumeric(dataProviderProject,'ID_CLIENT',idClient);
+				ID_PROJECT.selectedIndex = -1;
+			}
+			
+			private function changeProject():void
+			{
+				if(ID_PROJECT.selectedIndex<0)
+					return;
+
+				var objDat:Object = ID_PROJECT.selectedItem;
+				
+				ID_STEP.selectedIndex = -1;
+				ID_STEP.enabled = false;
+				
+				ID_STEP.dataProvider = new gnncDataArrayCollection().__filterNumeric(dataProviderStep,'ID_PROJECT',objDat.ID);
+				ID_STEP.enabled = ID_STEP.dataProvider.length > 0 ? true : false;
+				ID_STEP.prompt = ID_STEP.dataProvider.length > 0 ? 'Selecione' : 'Sem opções';
+			}
+			
+			private function __save():void
+			{
+				if(idClient==0){
+					initialChange();
+					return;
+				}
+				
+				if(ID_CLIENT.selectedIndex!=-1)
+					_tableProjectTeam.ID_CLIENT  = ID_CLIENT.selectedItem.ID;
+				if(ID_PROJECT.selectedIndex!=-1)
+					_tableProjectTeam.ID_PROJECT = ID_PROJECT.selectedItem.ID;
+				if(ID_STEP.selectedIndex!=-1)
+					_tableProjectTeam.ID_STEP    = ID_STEP.selectedItem.ID;
+				
+				_change = true;
+				__close();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<elements:elementStageBoxPopUp  />
+	<elements:elementLabelFont id="titlePopUp_" text="CLIENTES E PROJETOS" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" visible="{panelCenter_.visible}" />
+		<s:Rect width="100%"/>
+		<s:HGroup gap="10" paddingRight="10" verticalAlign="middle" >
+		</s:HGroup>
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52" >
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all">
+			
+			<s:VGroup width="100%" height="100%" gap="5" padding="30" paddingTop="15">
+				
+				<s:Label text="Cliente *" height="20" verticalAlign="middle" fontWeight="bold"/>
+				<mx:ViewStack id="SELECT_CLIENT" width="100%" height="30" selectedIndex="0">
+					<s:NavigatorContent width="100%" height="30" creationPolicy="all">
+						<s:layout>
+							<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+						</s:layout>
+						<s:Image source="{gnncEmbedBlackWhite.bw_client_16}"/>
+						<s:Rect width="5"/>
+						<elements:elementLabelBackgroudColor id="NAME_CLIENT" width="100%" height="30" _label="Natan Cabral" _fontSize="12" _paddingLeftText="10"
+															 doubleClick="{SELECT_CLIENT.selectedIndex = 1}" 
+															 doubleClickEnabled="true"
+															 />
+					</s:NavigatorContent>
+					<s:NavigatorContent width="100%" height="30" creationPolicy="all">
+						<s:layout>
+							<s:HorizontalLayout gap="1" verticalAlign="middle"/>
+						</s:layout>
+						<s:Image source="{gnncEmbedBlackWhite.bw_client_16}"/>
+						<s:Rect width="5"/>
+						<s:DropDownList id="ID_CLIENT" dataProvider="{new ArrayCollection()}" width="100%" height="30" labelField="NAME" labelFunction="{gnncData.labelFunctionFirstLetter}"
+										change="changeClientDropDown(event)"
+										/>
+						<s:Button label="Limpar" width="30" height="30" skinClass="GNNC.skin.button.skin_buttonLink" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}"
+								  click="{ID_CLIENT.selectedIndex = -1; ID_PROJECT.selectedIndex = -1; ID_STEP.selectedIndex = -1;}"
+								  />
+					</s:NavigatorContent>
+				</mx:ViewStack>
+				
+				<s:Label text="Projeto *" height="20" verticalAlign="middle" fontWeight="bold" paddingTop="7"/>
+				<s:HGroup width="100%" gap="1" verticalAlign="middle">
+					
+					<s:Image source="{gnncEmbedBlackWhite.bw_project_16}"/>
+					<s:Rect width="5"/>
+					<s:DropDownList id="ID_PROJECT" width="100%" height="30" dataProvider="{new ArrayCollection()}" prompt="Selecione" labelField="NAME"
+									change="{changeProject()}"
+									labelFunction="{gnncData.labelFunctionFirstLetter}"
+									/>
+					<s:Button label="Limpar" width="30" height="30" skinClass="GNNC.skin.button.skin_buttonLink" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}"
+							  click="{ID_PROJECT.selectedIndex = -1;ID_STEP.selectedIndex = -1;}"
+							  />
+				</s:HGroup>
+				
+				<s:Label text="Fase (não obrigatório)" height="20" verticalAlign="middle" fontWeight="bold" paddingTop="7"/>
+				<s:HGroup width="100%" gap="1" verticalAlign="middle">
+					
+					<s:Image source="{gnncEmbedBlackWhite.bw_project_step_16}"/>
+					<s:Rect width="5"/>
+					<s:DropDownList id="ID_STEP" width="100%" height="30" dataProvider="{new ArrayCollection()}" prompt="Selecione" labelField="NAME"
+									labelFunction="{gnncData.labelFunctionFirstLetter}"
+									/>
+					<s:Button label="Limpar" width="30" height="30" skinClass="GNNC.skin.button.skin_buttonLink" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}"
+							  click="{ID_STEP.selectedIndex = -1}"
+							  />
+				</s:HGroup>
+				
+				<!-- s:Label text="Kanban (não obrigatório)" height="20" verticalAlign="middle" fontWeight="bold" paddingTop="7"/>
+				<s:Group width="100%" fontWeight="bold" enabled="false">
+					<s:layout>
+						<s:TileLayout columnWidth="120" horizontalGap="10" verticalGap="10" rowHeight="25" verticalAlign="middle"/>
+					</s:layout>
+					<s:CheckBox label="Normal" selected="true"/>
+					<s:CheckBox label="A fazer"/>
+					<s:CheckBox label="Planejar"/>
+					<s:CheckBox label="Em progresso"/>
+					<s:CheckBox label="Revisar"/>
+					<s:CheckBox label="Feito"/>
+				</s:Group -->
+				
+			</s:VGroup>
+			
+		</s:NavigatorContent>
+		
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="39" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%" />
+		<s:Button id="btnSave_" icon="{gnncEmbedBlackWhite.bw_new_16}" label="Aplicar" click="{__save()}" fontWeight="bold" height="30" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" height="30" skinClass="GNNC.skin.button.skin_buttonLink" />	
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

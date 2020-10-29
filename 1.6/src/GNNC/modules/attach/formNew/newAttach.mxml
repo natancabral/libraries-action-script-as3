@@ -1,0 +1,766 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="750" height="520"
+		  creationComplete="__start()"
+		  
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:document="GNNC.document.*" xmlns:gnncPaint="GNNC.UI.gnncPaint.*" xmlns:file="GNNC.data.file.*"
+		  
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.audio.micrecorder.MicRecorder;
+			import GNNC.audio.micrecorder.encoder.WaveEncoder;
+			import GNNC.audio.micrecorder.encoder.wavSound.WavSound;
+			import GNNC.audio.micrecorder.events.RecordingEvent;
+			import GNNC.data.bitmap.gnncBitmap;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.encrypt.gnncMD5;
+			import GNNC.data.file.gnncFilesNative;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.attach.formView.viewAttach;
+			import GNNC.sqlTables.table_attach;
+			import GNNC.time.gnncTime;
+			
+			import flash.desktop.Clipboard;
+			import flash.desktop.ClipboardFormats;
+			
+			import mx.graphics.ImageSnapshot;
+			import mx.graphics.codec.JPEGEncoder;
+			import mx.graphics.codec.PNGEncoder;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import org.osmf.net.StreamType;
+			
+			import spark.components.mediaClasses.DynamicStreamingVideoItem;
+			import spark.components.mediaClasses.DynamicStreamingVideoSource;
+			
+			private var _connAttach:gnncAMFPhp      = new gnncAMFPhp();
+			public var _tableAttach:table_attach    = new table_attach();
+			public var _MIX:String		            = 'ATTACH';
+			
+			private var _gnncPopUp:gnncPopUp 		= new gnncPopUp();
+			private var _gnncFiles:gnncFilesNative	= new gnncFilesNative();
+			
+			public var _change:Boolean				= false;
+			
+			private function __start():void
+			{
+				btnView_.visible = false;
+				btnSave_.visible = false;
+				boxEdit_.visible  = false;
+				
+				_gnncFiles = new gnncFilesNative(gnncGlobalStatic._parent);
+				_gnncFiles._allowGlobalError = false;
+				_gnncFiles._allowGlobalLoading = false;
+
+				printScreen_paste();
+				sound_addEvent();
+
+				webCamVideo_.scaleX *= -1;
+				webCamShot_.scaleX  *= -1;
+				
+				__check();
+				__center();
+				
+				ATTACH_._MIX =_MIX;
+				ATTACH_._tableAttach = _tableAttach;
+				
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void { 
+				this.setFocus();
+			}
+
+			public function __center():void { 
+				new gnncPopUp().__center(this);
+				callLater(__center);
+			}
+
+			public function loading(show:Boolean):void { 
+				loading_.visible = show;
+				panelCenter_.enabled = !show;
+			}
+			
+			private function __check():void
+			{
+				if(_tableAttach != null){
+					if(uint(_tableAttach.ID)>0){
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var _SQL:String = new gnncSql().__SELECT(new table_attach(_tableAttach.ID));
+						_connAttach.__sql(_SQL,'','',__fResultEdit,__fFaultEdit);
+					}
+				} else {
+					_tableAttach = new table_attach();
+				}
+			}
+
+			protected function __fFaultEdit(event:FaultEvent):void
+			{
+				new gnncAlert().__alert('Impossível visualizar este arquivo. Tente novamente.');
+				_gnncPopUp.__close();
+				__close();
+			}
+			
+			protected function __fResultEdit(event:ResultEvent):void
+			{
+				_gnncPopUp.__close();
+				
+				if(_connAttach.DATA_ROWS == 1)
+				{
+					var o:Object            = _connAttach.DATA_ARR.getItemAt(0); 
+					_tableAttach.ID_KEY	   = o.ID_KEY;
+
+					NAME_.text				= o.NAME;
+					NEW_NAME_.text 			= o.NAME;
+					EXTENSION_.text 		= String(o.EXTENSION).toUpperCase();
+
+					btnView_.visible 		= true;
+					btnSave_.visible		= true;
+					boxEdit_.visible 		= true;
+
+					NAME_.setFocus();
+				}
+				else
+				{
+					new gnncAlert().__alert('Arquivo não encontrado, talvez já tenha sido removido.');
+					__close();
+				}
+			}
+			
+			private function __saveName():void
+			{
+				loading(true);
+				///_gnncPopUp.__loading();
+				
+				var t:table_attach 	= new table_attach();
+				t.ID_KEY			= _tableAttach.ID_KEY ? _tableAttach.ID_KEY : gnncDataRand.__key();
+				t.ID 				= _tableAttach.ID;
+				t.NAME				= NEW_NAME_.text;
+				
+				var sql:String = new gnncSql().__UPDATE(t);
+				_connAttach.__sql(sql,'','',fResult,fFault);
+				
+				function fResult(e:*):void{ 
+					_change = true;
+					_gnncPopUp.__close();
+					loading(false);
+					__close(); 
+				}
+				
+				function fFault(e:*):void{ 
+					_gnncPopUp.__close();
+					loading(false);
+				}
+			}
+
+			private function __close():void{
+				new gnncPopUp().__close(this);
+			}
+			
+			public function __closeAfterUpload(event:DataEvent):void{
+				_change = ATTACH_._change;
+				loading(false);
+				__close();
+			}
+		
+			private function __attachView():void
+			{
+				var o:Object = _connAttach.DATA_ARR.getItemAt(0);
+				var t:table_attach 	= new table_attach();
+				
+				t.ID	 			= o.ID;
+				t.ID_KEY			= o.ID_KEY;
+				t.NAME 				= o.NAME;
+				t.FILE_HTTP			= o.FILE_HTTP;
+				t.FILE_LINK			= o.FILE_LINK;
+				t.URL_LINK			= o.URL_LINK;
+				t.SIZE				= o.SIZE;
+				t.EXTENSION			= o.EXTENSION;
+				
+				var p:viewAttach 	= new viewAttach();
+				p._TABLE_ATTACH 	= t;
+				new gnncPopUp().__creation(p);
+			}
+
+			//-----------------------------------------------------------------------------------------------
+			// printScreen
+			//-----------------------------------------------------------------------------------------------
+
+			private function printScreen_paste():void
+			{
+				if(Clipboard.generalClipboard.hasFormat(ClipboardFormats.BITMAP_FORMAT)){
+					printScreenSource_.source = Clipboard.generalClipboard.getData(ClipboardFormats.BITMAP_FORMAT) as BitmapData;
+					panelCenter_.selectedIndex = 1;
+				}else if(Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT)){
+					var s:String = Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT) as String;
+					if(s.length>200){
+						createText_.text = s;
+						//if(s.length>500)
+							//panelCenter_.selectedIndex = 4;
+					}
+				} 
+			}
+
+			private function printScreen_send():void
+			{
+				loading(true);
+				printNavigation_.enabled = false;
+				if(printScreenSource_.source){
+					new gnncTime().__start(100,printScreen_upload,1);
+				}else{
+					new gnncNotification().__show('Cole uma imagem antes de enviar','',null,null,true);
+				}
+			}
+			
+			private function printScreen_upload():void
+			{
+				var name:String = gnncMD5.hash(new Date().time.toString() + Math.random());
+				var extension:String = 'png';
+				var imageBitmapData:ImageSnapshot = ImageSnapshot.captureImage(printScreenSource_.bitmapData,0,new PNGEncoder(),true);
+				var bArr:ByteArray = imageBitmapData.data;
+
+				_gnncFiles.__save2Upload(name,extension,'GNNC/upload/',gnncFilesNative._documentDirectory,bArr,fComplete,fError);
+
+				function fComplete(e:*=null):void{
+					saveData('PrintScreen',name,extension,bArr.length); //296922 = 290kb
+				}
+				
+				function fError(e:*=null):void
+				{
+					_gnncPopUp.__close(); 
+					loading(false);
+					printNavigation_.enabled = true;
+				}
+				
+			}
+
+			//-----------------------------------------------------------------------------------------------
+			// MicroPhone
+			//-----------------------------------------------------------------------------------------------
+
+			private var soundRecorder:MicRecorder = new MicRecorder( new WaveEncoder() );
+			private var soundPlayer:WavSound;
+			private var soundState:Boolean;
+			private var soundPlaying:Boolean;
+
+			/*public function __micEcho():void 
+			{
+				var mic:Microphone = null;
+				mic = Microphone.getMicrophone();
+				
+				Security.showSettings("2");
+				mic.setLoopBack(true);
+				
+				if (mic != null) {
+					mic.setUseEchoSuppression(true);
+					mic.addEventListener(ActivityEvent.ACTIVITY, activityHandler);
+					mic.addEventListener(StatusEvent.STATUS, statusHandler);
+				}
+			}
+			
+			private function activityHandler(event:ActivityEvent):void {
+				trace("activityHandler: " + event);
+			}
+			
+			private function statusHandler(event:StatusEvent):void {
+				trace("statusHandler: " + event);
+			}*/
+			
+			private function sound_addEvent():void
+			{
+				//playerTimer.addEventListener(Event.SOUND_COMPLETE,onProgress);
+				soundRecorder.addEventListener	(RecordingEvent.RECORDING, sound_recording);
+				soundRecorder.addEventListener	(Event.COMPLETE   ,sound_recordComplete);
+				soundRec_.addEventListener		(MouseEvent.CLICK ,sound_click);
+				soundSave_.addEventListener		(MouseEvent.CLICK ,sound_send);
+				soundPlay_.addEventListener		(MouseEvent.CLICK ,sound_play);
+			}
+			
+			private function sound_recording(event:RecordingEvent):void
+			{
+				soundRecBar_.width = Number(Number(event.time/100).toFixed(1))*2;
+				if(Number(Number(event.time/1000).toFixed(1)) <= 10)
+					soundMicroTime_.text = Number(event.time/1000).toFixed(1) + "seg";
+				else
+					sound_click(null);
+			}
+			
+			private function sound_recordComplete(event:Event):void
+			{
+				soundPlay_.enabled = true;
+				soundSave_.enabled = true;
+			}
+			
+			private function sound_play(evet:*):void
+			{
+				soundPlayer = new WavSound(soundRecorder.output);
+				soundPlayer.play();
+			}
+			
+			private function sound_click(event:*):void
+			{
+				if ( !soundState )//recording
+				{
+					//_playing = false;
+					//if(player) player.close();
+					soundRecorder.record();
+					soundRec_.setStyle('icon',gnncEmbedImage.PLAYBACK_16_STOP);
+					soundRec_.label = 'Parar';
+					soundPlay_.enabled = false;
+				}else {
+					soundRecorder.stop();
+					soundRec_.setStyle('icon',gnncEmbedImage.PLAYBACK_16_REC);
+					soundRec_.label = 'Gravar';
+					soundPlay_.enabled = true;
+				}
+				soundState = !soundState;
+			}
+
+			private function sound_send(event:MouseEvent):void
+			{
+				loading(true);
+				if(soundRecBar_.width>1){
+					new gnncTime().__start(100,sound_upload,1);
+				} else{
+					new gnncNotification().__show('Grave uma mensagem antes de enviar','',null,null,true);
+				}
+			}
+			
+			private function sound_upload():void
+			{
+				var name:String	= gnncMD5.hash(new Date().time.toString() + Math.random());
+				var extension:String = 'wav';
+				var bArr:ByteArray = soundRecorder.output;
+				
+				_gnncFiles.__save2Upload(name,extension,'GNNC/upload/',gnncFilesNative._documentDirectory,bArr,fComplete,fError);
+				
+				function fComplete(e:*=null):void{
+					saveData('Microfone',name,extension,bArr.length); //296922 = 290kb
+				}
+				function fError(e:*=null):void{
+					_gnncPopUp.__close(); 
+					loading(false);
+				}
+			}
+
+			//-----------------------------------------------------------------------------------------------
+			// WEBCAM
+			//-----------------------------------------------------------------------------------------------
+			
+			private var webCam:DynamicStreamingVideoSource =  new DynamicStreamingVideoSource();
+			private var webCamSource:DynamicStreamingVideoSource;
+			
+			protected function webCam_init(event:MouseEvent):void
+			{
+				webCamStatus_.text = 'Iniciando webcam...';
+				webCamSource = new DynamicStreamingVideoSource();
+				
+				var v:Vector.<DynamicStreamingVideoItem>;
+				v = new Vector.<DynamicStreamingVideoItem>();
+				v[0] = new DynamicStreamingVideoItem();
+				
+				webCamSource.host = "";
+				webCamSource.streamType	= StreamType.LIVE;
+				webCamSource.streamItems = v;				
+				webCamVideo_.source = webCamSource;
+				
+				if(webCamVideo_.videoObject)
+					webCamStatus_.text = '';
+				else
+					webCamStatus_.text = "Problema na webcam: " + webCamVideo_.videoObject;
+				
+				try
+				{
+					var cam:Camera = Camera.getCamera(); //Camera.names[0]);
+					cam.addEventListener(ActivityEvent.ACTIVITY,webCam_active);
+					cam.setMode(320, 240, 15, true); //640x480, 320x240 //favorarea forca a tamanhos não nativos
+					cam.setQuality(0, 100);
+					
+					webCamVideo_.videoObject.attachCamera(cam);
+					webCamVideo_.visible = true;
+					//myVideo.addEventListener(MediaPlayerStateChangeEvent.MEDIA_PLAYER_STATE_CHANGE,);
+					
+					webCamStop_.enabled = true;
+					webCamPlay_.enabled = false;
+				}
+				catch(e:*)
+				{
+					new gnncAlert().__alert('Dispositivo webcam não encontrado.');
+				}
+			}
+			
+			private function webCam_active(event:ActivityEvent):void{
+				webCamStatus_.text = '';
+			}
+			
+			private function webCam_stop():void
+			{
+				webCam_remove();
+				webCamVideo_.videoObject.attachCamera(null);
+				webCamVideo_.visible = false;
+				webCamStop_.enabled = false;
+				webCamPlay_.enabled = true;
+			}
+			
+			private function webCam_shot():void
+			{
+				webCamShot_.source = gnncBitmap.__captureBitmapData(webCamVideo_.videoObject,true);
+				webCamClear_.enabled = true;
+			}
+			
+			private function webCam_remove():void
+			{
+				webCamShot_.source = null;
+				webCamClear_.enabled = false;
+			}
+			
+			private function webCam_send():void 
+			{
+				loading(true);
+				if(webCamShot_.source){
+					new gnncTime().__start(100,webCam_upload,1);
+				}else{
+					new gnncNotification().__show('Capture a imagem antes de enviar','',null,null,true);
+				}
+			}
+			
+			private function webCam_upload():void 
+			{
+				var encoder:JPEGEncoder = new JPEGEncoder(90);
+				var bArr:ByteArray = encoder.encode(gnncBitmap.__captureBitmapData(myStage,true));
+				var name:String = gnncMD5.hash(new Date().time.toString() + Math.random());
+				var extension:String = 'jpg';
+				
+				_gnncFiles.__save2Upload(name,extension,'GNNC/upload/',gnncFilesNative._documentDirectory,bArr,fComplete,fError);
+				//_gnncFiles.__uploadJpg(name,'',gnncBitmap.__captureBitmapData(myStage,true),90,fComplete,fError);
+				
+				function fComplete(e:Event=null):void{
+					saveData('WebCam Shot',name,extension,bArr.length); //296922 = 290kb
+				}
+				
+				function fError(e:Event=null):void{
+					loading(false);
+				}
+			}
+			
+			//-----------------------------------------------------------------------------------------------
+			// Text
+			//-----------------------------------------------------------------------------------------------
+			private function text_send():void 
+			{
+				loading(true);
+				textNavigation_.enabled = false;
+				if(createText_.text.length>0){
+					new gnncTime().__start(100,text_upload,1);
+				}else{
+					new gnncNotification().__show('Mensagem muito curta','',null,null,true);
+				}
+			}
+			
+			private function text_upload():void 
+			{
+				var bArr:ByteArray = gnncFilesNative.__string2ByteArray(gnncData.__trimText(createText_.text));
+				var name:String = gnncMD5.hash(new Date().time.toString() + Math.random());
+				var extension:String = 'txt';
+				
+				_gnncFiles.__save2Upload(name,extension,'GNNC/upload/',gnncFilesNative._documentDirectory,bArr,fComplete,fError);
+				//_gnncFiles.__uploadJpg(name,'',gnncBitmap.__captureBitmapData(myStage,true),90,fComplete,fError);
+				
+				function fComplete(e:Event=null):void{
+					saveData('Text',name,extension,bArr.length); //296922 = 290kb
+				}
+				
+				function fError(e:Event=null):void{
+					textNavigation_.enabled = true;
+					loading(false);
+				}
+				
+			}
+
+			//-----------------------------------------------------------------------------------------------
+			// Paint
+			//-----------------------------------------------------------------------------------------------
+			private function paint_send():void 
+			{
+				loading(true);
+				sketchNavigation_.enabled = false;
+				new gnncTime().__start(100,paint_upload,1);
+			}
+			
+			private function paint_upload():void 
+			{
+				var bArr:ByteArray = _gnncFiles.__componentFlex2byteArray_jpg(createPaint_.canvas,100,90);
+				var name:String = gnncMD5.hash(new Date().time.toString() + Math.random());
+				var extension:String = 'jpg';
+				
+				_gnncFiles.__save2Upload(name,extension,'GNNC/upload/',gnncFilesNative._documentDirectory,bArr,fComplete,fError);
+				//_gnncFiles.__uploadJpg(name,'',gnncBitmap.__captureBitmapData(myStage,true),90,fComplete,fError);
+				
+				function fComplete(e:Event=null):void{
+					saveData('Sketch',name,extension,bArr.length);
+				}
+				
+				function fError(e:Event=null):void{
+					sketchNavigation_.enabled = true;
+					loading(false);
+				}
+			}
+			
+			private function saveData(type:String,name:String,ext:String,size:uint):void
+			{				
+				var t:table_attach 	= new table_attach();
+				t.ID_KEY			= gnncDataRand.__key();
+				t.ID_CLIENT 		= _tableAttach.ID_CLIENT;
+				t.ID_PROJECT		= _tableAttach.ID_PROJECT;
+				t.ID_STEP			= _tableAttach.ID_STEP;
+				t.ID_USER			= gnncGlobalStatic._userId;
+				
+				t.ID_MIX			= _tableAttach.ID_MIX;
+				t.MIX				= _MIX;
+				
+				t.NAME				= type+' - '+gnncDate.__date2Legend('',new Date());
+				
+				t.FILE_LINK			= name + '.' + ext;
+				t.URL_LINK			= _tableAttach.URL_LINK;
+				t.FILE_HTTP			= gnncGlobalStatic._httpHost;
+				
+				t.EXTENSION			= ext;
+				t.SIZE				= size;
+				t.DOWNLOAD_ENABLE	= 1;
+
+				_connAttach.__sql(new gnncSql().__INSERT(t),'','',fResultGlobal,fFaultGlobal);
+			}
+			
+			private function fResultGlobal(e:ResultEvent):void
+			{
+				_change = true;
+				loading(false);
+				_gnncPopUp.__close();
+				__close();
+				
+				printNavigation_.enabled = true;
+				textNavigation_.enabled = true;
+				sketchNavigation_.enabled = true;
+			}
+			
+			private function fFaultGlobal(e:FaultEvent):void
+			{
+				loading(false);
+				_gnncPopUp.__close();
+				
+				printNavigation_.enabled = true;
+				textNavigation_.enabled = true;
+				sketchNavigation_.enabled = true;
+			}					
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp/>
+	<elements:elementLabelFont id="titlePopUp_" text="ARQUIVOS" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" />
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="SELEÇÃO" width="100%" height="100%" creationPolicy="all">
+
+			<file:gnncFileUpload id="ATTACH_" width="100%" height="100%" 
+								   maxFileCount="10" maxFileSize="5" _parent="{this}" horizontalScrollPolicy="off"
+								    _functionAfter_DataEvent="{__closeAfterUpload}"
+								   />
+			
+		</s:NavigatorContent>
+		<s:NavigatorContent id="printNavigation_" label="PRINTSCREEN" width="100%" height="100%" creationPolicy="all" >
+			
+			<s:Group left="0" right="0" top="0" bottom="30">
+				<elements:elementBarStatus colorStart="0xFFFFFF" colorEnd="0xFFFFFF" height="100%"/>
+				<s:Image source="{gnncEmbedBlackWhite.bw_image_32}" horizontalCenter="0" verticalCenter="0" />
+				<s:Image id="printScreenSource_" left="1" top="1" right="1" bottom="1" scaleMode="letterbox" smooth="true" updateComplete="{printScreenDimension_.text = printScreenSource_.source!=null?printScreenSource_.sourceWidth+' x '+printScreenSource_.sourceHeight:'0x0'}" />
+			</s:Group>
+			
+			<s:HGroup width="100%" gap="1" bottom="0">
+				<s:Button label="Colar imagem" 	icon="{gnncEmbedBlackWhite.bw_clipboard_16_paste}" 	click="{printScreen_paste()}" fontWeight="bold"/>
+				<s:Label id="printScreenDimension_" height="25" verticalAlign="middle" textAlign="center" width="100%"/>
+				<s:Button label="Excluir" 		icon="{gnncEmbedBlackWhite.bw_delete_16}" 	click="{printScreenSource_.source = null}" enabled="{!printScreenSource_.source?false:true}"/>
+				<s:Button label="Enviar" 		icon="{gnncEmbedBlackWhite.bw_ok_16}" 		click="{printScreen_send()}" fontWeight="bold" enabled="{!printScreenSource_.source?false:true}"/>
+			</s:HGroup>
+			
+		</s:NavigatorContent>
+		<s:NavigatorContent label="WEBCAM" width="100%" height="100%" creationPolicy="all" >
+			
+			<s:HGroup top="40" horizontalCenter="0" gap="2">
+				<s:Scroller id="myStage" width="240" height="240" horizontalScrollPolicy="off" verticalScrollPolicy="off" 
+							contentBackgroundColor="0xFFFFFF" contentBackgroundAlpha="1">
+					<s:Group>
+						<elements:elementBarStatus colorStart="0xFFFFFF" colorEnd="0xFFFFFF" height="100%"/>
+						<s:Image source="{gnncEmbedBlackWhite.bw_client_32}" horizontalCenter="0" verticalCenter="0" />
+						<s:HGroup width="320" height="240" left="-40">
+							<s:VideoDisplay id="webCamVideo_" width="320" height="240" />
+						</s:HGroup>
+					</s:Group>
+				</s:Scroller>
+				<s:Scroller width="240" height="240" horizontalScrollPolicy="off" verticalScrollPolicy="off"
+							contentBackgroundColor="0xFFFFFF" contentBackgroundAlpha="1">
+					<s:Group>
+						<elements:elementBarStatus colorStart="0xFFFFFF" colorEnd="0xFFFFFF" height="100%"/>
+						<s:Image source="{gnncEmbedBlackWhite.bw_image_32}" horizontalCenter="0" verticalCenter="0" />
+						<s:Image id="webCamShot_" width="320" height="240" left="-40" />
+					</s:Group>
+				</s:Scroller>
+			</s:HGroup>
+
+			<s:HGroup width="100%" gap="1" bottom="0" >
+				<s:Button icon="{gnncEmbedImage.PLAYBACK_16_PLAY}" 	label="Ligar" 		id="webCamPlay_" 	click="{webCam_init(event)}" fontWeight="bold" />
+				<s:Button icon="{gnncEmbedImage.PLAYBACK_16_STOP}" 	label="Parar" 		id="webCamStop_" 	click="{webCam_stop()}" enabled="false"/>
+				<s:Button icon="{gnncEmbedImage.PLAYBACK_16_SHOT}" 	label="Capturar foto" 					click="{webCam_shot()}" />
+				<s:Label id="webCamStatus_" text="" width="100%" verticalAlign="middle" height="25" textAlign="center" />
+				<s:Button icon="{gnncEmbedBlackWhite.bw_delete_16}" label="Excluir" 	id="webCamClear_" 	click="{webCam_remove()}" enabled="false" />
+				<s:Button icon="{gnncEmbedBlackWhite.bw_ok_16}" 	label="Enviar" 							click="{webCam_upload()}" fontWeight="bold" enabled="{!webCamShot_.source?false:true}" />
+			</s:HGroup>
+			
+		</s:NavigatorContent>
+		<s:NavigatorContent label="MICROFONE" width="100%" height="100%" creationPolicy="all" >
+			
+			<s:Group width="100%" top="0" bottom="30">
+				
+				<elements:elementLabelFont id="soundMicroTime_" text="0seg" fontSize="45" verticalCenter="0" horizontalCenter="0"/>
+				
+				<s:Group width="204" height="20" verticalCenter="40" horizontalCenter="0">
+					<s:Rect width="204" height="20">
+						<s:fill>
+							<s:SolidColor color="0xffffff"/>
+						</s:fill>
+						<s:stroke>
+							<s:SolidColorStroke color="0xAAAAAA" weight="1"/>
+						</s:stroke>
+					</s:Rect>
+					<elements:elementBarGray id="soundRecBar_" top="2" left="2" bottom="1" width="0" alpha=".5" />
+					<elements:elementBarGray id="soundPlayBar_" top="2" left="2" bottom="1" width="0" alpha=".5" />
+				</s:Group>
+				
+			</s:Group>
+			
+			<s:HGroup width="100%" gap="1" bottom="0">
+				<s:Button id="soundRec_"  icon="{gnncEmbedImage.PLAYBACK_16_REC}" label="Gravar" fontWeight="bold" />
+				<s:Button id="soundPlay_" icon="{gnncEmbedImage.PLAYBACK_16_PLAY}" label="Reproduzir" enabled="false" />
+				<s:Rect width="100%"/>
+				<s:Button id="soundSave_" icon="{gnncEmbedBlackWhite.bw_ok_16}" label="Enviar" fontWeight="bold" enabled="{soundRecBar_.width>1?true:false}" />
+			</s:HGroup>
+			
+		</s:NavigatorContent>
+		<s:NavigatorContent id="textNavigation_" label="TEXTO" width="100%" height="100%" creationPolicy="all" >
+			
+			<s:VGroup width="100%" top="0" bottom="30" padding="0">
+				
+				<s:TextArea id="createText_" text="" width="100%" height="100%" paddingBottom="15" paddingLeft="15" paddingRight="15" paddingTop="15"
+							fontSize="13"
+							/> 
+				
+			</s:VGroup>
+			
+			<s:HGroup width="100%" gap="1" bottom="0">
+				<s:Rect width="100%"/>
+				<s:Button id="brnSaveText_" icon="{gnncEmbedBlackWhite.bw_ok_16}" label="Enviar" fontWeight="bold" 
+						  enabled="{createText_.text.length>10?true:false}" click="{text_send()}" />
+			</s:HGroup>
+			
+		</s:NavigatorContent>
+		<s:NavigatorContent id="sketchNavigation_" label="RASCUNHO" width="100%" height="100%" creationPolicy="all" >
+			
+			<s:Group width="100%" top="0" bottom="30">
+				<s:Rect width="100%" height="100%">
+					<s:fill>
+						<s:SolidColor color="0xffffff"/>
+					</s:fill>
+				</s:Rect>
+				<gnncPaint:ShaperlyNew id="createPaint_" />
+				<s:Rect width="100%" height="100%">
+					<s:stroke>
+						<s:SolidColorStroke color="0xdddddd"/>
+					</s:stroke>
+				</s:Rect>
+			</s:Group>
+			
+			<s:HGroup width="100%" gap="1" bottom="0">
+				<s:Rect width="100%"/>
+				<s:Button id="brnSavePaint_" icon="{gnncEmbedBlackWhite.bw_ok_16}" label="Enviar" fontWeight="bold" 
+						  click="{paint_send()}" />
+			</s:HGroup>
+			
+		</s:NavigatorContent>
+
+		<!-- s:NavigatorContent label="LINK URL" width="100%" height="100%" creationPolicy="all" enabled="false">
+			
+			<stage:UI_columnMac width="150" radiusX="2" />
+			<s:Image source="{gnncEmbedImage.NETWORK_128}" left="10" top="10"/>
+			
+			<s:VGroup gap="1" left="160" right="0" top="0" bottom="0">
+				<s:Label text="Nome" height="20" verticalAlign="middle" fontWeight="bold"/>
+				<s:TextInput height="25" width="300" restrict="[0-9][a-z][A-Z][\_\-,.!():][áãâÁÃÂ][éêÉÊ][íÍ][õôóÕÔÓ][úÚ][çÇ][ ]"/>
+				<s:Label text="Link do Arquivo (http://)" height="20" verticalAlign="middle" fontWeight="bold" />
+				<s:TextArea id="WEBSITE_" height="100%" width="480" prompt="http://"/>
+				<s:Button icon="{gnncEmbedImage.UPLOAD_16}" label="Enviar" fontWeight="bold" />
+			</s:VGroup>
+			
+		</s:NavigatorContent>
+		<s:NavigatorContent label="ARQUIVO EXISTENTE" width="100%" height="100%" creationPolicy="all" icon="{gnncEmbedImage.NEWS_24}" enabled="false">
+			
+		</s:NavigatorContent>
+		-->
+
+	</mx:ViewStack>
+
+	<s:Group id="boxEdit_" width="100%" height="100%" horizontalCenter="0" verticalCenter="0">
+		
+		<elements:elementStageBoxPopUp />
+		<elements:elementLabelFont text="ARQUIVOS" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+		
+		<s:VGroup width="470" horizontalCenter="0" verticalCenter="0" gap="5" >
+			<s:Label id="NAME_" fontSize="15" fontWeight="normal" width="100%" showTruncationTip="true" maxDisplayedLines="1" height="25" verticalAlign="middle" />
+			<s:HGroup width="100%" horizontalCenter="0" verticalCenter="0" gap="1" verticalAlign="middle" fontSize="11">
+				<s:Label text="Renomear para" fontWeight="bold"/>
+			</s:HGroup>
+			<s:HGroup width="100%" horizontalCenter="0" verticalCenter="0" gap="1" verticalAlign="middle" fontSize="11">
+				<s:TextInput id="NEW_NAME_" width="100%" height="30" fontSize="15" paddingLeft="5"/>
+				<elements:elementLabelFont id="EXTENSION_" text="" paddingLeft="5" paddingRight="5" fontSize="13" />
+			</s:HGroup>
+		</s:VGroup>
+	</s:Group>
+
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%"/>
+		<s:Button id="btnView_" icon="{gnncEmbedBlackWhite.bw_view_16}" 		 label="Visualizar" 		height="25" click="{__attachView()}"/>
+		<s:Button id="btnSave_" icon="{gnncEmbedBlackWhite.bw_edit_16}" 		 label="Salvar Edição" 		height="25" click="{__saveName()}" fontWeight="bold"/>
+		<s:Button 				 icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" 			height="25" click="{__close()}"/>
+	</s:HGroup>
+	
+	<elements:elementLabelBackgroudColor id="loading_" text="Enviando arquivo(s), aguarde" visible="false" 
+										 _fontSize="12" _color="0xffffff" _fontWeight="bold" _colorBackground="0x555555"
+										 _paddingLeftText="15" _paddingRightText="15"
+										 horizontalCenter="0" verticalCenter="0"
+									   />
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+
+</s:Module>

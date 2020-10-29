@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+	Copyright 2010 Chet Haase
+	
+	Licensed under the Apache License, Version 2.0 (the "License");
+	you may not use this file except in compliance with the License.
+	You may obtain a copy of the License at
+	
+	http://www.apache.org/licenses/LICENSE-2.0
+	
+	Unless required by applicable law or agreed to in writing, software
+	distributed under the License is distributed on an "AS IS" BASIS,
+	WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+	See the License for the specific language governing permissions and
+	limitations under the License.
+-->
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009"
+    xmlns:s="library://ns.adobe.com/flex/spark"
+    xmlns:mx="library://ns.adobe.com/flex/mx"
+    creationComplete="setDrawingState()">
+    
+    <fx:Script>
+        <![CDATA[
+			import GNNC.UI.gnncPaint.DrawingStateChangeEvent;
+			
+			import mx.graphics.GradientEntry;
+			import mx.graphics.IFill;
+			import mx.graphics.IStroke;
+			import mx.graphics.LinearGradient;
+            //import mx.graphics.IStroke;
+            private function setMode(event:MouseEvent):void
+            {
+                switch (event.currentTarget)
+                {
+                    case line:
+                        currentState = "lineMode";
+                        break;
+                    case rect:
+                        currentState = "rectMode";
+                        break;
+                    case ellipse:
+                        currentState = "ellipseMode";
+                        break;
+                    case path:
+                        currentState = "pathMode";
+                        break;
+                }
+            }
+            private function setDrawingState():void
+            {
+                var newStroke:IStroke;
+                var newFill:IFill;
+                if (fillCB.selected)
+                {
+                    if (fillColor.selectedColor == fillGradientColor.selectedColor)
+                        newFill = new SolidColor(fillColor.selectedColor);
+                    else
+                    {
+                        newFill = new LinearGradient();
+                        LinearGradient(newFill).entries = [
+                            new GradientEntry(fillColor.selectedColor),
+                            new GradientEntry(fillGradientColor.selectedColor)
+                        ];
+                    }
+                }
+                if (strokeCB.selected)
+                    newStroke = new SolidColorStroke(strokeColor.selectedColor);
+                sampleRect.stroke = newStroke;
+                sampleRect.fill = newFill;
+                var drawingChangeEvent:DrawingStateChangeEvent = 
+                    new DrawingStateChangeEvent("drawingStateChange",
+                    newStroke, newFill);
+                dispatchEvent(drawingChangeEvent);
+            }
+        ]]>
+    </fx:Script>
+        <fx:Metadata>
+            [Event(name="drawingStateChange", 
+                type="GNNC.UI.gnncPaint.DrawingStateChangeEvent")]
+			
+        </fx:Metadata>
+    <fx:Declarations>
+        <s:SolidColorStroke id="iconStroke" color="black" weight="2"/>
+    </fx:Declarations>
+    <s:states>
+        <s:State name="lineMode"/>
+        <s:State name="rectMode"/>
+        <s:State name="ellipseMode"/>
+        <s:State name="pathMode"/>
+    </s:states>
+    <s:Rect left="0" top="0" right="0" bottom="0">
+        <s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+        </s:fill>
+    </s:Rect>
+    <s:VGroup horizontalCenter="0" top="10" gap="1">
+        <s:Group id="line" width="40" height="40" click="setMode(event)">
+            <s:Rect left="0" top="0" right="0" bottom="0">
+                <s:stroke>
+                    <s:SolidColorStroke color="black" weight.lineMode="2"/>
+                </s:stroke>
+                <s:fill>
+                    <s:SolidColor color="white" color.lineMode="0xeeeeee"/>
+                </s:fill>
+            </s:Rect>
+            <s:Line xFrom="5" yFrom="5" xTo="35" yTo="35" stroke="{iconStroke}"/>
+        </s:Group>
+        <s:Group id="rect" width="40" height="40" click="setMode(event)">
+            <s:Rect left="0" top="0" right="0" bottom="0">
+                <s:stroke>
+                    <s:SolidColorStroke color="black" weight.rectMode="2"/>
+                </s:stroke>
+                <s:fill>
+                    <s:SolidColor color="white" color.rectMode="0xeeeeee"/>
+                </s:fill>
+            </s:Rect>
+            <s:Rect x="5" y="5" width="30" height="30" stroke="{iconStroke}"/>
+        </s:Group>
+        <s:Group id="ellipse" width="40" height="40" click="setMode(event)">
+            <s:Rect left="0" top="0" right="0" bottom="0">
+                <s:stroke>
+                    <s:SolidColorStroke color="black" weight.ellipseMode="2"/>
+                </s:stroke>
+                <s:fill>
+                    <s:SolidColor color="white" color.ellipseMode="0xeeeeee"/>
+                </s:fill>
+            </s:Rect>
+            <s:Ellipse x="5" y="5" width="30" height="30" stroke="{iconStroke}"/>
+        </s:Group>
+        <s:Group id="path" width="40" height="40" click="setMode(event)">
+            <s:Rect left="0" top="0" right="0" bottom="0">
+                <s:stroke>
+                    <s:SolidColorStroke color="black" weight.pathMode="2"/>
+                </s:stroke>
+                <s:fill>
+                    <s:SolidColor color="white" color.pathMode="0xeeeeee"/>
+                </s:fill>
+            </s:Rect>
+            <s:Path stroke="{iconStroke}"
+                data="M 5 5 L 7 11 L 11 9 L 13 5 L 14 7 L 21 20 L 19 25 L 25 24 L 35 35"/>
+        </s:Group>
+    </s:VGroup>
+    <s:VGroup bottom="10" padding="3" gap="2">
+		<s:Label text="Contorno" fontSize="9"/>
+        <s:CheckBox fontSize="10" label="Sim" id="strokeCB" selected="true" 
+                    change="setDrawingState()" width="100%" fontWeight="bold" />
+        <mx:ColorPicker id="strokeColor" change="setDrawingState()" 
+                        width="100%" selectedColor="0x444444"/>
+        <s:Rect id="sampleRect" x="10" width="100%" height="20"/>
+		
+		<s:Rect height="5"/>
+		
+		<s:Label text="Fundo" fontSize="9"/>
+		<s:CheckBox id="fillCB" label="Sim" fontSize="10" change="setDrawingState()" fontWeight="bold"/>
+        <s:HGroup enabled="{fillCB.selected}" gap="1">
+            <mx:ColorPicker id="fillColor" change="setDrawingState()" 
+                            selectedColor="0x555555"/>
+            <mx:ColorPicker id="fillGradientColor" change="setDrawingState()" 
+                            selectedColor="0x777777"/>
+        </s:HGroup>
+    </s:VGroup>
+</s:Group>

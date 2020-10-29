@@ -1,0 +1,170 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009"
+		  xmlns:s="library://ns.adobe.com/flex/spark"
+		  xmlns:mx="library://ns.adobe.com/flex/mx"
+		  xmlns:elements="GNNC.UI.elements.*"
+		  xmlns:stage="GNNC.elements.stage.*"
+		  xmlns:list="GNNC.elements.component.list.*"
+		  xmlns:select="GNNC.elements.component.select.*"
+		  width="750" height="520" creationComplete="{__start()}" >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_client;
+			
+			private var _gnncPop:gnncPopUp = new gnncPopUp();
+			public var _tableClient:table_client = new table_client(); 
+			private var _columns:Array = ['ID','NAME','DATE_BIRTH','ACTIVE','EMAIL','ID_GROUP','ID_DEPARTAMENT','ID_CATEGORY','COMPANY'];
+			
+			private function __start():void
+			{
+				__config();
+				searchText_._changeEvent = __select;
+			}
+
+			public function __config(e:*=null):void 
+			{
+				list_._contextMenu 				= null;
+				list_._contextMenuItems 		= null;
+				
+				list_._tableClass 				= gnncData.__clone(_tableClient);
+				//list_._tableClass.ID_DEPARTAMENT= DEPARTAMENT_.value;
+				list_._tableClass.ID_GROUP 		= GROUP_.value;
+				list_._tableClass.ID_CATEGORY 	= CATEGORY_.value; 
+			}
+			
+			public function __close():void 
+			{ 
+				_gnncPop.__close();
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __selectedItem():void
+			{
+				if(!list_.selected)
+					return;
+				
+				var obj:Object			= list_.selectedItem;
+				
+				_tableClient.ID			= obj.ID;
+				_tableClient.NAME		= obj.NAME;
+				_tableClient.NICK_NAME	= obj.NICK_NAME;
+				
+				__close();
+			}
+
+			private function __changeIndex(e:*=null):void
+			{
+				__config();
+				list_.__select();
+			}
+			
+			private function __select(e:*=null):void
+			{
+				var whereStr:String = '';
+				var whereArr:Array  = new Array();
+				
+				//if(DEPARTAMENT_.value>0)
+				//	whereArr.push(" ID_DEPARTAMENT = '"+DEPARTAMENT_.value+"' ");
+				
+				if(GROUP_.value>0)
+					whereArr.push(" ID_GROUP = '"+GROUP_.value+"' ");
+				
+				if(CATEGORY_.value>0)
+					whereArr.push(" ID_CATEGORY = '"+CATEGORY_.value+"' ");
+				
+				whereStr = whereArr.join('AND');
+				
+				list_.__selectWhere(searchText_.text,['NAME','NICK_NAME','EMAIL'],whereStr);
+
+				return;
+
+				var _text:String 					= searchText_.text;
+				var _sql:String 					= "";
+				var _table:table_client				= new table_client();
+				//_table.ID_DEPARTAMENT				= _ID_DEPARTAMENT;
+				_table.ID_GROUP						= GROUP_.value;
+				_table.ID_CATEGORY					= CATEGORY_.value;
+				
+				_table.VISIBLE						= 0;
+				_table.ACTIVE						= 0;
+				
+				_text = gnncData.__replace			(_text,'%','');
+				_text = gnncData.__replace			(_text,';','');
+				_text = gnncData.__replace			(_text,"'",'');
+				_text = gnncData.__replace			(_text,'"','');
+				_text = gnncData.__replace			(_text,'´','');
+				_text = gnncData.__replace			(_text,'`','');
+				gnncData.__scapeText				([_text]);
+				
+
+				list_.__loading(true);
+
+				//two lines
+				var c1:Array = _columns;
+				var c2:Array = _columns;
+
+				c1.push(" '1' as PRIORITY ");
+				c2.push(" '1' as PRIORITY ");
+
+				_sql  = new gnncSql().__SELECT(_table,false,c1,null,null,null,["NAME LIKE '%"+_text+"%'","MIDDLE_NAME LIKE '%"+_text+"%'","LAST_NAME LIKE '%"+_text+"%'","CPF_CNPJ LIKE '%"+_text+"%'","RG_REGISTER LIKE '%"+_text+"%'","ID = '"+_text+"'"],null,true,[70],['NAME']);
+				_sql  = " (SELECT " + c2.join(',') + " FROM dbd_client WHERE NAME LIKE '"+_text+"%' "+(Number(_table.ID_GROUP)>0?" AND ID_GROUP = '"+_table.ID_GROUP+"' ":'')+" LIMIT 70 ) UNION ("+_sql+") ORDER BY PRIORITY,NAME ASC"; //GROUP BY ID 
+				list_._connList.__sql(_sql,'','',__fResult,__fFault);
+
+				function __fFault(event:*):void{
+					list_.__loading(false);
+				}
+				
+				function __fResult(event:*):void{			
+					list_.dataProvider = list_._connList.DATA_ARR;					
+					list_.__loading(false);
+				}
+				return;
+				
+			}
+			
+			//_changeEvent="{__select(null)}"
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp />
+	<elements:elementLabelFont id="titlePopUp_" text="SELECIONAR CLIENTE" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<!--s:TabBar dataProvider="{panel_}" height="30" /-->
+		<s:Rect width="100%"/>
+		<elements:elementInputSearch id="searchText_" width="200"  />
+	</s:HGroup>
+
+	<s:HGroup left="20" right="20" top="55" bottom="52" gap="5" >
+		
+		<s:VGroup width="180" height="100%" gap="1" >
+			<s:Button width="100%" height="25" label="Favoritos"				click="{list_.__selectStar()}" 		icon="{gnncEmbedBlackWhite.bw_favorite_16}"/>
+			<s:Button width="100%" height="25" label="Todos"					click="{list_.__select()}" 			icon="{gnncEmbedBlackWhite.bw_all_16}"/>
+			<s:Button width="100%" height="25" label="10 Últimos Cadastros" 	click="{list_.__selectLast(10)}"	/>
+			<s:Button width="100%" height="25" label="30 Últimos Cadastros" 	click="{list_.__selectLast(30)}"	/>
+			<s:Rect height="100%"/>
+			<elements:elementHLine height="15"/>
+			<select:conSelect_GROUP 	id="GROUP_" 	  _ADD="false" _MIX="CLIENT" value="{_tableClient.ID_GROUP}" 		fontWeight="normal" _CHANGE_EVENT="{__changeIndex}" />
+			<select:conSelect_CATEGORY  id="CATEGORY_"	  _ADD="false" _MIX="CLIENT" value="{_tableClient.ID_CATEGORY}" 	fontWeight="normal" _CHANGE_EVENT="{__changeIndex}" />
+		</s:VGroup>
+		<list:conList_client id="list_" width="100%" height="100%" _borderVisible="true" _selectFirstItem="true" keyDown="{if(new gnncKeyboard()._ENTER(event)) __selectedItem(); }" _autoLoadStar="true" />
+
+	</s:HGroup>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%"/> 
+		<s:Button id="BTN_SAVE_" height="25" label="Selecionar Cliente (enter)" fontWeight="bold" icon="{gnncEmbedBlackWhite.bw_ok_16}" click="{__selectedItem()}"/>
+		<s:Button left="0" right="0" bottom="0" label="Fechar" click="{__close()}" icon="{gnncEmbedBlackWhite.app_close_16_clean}" skinClass="GNNC.skin.button.skin_buttonLink"/>
+	</s:HGroup>
+	
+	<s:Button right="4" top="4" width="10" height="10" click="{__close()}" tabFocusEnabled="false"  toolTip="Fechar"/>
+	
+</s:Module>

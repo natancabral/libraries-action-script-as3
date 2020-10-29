@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- http://blog.flexexamples.com/2009/06/21/creating-a-custom-halo-accordion-header-skin-in-flex-4/ -->
+<s:SparkSkin name="CustomAccordionHeaderSkin"
+			 xmlns:fx="http://ns.adobe.com/mxml/2009"
+			 xmlns:s="library://ns.adobe.com/flex/spark" 
+			 minWidth="25" minHeight="27" fontWeight="bold"
+			 alpha.disabled="0.5" 
+			 xmlns:stage="GNNC.elements.stage.*" 
+			 xmlns:icon="GNNC.elements.icon.*" 
+			 xmlns:elements="GNNC.UI.elements.*" 
+			 xmlns:icon1="GNNC.UI.elements.icon.*" 
+			 >
+	<!-- states -->
+	<s:states>
+		<s:State name="up" />
+		<s:State name="over" />
+		<s:State name="down" />
+		<s:State name="disabled" />
+		<s:State name="selectedUp" />
+		<s:State name="selectedOver" />
+		<s:State name="selectedDown" />
+		<s:State name="selectedDisabled" />
+	</s:states>
+	
+	<elements:elementBarStatus top="0" bottom="0" left="1" right="1" />
+	<s:Rect alpha=".5" visible="false" visible.over="true" visible.selectedOver="true" top="1" bottom="1" left="1" right="1">
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF"/>
+		</s:fill>
+	</s:Rect>
+	
+	<icon1:icon_directionDown scaleX=".5" scaleY=".5" right="10" top="10" includeIn="selectedDown,selectedOver,selectedDisabled,selectedUp"/>
+	<icon1:icon_directionLeft scaleX=".5" scaleY=".5" right="10" top="10" excludeFrom="selectedDown,selectedOver,selectedDisabled,selectedUp" />
+	
+</s:SparkSkin>

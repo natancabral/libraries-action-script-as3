@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				xmlns:stage="GNNC.elements.stage.*"
+				xmlns:gnncImage="GNNC.UI.gnncImage.*" 
+				xmlns:GNNC="GNNC.*" 
+				xmlns:elements="GNNC.UI.elements.*"
+				
+				creationComplete="{start()}"
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				
+				autoDrawBackground="false" 
+				doubleClickEnabled="true" 
+				width="100%" maxHeight="500"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.sqlTables.table_comment;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedExtension;
+			
+			import GNNC.gnncEmbedImage;
+			
+			import mx.collections.ArrayCollection;
+
+			import mx.graphics.SolidColor;
+			import mx.graphics.SolidColorStroke;
+			
+			private const paddingRightComment:uint = 10;//70;
+			
+			private function start():void{
+			}
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __view(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._view,data));
+			}
+			
+			//answer/reply/return
+			private function __answer(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._new,data));
+			}
+			
+			private function __attach(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral('newAttach',data));
+			}
+			
+			private function __jobView(e:*=null):void
+			{
+				if(uint(data.ID_JOB)>0)
+					Object(owner).dispatchEvent(new gnncEventGeneral('viewJob',data));
+			}
+			
+			private function __job(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral('newJob',data));
+			}
+			
+			private function __attachView(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral('viewAttach',data));
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._view,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __delete():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._delete,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			protected function __location(data_:Object):Object
+			{
+				if(String(data_.ATTACH_CLIENT).length>5)
+					return gnncGlobalStatic._httpHost+'ATTACH/'+String(gnncGlobalStatic._dataBase).toUpperCase()+'/thumbnailCrop/'+data_.ATTACH_CLIENT;
+				else
+					return null;
+			}
+			
+			protected function mess(data_:Object):Object
+			{
+				return String(data_.MESSAGE).split('\n').join(' ').split('\r').join(' ').split('\t').join(' ');
+			}
+			
+			protected function messReply(data_:Object):Object
+			{
+				if(data_.REPLY_MESSAGE==null || data_.REPLY_MESSAGE=='null' || !data_.REPLY_MESSAGE)
+					return '(comentário removido)';
+				return String(data_.REPLY_MESSAGE).split('\n').join(' ').split('\r').join(' ').split('\t').join(' ');
+			}
+			
+			protected function haveBreak(data_:Object):Boolean
+			{
+				return String(data_.MESSAGE).split('\n').length>1?true:false;
+			}
+			
+			protected function expand(data_:Object,idgnnc:Object):void
+			{
+				if(ex.label == 'abrir'){
+					__view();
+					return;
+				}
+				
+				mm.text = String(data_.MESSAGE);
+				mm.showTruncationTip = true;
+				ex.label = 'abrir';
+			}
+			
+			private function str(s:String):String
+			{
+				return s.substr(0,1).toUpperCase()+s.substr(1).toLowerCase();
+			}
+			
+			private function letter2color(s:String):uint
+			{
+				var l:String = s.substr(0,1).toUpperCase();
+				var i:uint = 0;
+				
+				var f:Array = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z'];
+				var r:Array = gnncGlobalArrays._CHART_COLOR.toArray();
+				r.push(0x999999,0x111111,0xAAAAAA);
+				
+				if(f.indexOf(l)>-1)
+					return r[r.indexOf(l)];
+				return 0xCCCCCC;
+			}
+			
+			private function getSizeAttach(data:Object,defaultValue:uint):uint
+			{
+				return String(data.ATTACH_LINKS).length>10?16:defaultValue;
+			}
+			
+			private function getVisibleAttach(data:Object,defaultValue:Boolean):Boolean
+			{
+				return String(data.ATTACH_LINKS).length>10?true:defaultValue;
+			}
+			
+			private function isFinal(data_:Object):Boolean
+			{
+				return gnncDate.__isValid(data_.DATE_FINAL_JOB) ? true : false ;
+			}
+			
+			private function isCanceled(data_:Object):Boolean
+			{
+				return gnncDate.__isValid(data_.DATE_CANCELED_JOB) ? true : false ;
+			}
+			
+			private function isPublic(data_:Object):Boolean
+			{
+				return Number(data_.PUBLIC) == 1 ? true : false ;
+			}
+			
+			private function isPrivateMe(data_:Object):Boolean
+			{
+				return Number(data_.PUBLIC) == 0 ? true : false ;
+			}
+			
+			private function isPrivateInternal(data_:Object):Boolean
+			{
+				return Number(data_.PUBLIC) == 2 ? true : false ;
+			}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:HGroup left="0" top="0" right="0" bottom="0" gap="8" padding="5" paddingTop="8" paddingBottom="15"
+			  color="0x555555" lineHeight="12" wordSpacing="1" fontFamily="Arial"
+			  >
+		
+		<s:Group width="32" height="32" alpha="1" >
+			<s:Rect width="100%" height="100%" fill="{new SolidColor(0xeeeeee)}" radiusX="4" radiusY="4" />
+			<s:Label text="{data.NAME_USER?String(data.NAME_USER).substr(0,2).toUpperCase():'Usuário não encontrado'}" width="32" height="32" textAlign="center" verticalAlign="middle"/>
+			<gnncImage:gnncImageCD width="32" height="32" data="{data}" property="ATTACH_CLIENT"/>
+			<s:Image source="{isCanceled(data)?gnncEmbedBlackWhite.check_16_bw_ok:isFinal(data)?gnncEmbedBlackWhite.check_16_green_ok:uint(data.ID_JOB)>0?gnncEmbedBlackWhite.bw_project_job_16:null}" bottom="-5" right="-5" width="16" height="16"
+					 buttonMode="{uint(data.ID_JOB)>0?true:false}"
+					 click="{__jobView()}"
+					 />
+		</s:Group>
+		
+		<s:VGroup width="100%" height="100%" gap="-3" paddingLeft="10">
+			
+			<s:VGroup width="100%" height="100%" gap="1">
+				<s:HGroup width="100%" gap="5" paddingTop="1" verticalAlign="middle" paddingBottom="6">
+					
+					<s:Label text="{data.NAME_USER?gnncData.__firstLetterUpperCase(data.NAME_USER):'Usuário não encontrado'}" 
+							 showTruncationTip="true" maxDisplayedLines="1" fontSize="11" fontWeight="bold"
+							 color="0x111111"
+							 verticalAlign="middle"
+							 />
+					<s:Label text="{gnncDate.__date2Legend(data.DATE,null,true,true,'-',true,true,' ')}" 
+							 maxDisplayedLines="1" showTruncationTip="true" fontSize="10" paddingTop="1" alpha="1" fontWeight="normal" textAlign="left" 
+							 includeIn="hovered,hoveredAndShowsCaret" color="0xbbbbbb"
+							 verticalAlign="middle" width="100%"
+							 />
+					<s:Label text="{gnncDate.__relativeDateFromNow(data.DATE,false)}" 
+							 maxDisplayedLines="1" showTruncationTip="true" fontSize="10" paddingTop="1" alpha="1" fontWeight="normal" textAlign="left" 
+							 excludeFrom="hovered,hoveredAndShowsCaret" color="0xbbbbbb"
+							 verticalAlign="middle" width="100%"
+							 />
+					<s:Label text="{data.ID}" fontSize="8" color="0xeeeeee"/>
+					
+					<s:Rect width="5" height="5" radiusX="3" radiusY="3" includeIn="selected,selectedAndShowsCaret">
+						<s:fill>
+							<s:SolidColor color="0x33cc00"/>
+						</s:fill>
+					</s:Rect>
+					
+					<s:Label text="responder" fontSize="11" click="{__answer()}" color="0x33cc00" paddingLeft="3" paddingRight="3"
+							 buttonMode="true"
+							 />
+					
+				</s:HGroup>
+				<!-- s:TextArea text="{data.MESSAGE}" borderVisible="false" width="100%" height="100%" contentBackgroundAlpha="0" editable="false"
+				selectable="false" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0"
+				verticalScrollPolicy="off" horizontalScrollPolicy="off"
+				/ -->
+				<s:Label id="mm" text="{mess(data)}" width="100%" fontSize="11" color="0x333333"
+						 paddingBottom="0" paddingLeft="0" paddingRight="{width>500?70:paddingRightComment}" paddingTop="0"
+						 maxDisplayedLines="10" showTruncationTip="false"
+						 lineHeight="15"
+						 />
+				
+				<s:HGroup width="100%" gap="7" visible="{Number(data.ID_COMMENT_REPLY)>0?true:false}" paddingTop="{Number(data.ID_COMMENT_REPLY)>0?5:0}">
+					<s:Rect width="2" height="100%" alpha=".9">
+						<s:fill>
+							<s:SolidColor color="0x33cc00"/>
+						</s:fill>
+					</s:Rect>
+					<s:VGroup width="100%" gap="{Number(data.ID_COMMENT_REPLY)>0?2:-1}">
+						<s:Label text="{data.REPLY_NAME_USER?gnncData.__firstLetterUpperCase(data.REPLY_NAME_USER):'Usuário não encontrado'}" width="100%" 
+								 
+								 fontSize="{Number(data.ID_COMMENT_REPLY)>0?11:1}"
+								 paddingTop="{Number(data.ID_COMMENT_REPLY)>0?5:0}"
+								 maxDisplayedLines="{Number(data.ID_COMMENT_REPLY)>0?2:1}"
+								 lineHeight="{Number(data.ID_COMMENT_REPLY)>0?18:1}"
+								 
+								 alpha=".5"
+								 
+								 paddingBottom="0" paddingLeft="0" paddingRight="0" fontWeight="bold" showTruncationTip="false"
+								 color="{0x33cc00}"
+								 />
+						<!-- 5073cf 0x8098ac -->
+						<!-- s:Label text="{messReply(data)}" width="100%" 
+						paddingLeft="0" paddingRight="0" 
+						showTruncationTip="false" alpha=".5"
+						
+						visible="{Number(data.ID_COMMENT_REPLY)>0?true:false}"
+						paddingBottom="{Number(data.ID_COMMENT_REPLY)>0?5:0}" 
+						maxDisplayedLines="{Number(data.ID_COMMENT_REPLY)>0?2:1}" 
+						lineHeight="{Number(data.ID_COMMENT_REPLY)>0?18:1}"
+						fontSize="{Number(data.ID_COMMENT_REPLY)>0?12:1}"
+						
+						/ -->
+						<elements:elementLabelFont text="{messReply(data)}" 
+												   width="100%" 
+												   paddingLeft="0" paddingRight="{width>500?70:paddingRightComment}" 
+												   showTruncationTip="false" alpha=".5"
+												   
+												   paddingBottom="{Number(data.ID_COMMENT_REPLY)>0?5:0}" 
+												   maxDisplayedLines="{Number(data.ID_COMMENT_REPLY)>0?2:1}" 
+												   lineHeight="{Number(data.ID_COMMENT_REPLY)>0?15:1}"
+												   fontSize="{Number(data.ID_COMMENT_REPLY)>0?12:1}"
+												   
+												   />
+					</s:VGroup>
+				</s:HGroup>
+				
+			</s:VGroup>
+			
+			<s:HGroup width="100%" gap="2" verticalAlign="middle" paddingTop="{getVisibleAttach(data,false)?15:0}" height="{getSizeAttach(data,1)}" visible="{getVisibleAttach(data,false)}">
+				<!-- s:Image height="{getSizeAttach(data,1)}" source="{gnncEmbedBlackWhite.bw_new_16}" width="16" click="{__attach(event)}" toolTip="{'links:'+data.ATTACH_LINKS}" / -->
+				<s:List height="{getSizeAttach(data,1)}" width="100%" borderVisible="false"
+						dataProvider="{new ArrayCollection(String(data.ATTACH_LINKS).split(','))}"
+						itemRenderer="GNNC.modules.attach.itemRender.itemRender_attach_icons_forList"
+						>
+					<s:layout>
+						<s:HorizontalLayout gap="4" columnWidth="16"/>
+					</s:layout>
+				</s:List>
+			</s:HGroup>
+			
+		</s:VGroup>
+		
+		<s:Group height="25" width="10">
+			<s:VGroup width="10" verticalAlign="middle" horizontalAlign="center" gap="1" top="0" 
+					  click="{options_.displayPopUp=true}" buttonMode="true">
+				<!--  includeIn="selected,selectedAndShowsCaret,hovered,hoveredAndShowsCaret" -->
+				<s:Rect width="4" height="4" radiusX="3" radiusY="3">
+					<s:fill>
+						<s:SolidColor color="0xdddddd" 
+									  color.hovered="0x5073cf" color.hoveredAndShowsCaret="0x5073cf"
+									  color.selected="0x5073cf" color.selectedAndShowsCaret="0x5073cf"
+									  />
+					</s:fill>
+				</s:Rect>
+				<s:Rect width="4" height="4" radiusX="3" radiusY="3">
+					<s:fill>
+						<s:SolidColor color="0xdddddd" 
+									  color.hovered="0x5073cf" color.hoveredAndShowsCaret="0x5073cf"
+									  color.selected="0x5073cf" color.selectedAndShowsCaret="0x5073cf"
+									  />
+					</s:fill>
+				</s:Rect>
+				<s:Rect width="4" height="4" radiusX="3" radiusY="3">
+					<s:fill>
+						<s:SolidColor color="0xdddddd" 
+									  color.hovered="0x5073cf" color.hoveredAndShowsCaret="0x5073cf"
+									  color.selected="0x5073cf" color.selectedAndShowsCaret="0x5073cf"
+									  />
+					</s:fill>
+				</s:Rect>
+			</s:VGroup>
+			<s:PopUpAnchor id="options_" popUpPosition="left" width="110" displayPopUp="false" popUpHeightMatchesAnchorHeight="false" top="0" left="10" >
+				<s:Group width="100%" height="100%" rollOut="{options_.displayPopUp=false}">
+					<s:RectangularDropShadow width="100%" height="100%" blurX="7" blurY="7" alpha=".2" blendMode="darken" distance="0"
+											 tlRadius="4" trRadius="4" blRadius="4" brRadius="4" 
+											 />
+					<s:Rect width="100%" height="100%" radiusX="4" radiusY="4">
+						<s:fill>
+							<s:SolidColor color="0xffffff"/>
+						</s:fill>
+					</s:Rect>
+					<s:VGroup gap="1" width="100%" fontSize="11" fontWeight="normal" padding="10">
+						<s:Button label="expandir" height="20" width="100%" enabled="{haveBreak(data)}" click="{expand(data,data.ID)}" id="ex"
+								  skinClass="GNNC.skin.button.skin_buttonLink"/>
+						<s:Button label="responder" height="20" width="100%" click="{__answer()}" color="0x33cc00" 
+								  skinClass="GNNC.skin.button.skin_buttonLink"/>
+						<s:Button label="anexar" height="20" width="100%" click="{__attach()}" 
+								  skinClass="GNNC.skin.button.skin_buttonLink" enabled="{true}"/>
+						<s:Button label="criar job" height="20" width="100%" click="{__job()}" toolTip="Transformar em job (tarefa)" 
+								  skinClass="GNNC.skin.button.skin_buttonLink" enabled="{uint(data.ID_CLIENT)==0?false:uint(data.ID_PROJECT)==0?false:uint(data.ID_STEP)==0?false:true}"/>
+						<s:Button label="ver job" height="20" width="100%" click="{__jobView()}"
+								  skinClass="GNNC.skin.button.skin_buttonLink" enabled="{uint(data.ID_JOB)>0?true:false}"/>
+						<s:Button label="excluir" height="20" width="100%" click="{__delete()}" 
+								  skinClass="GNNC.skin.button.skin_buttonLink"/>
+					</s:VGroup>
+				</s:Group>
+			</s:PopUpAnchor>
+		</s:Group>
+		
+	</s:HGroup>
+
+	<s:Image source="{isPublic(data)?gnncEmbedBlackWhite.bw_global_16:isPrivateInternal(data)?gnncEmbedBlackWhite.bw_client_16_team:isPrivateMe(data)?null:null}" 
+			 top="30" right="5" width="16" height="16" alpha=".2"
+			 />
+
+	
+</s:ItemRenderer>

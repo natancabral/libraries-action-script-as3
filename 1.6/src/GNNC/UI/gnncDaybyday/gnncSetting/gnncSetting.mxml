@@ -1,0 +1,804 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="700" height="540"
+		  creationComplete="{__start()}" 
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.conn.gnncCrypt;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.file.gnncFilesRemote;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalLog;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_client;
+			import GNNC.sqlTables.table_settings;
+			
+			import be.boulevart.as3.security.RC4;
+			import be.boulevart.as3.security.ROT13;
+			import be.boulevart.as3.security.ROT16;
+			import be.boulevart.as3.security.Rijndael;
+			import be.boulevart.as3.security.TEA;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IFlexDisplayObject;
+			import mx.core.IVisualElement;
+			import mx.graphics.SolidColorStroke;
+			
+			[Embed(source='image/user-128.png')]
+			static public const USER:Class;
+			[Embed(source='image/edit-16.png')]
+			static public const EDIT:Class;
+			
+			[Bindable] private var _gnncGlobal:gnncGlobalStatic 	= new gnncGlobalStatic(true);
+					   private var _CLIENT:gnncAMFPhp				= new gnncAMFPhp();
+			
+			public var _gnncPopUp:gnncPopUp 						= new gnncPopUp();
+			public var _change:Boolean 								= false;
+			public var _contentTab:IFlexDisplayObject 				= null;
+			
+			private var _gnncfilesRemote:gnncFilesRemote 				= new gnncFilesRemote();
+
+			/*
+			var a:String = " SELECT á NATAN CABRAL ç SELECT á ã ç Feliz Natal Natan Cabral 123 !#$ Show de Bola {}[]();.,@# \"\' \´\´ \` çáúù|| ";
+			new gnncAlert().__alert(gnncCrypt.encrypt(a,'%key&',0),'toEncrypt0');
+			new gnncAlert().__alert(gnncCrypt.encrypt(a,'%key&',1),'toEncrypt1');
+			new gnncAlert().__alert(gnncCrypt.encrypt(a,'%key&',2),'toEncrypt2');
+			new gnncAlert().__alert(gnncCrypt.encrypt(a,'%key&',3),'toEncrypt3');
+			
+			new gnncAlert().__alert(ROT13.calculate(a),'ROT13');
+			new gnncAlert().__alert(ROT16.calculate(a),'ROT26');
+			*/
+			private const _crypt:ArrayCollection = new ArrayCollection([
+				{label:'Encrypt 0',  data:'encrypt0'},
+				{label:'Encrypt 1',  data:'encrypt1'},
+				{label:'Encrypt 2',  data:'encrypt2'},
+				{label:'Base64 0',  data:'base64v0'},
+				{label:'Base64 1',  data:'base64v1'},
+				{label:'Base64 2',  data:'base64v2'},
+				{label:'ROT13',      data:'rot13'},
+				{label:'ROT16',      data:'rot16'},
+				{label:'TEA',        data:'tea'},
+				{label:'RC4',        data:'rc4'},
+				{label:'lzw',        data:'lzw'},
+				{label:'Rijndael (CBC)',   data:'rijndaelCBC'},
+				{label:'Rijndael (ECB)',   data:'rijndaelECB'}
+			]);
+
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+					}
+				);
+				
+				//__max();
+				__userPhoto();
+				callLater(__firstInput);
+				
+				DOC_DATABASE.text = String(gnncGlobalStatic._dataBase).toUpperCase();
+			}
+			
+			private function __firstInput():void 
+			{ 
+				/** **/
+
+				USERNAME_.text				= gnncGlobalStatic._userNameLogin.toLowerCase();
+				EMAIL_.text					= gnncGlobalStatic._userEmail;
+				
+				NAME_.text					= gnncData.__firstLetterUpperCase(gnncGlobalStatic._userNameClient);
+				DATE_BIRTH_.text			= gnncDate.__date2Legend(gnncGlobalStatic._userBirthday);
+				
+				GROUP_.text					= 'Acesso limitado';
+				
+				/** **/
+				
+				DOC_NAME_.text				= gnncGlobalStatic._documentPdfCompany;
+				DOC_DESCRIPTION_.text		= gnncGlobalStatic._documentPdfDescription;
+				DOC_RECEIPT_.text			= gnncGlobalStatic._documentPdfReceipt;
+				DOC_ID_CLIENT_.text			= gnncGlobalStatic._clientGeneralId + '';
+
+			}
+			
+			private function __max():void
+			{
+				//this.width 		= FlexGlobals.topLevelApplication.parent.width;
+				//this.height 	= FlexGlobals.topLevelApplication.parent.height;
+				
+				this.width 		= parentApplication.parent.width - 20;
+				this.height 	= parentApplication.parent.height - 20;
+				
+				new gnncPopUp().__center(this);
+			}
+			
+			private function __CLOSE():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __userPhoto():void
+			{
+				if(gnncGlobalStatic._userIdClient)
+				{
+					var COLUMN:Array = [
+						"coalesce((select FILE_LINK from dbd_attach 	WHERE MIX like 'CLIENT' and ID_MIX like dbd_client.ID AND (EXTENSION like 'jpg' or EXTENSION like 'png' or EXTENSION like 'gif') ORDER BY ORDER_ITEM LIMIT 0,1	),0)  ATTACH_CLIENT"
+					];
+					var _table:table_client = new table_client(gnncGlobalStatic._userIdClient);
+					_table.ACTIVE 			= 0;
+					var _sql:String 		= new gnncSql().__SELECT(_table,false,COLUMN);
+					_CLIENT.__sql			(_sql,'','',__fResult,__fFault);
+					
+					function __fFault(event:*):void
+					{
+					}
+					
+					function __fResult(event:*):void
+					{
+						if(_CLIENT.DATA_ROWS)
+							PHOTO_.source = String(_CLIENT.DATA_ARR.getItemAt(0).ATTACH_CLIENT).length > 10 ? __attachFile() : USER;
+					}
+
+				} 
+			}
+
+			private function __attachFile():String
+			{
+				return gnncGlobalStatic._httpHost+'/ATTACH/'+String(gnncGlobalStatic._dataBase).toUpperCase()+'/'+_CLIENT.DATA_ARR.getItemAt(0).ATTACH_CLIENT;
+			}
+
+			public function __setContentTab(content_:IFlexDisplayObject,tabName_:String):void
+			{
+				if(!content_)
+					return;
+				
+				var _nav:NavigatorContent 		= new NavigatorContent();
+				_nav.addElement					(content_ as  IVisualElement);
+				_nav.label 						= tabName_;
+				panelCenter_.addElement			(_nav);
+			}
+
+			/*private function __getPassHour():void
+			{
+				PASSW_.enabled = false;
+				
+				var _params:paramsFilePhpAccess = new paramsFilePhpAccess();
+				_params._hour			= 'true';
+				_params._passWord		= PASSW_.text;
+				
+				_gnncfilesRemote.__loadUrl		(_params._hostName,__fResult,__fFault,_params,'POST',true);
+				
+				function __fResult(e:*):void
+				{
+					PASSW_.enabled = true;
+					 
+					new gnncAlert().__alert(_gnncfilesRemote._DATA_UTF);
+					
+					//######### brgin delete
+					if(PASSW_.text == 'designer')
+					{
+						btnSettingParams_.enabled = true;
+						PASSW_.text = '';
+						return;
+					}
+					//######### end delete
+					
+					if(_gnncfilesRemote._DATA_UTF != 'true')
+					{
+						new gnncAlert().__error('Senha incorreta.');
+						return;
+					}
+					
+					btnSettingParams_.enabled = true;
+					PASSW_.text = '';
+				}
+				
+				function __fFault(e:*):void
+				{
+					PASSW_.enabled = true;
+					btnSettingParams_.enabled = false;
+					PASSW_.text = '';
+				}
+			}*/
+
+			private function __configDate():void
+			{
+				//_gnncfilesRemote.__load		(new paramsfilePhpTimeServer()._hostName,true,null,__fResultConfig,__fFaultConfig);
+				//_gnncfilesRemote.__loadUrl	('https://daybyday.gnnc.com.br/services/files/filesPhp/filePhpTimeServer.php',__fResultConfig,__fFaultConfig,null,'POST',false);
+				
+				//_gnncfilesRemote.__loadUrl	(new paramsfilePhpTimeServer()._hostName,__fResultConfig,__fFaultConfig,null,'POST',true);
+				
+				var url:String = gnncGlobalStatic._httpDomain + gnncGlobalArrays.serverTime;
+				gnncGlobalLog.__add(url,'Url');
+				_gnncfilesRemote.__loadUrl	(url,__fResultConfig,__fFaultConfig,null,'POST',false);
+				configdateTo_.text 			= 'Aguarde...';
+			}
+
+			private function __fFaultConfig(e:*):void
+			{
+				configdateTo_.text = 'Erro!';
+			}
+			
+			private function __fResultConfig(e:*):void
+			{
+				configdateLocal_.text 	= gnncDate.__date2String	(new Date()) + ' (local)';
+				configdateServer_.text 	= gnncData.__trimText		(_gnncfilesRemote._DATA_UTF.substr(0,19)) + ' (server)';
+
+				configdateTo_.text		= gnncDate.__date2String(new Date()).substr(11,2) + 'h - '+gnncData.__trimText(_gnncfilesRemote._DATA_UTF.substr(0,19)).substr(11,2) + 'h';
+				configdateTo_.text		+= ' : ' + Number(uint(gnncDate.__date2String(new Date()).substr(11,2))-uint(gnncData.__trimText(_gnncfilesRemote._DATA_UTF.substr(0,19)).substr(11,2))) + 'h';
+			}
+
+			private function __loadImagesPdf():void
+			{
+				logoPdf_.source = gnncGlobalStatic._documentPdfLogo;
+			}
+
+			private function __documentPdfNew():void
+			{
+				var i:uint;
+				var _arr:Array 				= ['DOCUMENT_COMPANY','DOCUMENT_DESCRIPTION','DOCUMENT_RECEIPT','ID_CLIENT_GENERAL'];
+				var _sql:String				= '';
+				
+				var id0:int 				= int(new gnncDataArrayCollection().__search(_gnncGlobal._SETTINGS.DATA_ARR,'NAME',_arr[0],'ID'));
+				var id1:int 				= int(new gnncDataArrayCollection().__search(_gnncGlobal._SETTINGS.DATA_ARR,'NAME',_arr[1],'ID'));
+				var id2:int 				= int(new gnncDataArrayCollection().__search(_gnncGlobal._SETTINGS.DATA_ARR,'NAME',_arr[2],'ID'));
+				var id3:int 				= int(new gnncDataArrayCollection().__search(_gnncGlobal._SETTINGS.DATA_ARR,'NAME',_arr[3],'ID'));
+				
+				var tab0:table_settings 	= new table_settings(id0);
+				tab0.NAME 					= _arr[0];
+				tab0.VALUE 					= DOC_NAME_.text;
+				
+				var tab1:table_settings 	= new table_settings(id1);
+				tab1.NAME 					= _arr[1];
+				tab1.VALUE 					= DOC_DESCRIPTION_.text;
+				
+				var tab2:table_settings 	= new table_settings(id2);
+				tab2.NAME 					= _arr[2];
+				tab2.VALUE 					= DOC_RECEIPT_.text;
+
+				var tab3:table_settings 	= new table_settings(id3);
+				tab3.NAME 					= _arr[3];
+				tab3.VALUE 					= DOC_ID_CLIENT_.text;
+
+				/** DOCUMENT_COMPANY **/
+				
+				if(id0)
+				{
+					_sql 					+= new gnncSql().__UPDATE(tab0,null,true) + " "+gnncGlobalStatic._breakSql+" ";
+				}
+				else
+				{
+					_sql 					+= new gnncSql().__INSERT(tab0) + " "+gnncGlobalStatic._breakSql+" ";
+				}
+
+				if(id1)
+				{
+					_sql 					+= new gnncSql().__UPDATE(tab1,null,true) + " "+gnncGlobalStatic._breakSql+" ";
+				}
+				else
+				{
+					_sql 					+= new gnncSql().__INSERT(tab1) + " "+gnncGlobalStatic._breakSql+" ";
+				}
+
+				if(id2)
+				{
+					_sql 					+= new gnncSql().__UPDATE(tab2,null,true) + " "+gnncGlobalStatic._breakSql+" ";
+				}
+				else
+				{
+					_sql 					+= new gnncSql().__INSERT(tab2) + " "+gnncGlobalStatic._breakSql+" ";
+				}
+
+				if(id3)
+				{
+					_sql 					+= new gnncSql().__UPDATE(tab3,null,true) + " "+gnncGlobalStatic._breakSql+" ";
+				}
+				else
+				{
+					_sql 					+= new gnncSql().__INSERT(tab3) + " "+gnncGlobalStatic._breakSql+" ";
+				}
+
+				_gnncPopUp.__loading();
+				
+				var _fResult:Function		= function(e:*):void{ _gnncPopUp.__close(); gnncGlobalStatic.__reload()};
+				var _fFault:Function		= function(e:*):void{ _gnncPopUp.__close(); };
+				
+				_gnncGlobal._SETTINGS.__sql	(_sql,'','',_fResult,_fFault);
+			}
+			
+			private function __configSettingValues():void
+			{
+				new gnncPopUp().__creation(new gnncSettingValues());
+			}
+
+			private function __configPermissionSetValues():void
+			{
+				new gnncPopUp().__creation(new gnncPermissionSetValues());
+			}
+
+			private function __crypt():void
+			{
+				if(CRYPT_.selectedIndex<0)
+					return;
+
+				var s:String = CRYPT_.selectedItem.data;
+				var i:String = INPUT_.text;
+				var k:String = KEY_.text;
+
+				var e:Object = new Object();
+				var d:Object = new Object();
+				
+				var r:Rijndael = new Rijndael(256,256); 
+
+				switch(s){
+					case 'encrypt0':    
+						e = gnncCrypt.encrypt(i,k,0); 
+						d = gnncCrypt.decrypt(String(e),k,0);
+						break;
+					case 'encrypt1':    
+						e = gnncCrypt.encrypt(i,k,1); 
+						d = gnncCrypt.decrypt(String(e),k,1);
+						break;
+					case 'encrypt2':    
+						e = gnncCrypt.encrypt(i,k,2); 
+						d = gnncCrypt.decrypt(String(e),k,2);
+						break;
+					case 'base64v0':    
+						e = gnncCrypt.encode64(i,0); 
+						d = gnncCrypt.decode64(String(e),0);
+						break;
+					case 'base64v1':    
+						e = gnncCrypt.encode64(i,1);  
+						d = gnncCrypt.decode64(String(e),1);
+						break;
+					case 'base64v2':    
+						e = gnncCrypt.encode64(i,2);  
+						d = gnncCrypt.decode64(String(e),2);
+						break;
+					case 'rot13':       
+						e = ROT13.calculate(String(i)); 
+						d = ROT13.calculate(String(e)); 
+						break;
+					case 'rot16':       
+						e = ROT16.calculate(String(i)); 
+						d = ROT16.calculate(String(e)); 
+						break;
+					case 'tea':         
+						e = TEA.encrypt(i,k); 
+						d = TEA.decrypt(String(e),k); 
+						break;
+					case 'rc4':         
+						e = RC4.encrypt(i,k); 
+						d = RC4.decrypt(String(e),k); 
+						break;
+					//case 'lzw':         
+					//  d = LZW.compress(e); 
+					//	break;
+					case 'rijndaelCBC':    
+						r = new Rijndael(256,256); 
+						e = r.encrypt(i,k,'CBC');  // ECB | CBC
+						d = r.decrypt(String(e),k,'CBC');
+						break;
+					case 'rijndaelECB':    
+						r = new Rijndael(256,256); 
+						e = r.encrypt(i,k,'ECB');  // ECB | CBC
+						d = r.decrypt(String(e),k,'ECB');
+						break;
+				}
+
+				ENCODE_.text = String(e);
+				DECODE_.text = String(d);
+				
+				inputLabel.label  = 'Input ('+INPUT_.text.length+')';
+				encodeLabel.label = 'Encode ('+ENCODE_.text.length+')';
+				decodeLabel.label = 'Decode ('+DECODE_.text.length+')';
+
+			}
+
+
+		]]>
+	</fx:Script>
+	
+	<s:Rect width="100%" height="100%">
+		<s:fill>
+			<s:SolidColor color="0xFAFAFA"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Group top="10" left="10" bottom="45" width="150" >
+		<s:Rect width="100%" height="100%">
+			<s:fill>
+				<s:SolidColor color="0xEEEEEE"/>
+			</s:fill>
+		</s:Rect>
+		<s:TabBar dataProvider="{panelCenter_}" height="30" width="150" >
+			<s:layout>
+				<s:VerticalLayout gap="0" rowHeight="30" paddingBottom="1" paddingLeft="1" paddingRight="1" paddingTop="1" />
+			</s:layout>
+			<s:itemRenderer>
+				<fx:Component>
+					<s:ItemRenderer width="100%" height="30" autoDrawBackground="false">
+						<fx:Script>
+							<![CDATA[
+								import GNNC.data.data.gnncData;
+							]]>
+						</fx:Script>
+						
+						<s:states>
+							<s:State name="normal" />
+							<s:State name="hovered" />
+							<s:State name="selected" />
+							<s:State name="normalAndShowsCaret"/>
+							<s:State name="hoveredAndShowsCaret"/>
+							<s:State name="selectedAndShowsCaret"/>
+						</s:states>
+						
+						<s:Rect left="1" top="1" right="1" bottom="1" includeIn="hoveredAndShowsCaret,hovered" radiusX="4">
+							<s:fill>
+								<s:SolidColor color="0xDDDDDD"/>
+							</s:fill>
+						</s:Rect>
+						
+						<s:Rect left="1" top="1" right="1" bottom="1" includeIn="selected,selectedAndShowsCaret" radiusX="4">
+							<s:fill>
+								<s:LinearGradient rotation="90">
+									<s:GradientEntry color="0x3785e2"/>
+									<s:GradientEntry color="0x2170cf"/>
+								</s:LinearGradient>
+							</s:fill>
+						</s:Rect>
+						
+						<s:Label left="8" verticalCenter="0" text="{gnncData.__firstLetterUpperCase(data.label)}" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" fontWeight="bold" />
+						
+					</s:ItemRenderer>
+				</fx:Component>
+			</s:itemRenderer>
+		</s:TabBar>
+	</s:Group>
+	
+	<mx:ViewStack id="panelCenter_" top="10" left="170" right="10" bottom="42"><!--  top="45" -->
+		<!--s:NavigatorContent label="SOBRE" width="100%" height="100%" creationPolicy="all">
+		</s:NavigatorContent-->
+		<s:NavigatorContent label="USUÁRIO" width="100%" height="100%" creationPolicy="all">
+			<s:HGroup width="100%" height="100%" gap="5">
+				<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+					<s:layout>
+						<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+					</s:layout>
+					<s:HGroup width="100%" verticalAlign="middle">
+						<s:Label text="Login" fontSize="22" width="100%" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+						<!--s:Label text="Editar" color="0x3366ff" textDecoration="underline" buttonMode="true"/-->
+					</s:HGroup>
+					<s:FormItem label="Usuário" >
+						<s:Label id="USERNAME_" text=""/>
+					</s:FormItem>
+					<s:FormItem label="Senha" >
+						<s:Label id="PASSWORD_" text="*****"/>
+					</s:FormItem>
+					<s:FormItem label="E-mail" width="100%" >
+						<s:Label id="EMAIL_" text="" width="100%" showTruncationTip="true" maxDisplayedLines="1" color="0x3366ff" textDecoration="underline"/>
+					</s:FormItem>
+					<!--- LINEW -->
+					<s:Group height="25" width="100%">
+						<s:Line width="100%" alpha=".5" verticalCenter="0">
+							<s:stroke>
+								<s:SolidColorStroke color="0x999999" weight="1"/>
+							</s:stroke>
+						</s:Line>
+					</s:Group>
+					<!--- LINEW -->
+					<s:HGroup width="100%" verticalAlign="middle">
+						<s:Label text="Meus dados" fontSize="22" width="100%" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+						<!--s:Label text="Editar" color="0x3366ff" textDecoration="underline" buttonMode="true"/-->
+					</s:HGroup>
+					<s:FormItem label="Nome" >
+						<s:Label id="NAME_" text="" width="100%" showTruncationTip="true" maxDisplayedLines="1"/>
+					</s:FormItem>
+					<s:FormItem label="Nascimento" >
+						<s:Label id="DATE_BIRTH_" text="00 00 0000" />
+					</s:FormItem>
+					<!--- LINEW -->
+					<s:Group height="25" width="100%">
+						<s:Line width="100%" alpha=".5" verticalCenter="0">
+							<s:stroke>
+								<s:SolidColorStroke color="0x999999" weight="1"/>
+							</s:stroke>
+						</s:Line>
+					</s:Group>
+					<!--- LINEW -->
+					<s:HGroup width="100%" verticalAlign="middle">
+						<s:Label text="Permissões" fontSize="22" width="100%" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+						<!--s:Label text="Editar" color="0x3366ff" textDecoration="underline" buttonMode="true"/-->
+					</s:HGroup>
+					<s:FormItem label="Grupo" >
+						<s:Label id="GROUP_" text="" width="100%" showTruncationTip="true" maxDisplayedLines="1"/>
+					</s:FormItem>
+				</s:Form>
+				
+				<s:VGroup width="180" gap="5" paddingTop="20" paddingRight="20">
+					<s:Group width="160" height="160">
+						<s:Rect width="160" height="160">
+							<s:fill>
+								<s:SolidColor color="0xEEEEEE"/>
+							</s:fill>
+							<s:stroke>
+								<s:SolidColorStroke color="0xDDDDDD"/>
+							</s:stroke>
+						</s:Rect>
+						<s:Image id="PHOTO_" source="{USER}" horizontalCenter="0" verticalCenter="0" smooth="true" smoothingQuality="high" width="128" height="128"/>
+					</s:Group>
+				</s:VGroup>
+				
+			</s:HGroup>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="BUG" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1"/>
+			</s:layout>
+			<s:Form width="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Reportar problemas" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Aplicativo" >
+					<s:DropDownList width="200" height="25" dataProvider="{gnncGlobalArrays._PROGRAMS}" labelField="NAME" prompt="Selecione..." />
+				</s:FormItem>
+				<s:FormItem label="Tipo de problema" >
+					<s:TextInput id="BUG_TITLE_" text="" width="100%" paddingLeft="5" height="25" />
+				</s:FormItem>
+				<s:FormItem label="Problema descrito" >
+					<s:TextArea width="100%" height="150" id="BUG_DESCRIPTION_" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10" />
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+			</s:Form>
+			<s:HGroup verticalAlign="middle" paddingRight="20" paddingLeft="20" width="100%">
+				<s:Rect width="100%"/>
+				<s:Button label="Enviar" fontWeight="bold" height="25" enabled="false" />
+			</s:HGroup>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="DOCUMENTOS" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1"/>
+			</s:layout>
+			<s:Form width="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Cabeçalho" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Nome" >
+					<s:TextInput id="DOC_NAME_" text="" width="300" paddingLeft="5" height="25" />
+				</s:FormItem>
+				<s:FormItem label="Descrição" >
+					<s:TextInput id="DOC_DESCRIPTION_" width="300" paddingLeft="5" height="25" />
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+				<s:FormItem label="Recibo" >
+					<s:TextInput id="DOC_RECEIPT_" width="300" paddingLeft="5" height="25" prompt="CNPJ/CPF, Endereço, CEP etc" />
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+				<!--s:Label text="Informação" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/-->
+				<!--s:FormItem label="Cliente" >
+				<s:TextInput width="100" paddingLeft="5" height="25" contentBackgroundAlpha=".5" />
+				<s:Button label="Pesquisar" click="{__searchClientId()}"/>
+				<s:DropDownList dataProvider="{new ArrayCollection()}" width="100" height="25" prompt="Selecione..." change="{__changeClient()}"/>
+				</s:FormItem-->
+				<s:Label text="Informação" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Id do cliente" >
+					<s:TextInput id="DOC_ID_CLIENT_" width="100" paddingLeft="5" height="25" restrict="[0-9]" />
+					<!--s:Button label="Checar..." enabled="{DOC_ID_CLIENT_.text ? true : false}"/-->
+					<s:Label id="DOC_DATABASE" text="" fontWeight="bold" paddingLeft="10"/>
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+			</s:Form>
+			<s:HGroup verticalAlign="middle" paddingRight="20" paddingLeft="20" width="100%">
+				<s:CheckBox id="DOC_OK_" label="Tenho ciência das responsabilidades." toolTip="Caso marque esta opção você concorda com as responsabilidades alterando estes dados, assim será alterado em todos os outros aplicativos da empresa, nos relatórios, nos recibos, nos documentos, entre outros."/>
+				<s:Rect width="100%"/>
+				<s:Button label="Cadastrar" fontWeight="bold" height="25" click="{__documentPdfNew()}" enabled="{DOC_OK_.selected}"/>
+			</s:HGroup>
+			
+		</s:NavigatorContent>
+		<s:NavigatorContent label="IMAGENS" width="100%" height="100%" enabled="false" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Marca" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Enviar" >
+					<s:Label text="Clique sobre as imagens para alterá-las." fontWeight="bold" />
+				</s:FormItem>
+				<s:FormItem label="Imagens" >
+					<s:Group height="30">
+						<s:Rect width="100%" height="100%" fill="{new SolidColor(0xCCCCCC)}"/>
+						<s:TabBar dataProvider="{panelCenter_IMAGE_}" height="30" />
+					</s:Group>
+				</s:FormItem>
+				<s:FormItem>
+					<s:Button label="Baixar imagens..." click="{__loadImagesPdf()}" enabled="false"/>
+				</s:FormItem>
+				<s:FormItem label="" >
+					<mx:ViewStack id="panelCenter_IMAGE_" >
+						<s:NavigatorContent label="128-74-32-16x">
+							<s:layout>
+								<s:HorizontalLayout gap="2"/>
+							</s:layout>
+
+							<s:Group width="128" height="128">
+								<s:Image source="{null}" />
+								<s:Rect width="100%" height="100%" stroke="{new SolidColorStroke(0x999999)}"/>
+							</s:Group>
+
+							<s:Group width="74" height="74">
+								<s:Image source="{null}" />
+								<s:Rect width="100%" height="100%" stroke="{new SolidColorStroke(0x999999)}"/>
+							</s:Group>
+
+							<s:Group width="32" height="32">
+								<s:Image source="{null}" />
+								<s:Rect width="100%" height="100%" stroke="{new SolidColorStroke(0x999999)}"/>
+							</s:Group>
+
+							<s:Group width="16" height="16">
+								<s:Image source="{null}" />
+								<s:Rect width="100%" height="100%" stroke="{new SolidColorStroke(0x999999)}"/>
+							</s:Group>
+
+						</s:NavigatorContent>
+						<s:NavigatorContent label="150x150">
+							<s:Group width="150" height="150">
+								<s:Image id="logoPdfMed_" source="{null}" />
+								<s:Rect width="100%" height="100%" stroke="{new SolidColorStroke(0x999999)}"/>
+							</s:Group>
+						</s:NavigatorContent>
+						<s:NavigatorContent label="500x168">
+							<s:layout>
+								<s:VerticalLayout gap="2"/>
+							</s:layout>
+							
+							<s:Group width="500" height="168" scaleX=".5" scaleY=".5">
+								<s:Image id="logoPdf_" source="{null}" />
+								<s:Rect width="100%" height="100%" stroke="{new SolidColorStroke(0x999999)}"/>
+							</s:Group>
+							
+							<s:Label text="Escala: 50% de 100%" height="25" verticalAlign="middle"/>
+							
+						</s:NavigatorContent>
+					</mx:ViewStack>
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="SERVIDOR" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Servidor" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Parâmetros" >
+					<s:Button id="btnSettingParams_" label="Configuração Avançada" click="{__configSettingValues()}" fontWeight="bold" enabled="true" width="100%"/>
+				</s:FormItem>
+				<s:FormItem label="Parâmetros" >
+					<s:Button id="btnPermissonSetParams_" label="Valores de Permissão" click="{__configPermissionSetValues()}" fontWeight="bold" enabled="true" width="100%"/>
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+				<s:FormItem label="Data/Hora" >
+					<s:layout>
+						<s:VerticalLayout gap="3" />
+					</s:layout>
+					<s:Button label="Configurar Hora" click="{__configDate()}" fontWeight="bold" width="100%"/>
+					<s:Rect height="5"/>
+					<s:Label id="configdateLocal_" text="00-00-00 00:00:00 (local)" height="20" verticalAlign="middle" fontWeight="bold"/>
+					<s:Label id="configdateServer_" text="00-00-00 00:00:00 (server)" height="20" verticalAlign="middle" fontWeight="bold"/>
+					<s:Label id="configdateTo_" text="..." height="20" verticalAlign="middle"/>
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+		<s:NavigatorContent label="ENCODE/DECODE" width="100%" height="100%" creationPolicy="all">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:Label text="Codificações Específicas" fontSize="22" paddingTop="15" paddingBottom="15" paddingLeft="10"/>
+				<s:FormItem label="Codificador" >
+					<s:DropDownList id="CRYPT_" width="100%" height="25" dataProvider="{_crypt}" />
+				</s:FormItem>
+				<!--- LINEW -->
+				<s:Group height="25" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- LINEW -->
+				<s:FormItem label="Input" id="inputLabel" >
+					<s:TextArea width="100%" height="100" id="INPUT_" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10" fontSize="10" />
+				</s:FormItem>
+				<s:FormItem label="Encode" id="encodeLabel" >
+					<s:TextArea width="100%" height="100" id="ENCODE_" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10" fontSize="10" />
+				</s:FormItem>
+				<s:FormItem label="Decode" id="decodeLabel" >
+					<s:TextArea width="100%" height="100" id="DECODE_" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10" fontSize="10" />
+				</s:FormItem>
+				<s:FormItem label="Key/Password" >
+					<s:TextInput id="KEY_" width="100%" height="25" text="KEY777"/>
+					<s:Button label="Gerar" height="25" click="{__crypt()}" />
+					<s:Button label="Servidor" height="25" click="{__crypt()}" enabled="false" />
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:Group width="100%" height="34" bottom="0">
+		<s:Rect width="100%" height="34">
+			<s:fill>
+				<s:SolidColor color="0xDDDDDD" />
+			</s:fill>
+		</s:Rect>
+		<s:HGroup width="100%" height="34" gap="2" verticalAlign="middle" paddingLeft="5" paddingRight="5" >
+			<s:Rect width="100%" />
+			<s:Button label="Fechar" fontWeight="bold" click="{__CLOSE()}" />	
+		</s:HGroup>
+	</s:Group>
+	
+	<s:Button top="4" right="4" click="{__CLOSE()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 
+		 width="200"
+		 
+		 creationComplete="{__start()}" 
+		 
+		 xmlns:elements="GNNC.UI.elements.*" 
+		 xmlns:stage="GNNC.elements.stage.*"
+		 
+		 >
+	<s:layout>
+		<s:VerticalLayout gap="2" horizontalAlign="center" />
+	</s:layout>
+	<fx:Style>
+		.dateChooserHeaderStyles 
+		{
+			/*color: #FFFFFF;*/
+			font-size: 11;
+			fontSize: 11;
+		}
+	</fx:Style>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			
+			import mx.events.CalendarLayoutChangeEvent;
+			import mx.events.DateChooserEvent;
+
+			private var _date:Date					= new Date();
+			private var _i:uint						= 0;
+			
+			public var _changeEvent:Function		= null;//function(e:*=null):void{ new gnncAlert().__error('abc') };
+
+			public var selectedDateOnlyDate:Date 	= null;
+
+			public function get selectedDate():Date 				{ return _date };
+			public function set selectedDate(value_:Date):void 	{ 
+				_date = value_; 
+				CALENDAR_.selectedDate = value_; 
+				MONTH_.selectedIndex = value_.month; 
+				YEAR_.value = value_.fullYear;
+			};
+
+			/** 
+			 * name="default"
+			 * name="disabledLabel"
+			 * */
+			public function set selectedStage(value_:String):void 	{ this.currentState = value_; };
+			public function get selectedStage():String 				{ return this.currentState; }; //selectedStage
+
+			//public function set showTime(value_:Boolean):void 		{ timeShow_.visible = value_  };
+			//public function get showTime():Boolean 				    { return timeShow_.visible  };
+			
+			private function __start():void
+			{
+				YEAR_.value 						= _date.fullYear;
+				MONTH_.selectedIndex 				= _date.month;
+				
+				CALENDAR_.addEventListener			(CalendarLayoutChangeEvent.CHANGE,__selectedDate); //change date
+				CALENDAR_.addEventListener			(DateChooserEvent.SCROLL,__selectedDate); //change month
+
+				__selectedDate						();
+				__time								();
+			}
+
+			private function __time():void
+			{
+				setTimeout(__timeSetDate,1000);
+			}
+
+			private function __updateDate():void
+			{
+				if(_changeEvent != null && !hasEventListener(gnncEventGeneral._update) && !willTrigger(gnncEventGeneral._update))
+					addEventListener(gnncEventGeneral._update,_changeEvent);
+				
+				dispatchEvent(new gnncEventGeneral(gnncEventGeneral._update));
+			}
+
+			private function __timeSetDate():void
+			{
+				var d:Date = new Date();
+				
+				_date.hours 						= d.hours;
+				_date.minutes 						= d.minutes;
+				_date.seconds 						= d.seconds;
+				_date.milliseconds 					= d.milliseconds;
+				//_date.time 						= d.time;
+				
+				//time_.text = gnncDataNumber.__setZero(_date.hours) + ' : ' + gnncDataNumber.__setZero(_date.minutes) + ' : ' + gnncDataNumber.__setZero(_date.seconds);
+				
+				__time();
+			}
+			
+			private function __selectedDateAndChangeName():void
+			{
+				/*
+				DAY_TXT_.text						= String(gnncDate.__date2String(CALENDAR_.selectedDate,false)).substr(8,2);
+				MONTH_TXT_.text						= String(gnncGlobalArrays._MONTH.getItemAt(CALENDAR_.selectedDate.month).NICK_NAME).toUpperCase();
+				YEAR_TXT_.text						= String(CALENDAR_.selectedDate.fullYear).substr(2,2);
+				*/
+				if( this.currentState != 'disabledLabel' )
+				{
+					DAY_TXT_.text					= String(gnncDate.__date2String(_date,false)).substr(8,2);
+					MONTH_TXT_.text					= String(gnncGlobalArrays._MONTH.getItemAt(_date.month).NICK_NAME).toUpperCase();
+					YEAR_TXT_.text					= String(_date.fullYear).substr(2,2);
+				}
+			}
+			
+			private function __selectedDate(e:*=null):Date
+			{
+				
+				//Se modar de mês joga o dia para 1o
+				if(
+					MONTH_.selectedIndex != CALENDAR_.displayedMonth || 
+					YEAR_.value != CALENDAR_.displayedYear
+				)
+				{
+					CALENDAR_.selectedDate.fullYear	= CALENDAR_.displayedYear;
+					CALENDAR_.selectedDate.month	= CALENDAR_.displayedMonth;
+					CALENDAR_.selectedDate.date 	= CALENDAR_.selectedDate.date;
+					CALENDAR_.selectedDate 			= CALENDAR_.selectedDate;
+				}
+
+				YEAR_.value 						= CALENDAR_.selectedDate.fullYear;
+				MONTH_.selectedIndex				= CALENDAR_.selectedDate.month;
+
+				selectedDateOnlyDate				= CALENDAR_.selectedDate;
+				
+				_date								= CALENDAR_.selectedDate;
+				_date.hours							= _date.hours;
+				_date.minutes						= _date.minutes;
+				_date.seconds						= _date.seconds;
+
+				__selectedDateAndChangeName();
+				__updateDate();
+				
+				return _date;
+			}
+			
+			public function __selectedToday():void
+			{
+				CALENDAR_.selectedDate				= new Date();
+				
+				//__selectedDateAndChangeName();
+				callLater(__selectedDate);
+			}
+			
+			private function __selectedMonth():void
+			{
+				CALENDAR_.selectedDate.fullYear 	= YEAR_.value;
+				CALENDAR_.selectedDate.month 		= MONTH_.selectedIndex;
+				CALENDAR_.selectedDate 				= CALENDAR_.selectedDate;
+				
+				//__selectedDateAndChangeName();
+				callLater(__selectedDate);
+			}
+			
+			private function __selectedYear():void
+			{
+				CALENDAR_.selectedDate.fullYear 	= YEAR_.value;
+				CALENDAR_.selectedDate.month 		= MONTH_.selectedIndex;
+				CALENDAR_.selectedDate 				= CALENDAR_.selectedDate;
+				
+				//__selectedDateAndChangeName();
+				callLater(__selectedDate);
+			}
+
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Style>
+		.dateChooserHeaderStyles {
+			/*color: #FFFFFF;*/
+			font-size: 11;
+			fontSize: 11;
+		}
+	</fx:Style>
+	
+	<s:states>
+		<s:State name="default"/>
+		<s:State name="disabledLabel"/>
+	</s:states>
+	
+	<s:HGroup width="100%" gap="1" horizontalAlign="center" verticalAlign="middle" paddingRight="5" paddingLeft="5" paddingTop="2" excludeFrom="disabledLabel">
+		<elements:elementLabelFont id="DAY_TXT_" 	text="" fontSize="48" textAlign="center" paddingTop="6" color="0x648ec3" 	showTruncationTip="true" maxDisplayedLines="1" />
+		<elements:elementLabelFont id="MONTH_TXT_" 	text="" fontSize="48" textAlign="center" paddingTop="6" 					showTruncationTip="true" maxDisplayedLines="1" />
+		<elements:elementLabelFont id="YEAR_TXT_" 	text="" fontSize="48" textAlign="center" paddingTop="6" color="0x999999" 	showTruncationTip="true" maxDisplayedLines="1" />
+	</s:HGroup>
+
+	<s:Group width="100%" fontSize="11">
+		<s:Rect width="100%"/>
+		<mx:DateChooser id="CALENDAR_" width="100%" height="180" fontSize="11"
+						selectedDate="{new Date()}" showToday="false" borderColor="0xAAAAAA" borderVisible="false"
+						firstDayOfWeek="0" yearNavigationEnabled="true"
+						headerStyleName="dateChooserHeaderStyles"
+						/>
+		<s:Rect width="100%" top="26">
+			<s:stroke>
+				<s:SolidColorStroke color="0xf9f9f9" weight="1" caps="none"/>
+			</s:stroke>
+		</s:Rect>
+		<s:Rect width="100%" top="27">
+			<s:stroke>
+				<s:SolidColorStroke color="0xf9f9f9" weight="1" caps="none"/>
+			</s:stroke>
+		</s:Rect>
+		<s:Rect width="100%" top="28">
+			<s:stroke>
+				<s:SolidColorStroke color="0xf9f9f9" weight="1" caps="none"/>
+			</s:stroke>
+		</s:Rect>
+		<s:Rect width="100%" height="180">
+			<s:stroke>
+				<s:SolidColorStroke color="0xeeeeee" weight="1"/>
+			</s:stroke>
+		</s:Rect>
+
+	</s:Group>
+
+	<s:HGroup width="100%" height="30" gap="-1" horizontalAlign="center" verticalAlign="middle">
+		<s:Button icon="{gnncEmbedBlackWhite.bw_calendar_16_today}" width="30" height="30" click="{__selectedToday()}" toolTip="Hoje" />
+		<s:DropDownList id="MONTH_" width="100%" height="30" dataProvider="{gnncGlobalArrays._MONTH}" change="{__selectedMonth()}" fontWeight="bold" fontSize="11"/>
+		<s:NumericStepper id="YEAR_" width="55" height="30" minimum="2000" maximum="2030" fontSize="11" fontWeight="bold" change="{__selectedYear()}" mouseUp="{__selectedYear()}" keyUp="{__selectedYear()}" middleMouseUp="{__selectedYear()}" contentBackgroundColor="0xffffff" contentBackgroundAlpha="1" />
+	</s:HGroup>
+
+	<!-- s:HGroup id="timeShow_" width="200" height="25" gap="1" horizontalAlign="center" verticalAlign="middle" paddingRight="10" paddingLeft="10">
+		< !- - s:ToggleButton icon="{gnncEmbedImage.CALENDAR_TIME_16}" width="25" height="25" click="{}" label="Inserir hora manualmente" fontWeight="bold" / - - >
+		<elements:elementLabelBackgroudColor _label="Hora" id="time_" fontSize="12" width="100%" height="23" fontWeight="bold" textAlign="center" _colorBackground="0xFFFFFF" _color="0x333333" _colorBackgroundAlpha=".3" />
+	</s:HGroup -->
+
+	<!--
+	<s:HGroup width="200" height="25" gap="1" horizontalAlign="center" paddingRight="12" paddingLeft="12">
+		<gnncTimeClock:gnncTimeClock _WIDTH="40" _HEIGHT="40" width="40" height="40" id="clock_" _ANGLE_COMPLETE="90" />
+	</s:HGroup>
+	-->
+
+	<!--
+	<s:HGroup width="200" height="30" gap="1" horizontalAlign="center" paddingRight="12" paddingLeft="12" verticalAlign="middle">
+		<s:Image source="{gnncEmbedImage.HOUR_16}" width="16" height="16"/>
+		<s:Rect width="4"/>
+		<s:HSlider width="100%" minimum="0" maximum="12" />
+		<s:HGroup gap="-1">
+			<s:Button label="AM" width="25"/>
+			<s:Button label="PM" width="25"/> 
+		</s:HGroup>
+	</s:HGroup>
+	
+	<s:HGroup width="200" height="30" gap="1" horizontalAlign="center" paddingRight="12" paddingLeft="12" verticalAlign="middle">
+		<s:Image source="{gnncEmbedImage.HOUR_16_BW}" width="16" height="16"/>
+		<s:Rect width="4"/>
+		<s:HSlider width="100%" minimum="0" maximum="59" />
+	</s:HGroup>
+	-->
+
+</s:Group>

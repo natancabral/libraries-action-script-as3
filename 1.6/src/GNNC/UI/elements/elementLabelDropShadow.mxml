@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Label xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 text=" " verticalAlign="middle" styleName="conLabelDropShadow" 
+		 paddingTop="1" filters="{[ds]}"
+		 >
+	<fx:Script>
+		<![CDATA[
+			public function set _shadowBlurX (value_:Number):void		{ds.blurX = value_;}
+			public function set _shadowBlurY (value_:Number):void		{ds.blurY = value_;}
+			public function set _shadowColor (value_:uint):void			{ds.color = value_;}
+			public function set _shadowAlpha (value_:Number):void		{ds.alpha = value_;}
+			public function set _shadowDistance (value_:Number):void	{ds.distance = value_;}
+			public function set _shadowStrength (value_:uint):void		{ds.strength = value_;}
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:DropShadowFilter id="ds" distance="1" angle="90" blurX="0" blurY="0" alpha=".5" color="0xFFFFFF" strength="1" />
+	</fx:Declarations>
+	<fx:Style>
+		.conLabelDropShadow {
+			fontFamily: "SWISS,SWISSCFF,Swis721 Cn BT,Swis721CnBT,Calibri,Arial,Tahoma";
+			font-family: "SWISS,SWISSCFF,Swis721 Cn BT,Swis721CnBT,Calibri,Arial,Tahoma";
+			fontLookup:"embeddedCFF";
+			renderingMode:"cff";
+			advanced-anti-aliasing: true;
+			advancedAntiAliasing: true;
+			antiAliasTypes: advanced; /* mais legivel */
+			embedAsCFF: true;
+			fontSharpness:0;
+			fontThickness:0;
+		}
+	</fx:Style>
+</s:Label>

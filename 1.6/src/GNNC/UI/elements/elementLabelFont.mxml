@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Label xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 text=" " verticalAlign="middle" styleName="conLabelFont"
+		 paddingTop="1"
+		 >
+	<fx:Declarations> 
+	</fx:Declarations>
+	<fx:Style>
+		.conLabelFont {
+			fontFamily: "SWISS,SWISSCFF,Swis721 Cn BT,Swis721CnBT,Calibri,Arial,Tahoma";
+			font-family: "SWISS,SWISSCFF,Swis721 Cn BT,Swis721CnBT,Calibri,Arial,Tahoma";
+			fontLookup:"embeddedCFF";
+			renderingMode:"cff";
+			advanced-anti-aliasing: true;
+			advancedAntiAliasing: true;
+			antiAliasTypes: advanced; /* mais legivel */
+			embedAsCFF: true;
+			fontSharpness:0;
+			fontThickness:0;
+		}
+	</fx:Style>
+</s:Label>

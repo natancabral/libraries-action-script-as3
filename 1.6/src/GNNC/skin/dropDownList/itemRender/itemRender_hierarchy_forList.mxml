@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" width="100%" height="100%" minHeight="22"
+				
+				click			= "{__click()}"
+				mouseDown		= "{__mouseDown()}"
+				mouseUp			= "{__mouseUp()}"
+				rightMouseDown	= "{__rightClick()}" xmlns:stage="GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*" 
+				
+				>
+	<fx:Script>
+		<![CDATA[
+			
+			private function __click():void
+			{
+				Object(owner).dispatchEvent(new Event('MOUSE_CLICK'));
+			}
+			
+			private function __mouseDown():void
+			{
+				Object(owner).dispatchEvent(new Event('MOUSE_DOWN'));
+			}
+			
+			private function __mouseUp():void
+			{
+				Object(owner).dispatchEvent(new Event('MOUSE_UP'));
+			}
+			
+			private function __rightClick():void
+			{
+				var id:ContextMenuItem 		= new ContextMenuItem("Id: "+data.ID, false, false);
+				//view.addEventListener			(Event.SELECT,__f);
+				
+				var cm:ContextMenu 				= new ContextMenu();
+				cm.hideBuiltInItems				();
+				cm.customItems 					= [id];
+				
+				this.contextMenu 				= cm;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Group left="{!data.hasOwnProperty('LEVEL')?0:data.LEVEL==0?0:data.LEVEL==1?5:data.LEVEL==2?10:data.LEVEL==3?15:data.LEVEL==4?20:25}" top="0" right="0" bottom="0">
+		<s:Rect left="0" top="0" right="0" bottom="0" radiusX="2">
+			<s:fill>
+				<s:SolidColor color="0xFFFFFF" color.hovered="0xEEEEEE" color.hoveredAndShowsCaret="0xEEEEEE"/>
+			</s:fill>
+		</s:Rect>
+		<s:Rect left="0" top="0" right="0" bottom="0" includeIn="hoveredAndShowsCaret,hovered" radiusX="0">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0xFAFAFA" />
+					<s:GradientEntry color="0xEDEDED" />
+				</s:LinearGradient>
+			</s:fill>
+			<s:stroke>
+				<s:SolidColorStroke color="0xBBBBBB" />
+			</s:stroke>
+		</s:Rect>
+		
+		<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" radiusX="3">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0x3785e2"/>
+					<s:GradientEntry color="0x2170cf"/>
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+		
+		<s:Label text="{label}" fontSize="{!data.hasOwnProperty('LEVEL')?12:data.LEVEL==0?12:12}" 
+				 
+				 color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" 
+				 
+				 color="{!data.hasOwnProperty('LEVEL')?0x222222:data.LEVEL==2?0x555555:0x222222}"
+				 fontWeight="{!data.hasOwnProperty('ID_FATHER')?'bold':data.ID_FATHER==0?'bold':'normal'}" 
+				 textDecoration="{!data.hasOwnProperty('LEVEL')?'none':data.LEVEL==3?'underline':'none'}" 
+				 fontStyle="{!data.hasOwnProperty('LEVEL')?'normal':data.LEVEL==2?'italic':'normal'}" 
+				 
+				 paddingTop="1" paddingLeft="2" verticalAlign="middle"
+				 
+				 left="5" top="1" bottom="0" right="{!data.hasOwnProperty('TYPE_FINANCIAL_FIX')?5:data.TYPE_FINANCIAL_FIX==0?5:20}"
+				 showTruncationTip="true" maxDisplayedLines="1"
+				 />
+	</s:Group>
+	
+	<elements:elementVLine left="{!data.hasOwnProperty('LEVEL')?0:data.LEVEL==0?0:data.LEVEL==1?5:data.LEVEL==2?10:data.LEVEL==3?15:data.LEVEL==4?20:25}" width="1" color="0xBBBBBB"
+					visible="{!data.hasOwnProperty('LEVEL')?false:data.LEVEL==0?false:true}"
+					/>	
+	
+	<!--- SIMBOL OF TITLE -->
+	<!-- s:Rect width="6" height="6" right="3" radiusX="2" verticalCenter="0" visible="{!data.hasOwnProperty('ACTIVE')?false:data.ACTIVE==0?false:data.ACTIVE==1?true:true}">
+	<s:fill>
+	<s:SolidColor color="0x333333"/>
+	</s:fill> 
+	</s:Rect -->
+	<!--- SIMBOL OF TITLE / END -->
+	
+	<s:Group right="4" width="14" height="14" verticalCenter="0" visible="{!data.hasOwnProperty('TYPE_FINANCIAL_FIX')?false:data.TYPE_FINANCIAL_FIX==0?false:true}">
+		<s:Rect width="14" height="14" radiusX="3" radiusY="3">
+			<s:stroke>
+				<s:SolidColorStroke color="0xffffff" weight="2"/>
+			</s:stroke>
+		</s:Rect>
+		<s:Rect width="14" height="14" radiusX="3" radiusY="3">
+			<s:fill>
+				<s:SolidColor color="0x777777"/>
+			</s:fill>
+		</s:Rect>
+		<s:Label 
+			text="{!data.hasOwnProperty('TYPE_FINANCIAL_FIX')?'':data.TYPE_FINANCIAL_FIX==0?'':data.TYPE_FINANCIAL_FIX==1?'F':data.TYPE_FINANCIAL_FIX==2?'V':'..'}" 
+			toolTip="{!data.hasOwnProperty('TYPE_FINANCIAL_FIX')?'':data.TYPE_FINANCIAL_FIX==0?'':data.TYPE_FINANCIAL_FIX==1?'Custo Fixo':data.TYPE_FINANCIAL_FIX==2?'Custo Variável':'..'}" 
+			width="14" height="14" verticalAlign="middle" textAlign="center" color="0xffffff" fontWeight="bold" fontSize="9" paddingTop="1" />
+	</s:Group>
+
+
+</s:ItemRenderer>

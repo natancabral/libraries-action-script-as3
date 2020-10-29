@@ -1,0 +1,418 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 
+		 width="100%" height="100%"
+		 
+		 creationComplete="{__start()}" 
+		 
+		 xmlns:elements="GNNC.UI.elements.*" 
+		 xmlns:stage="GNNC.elements.stage.*"
+		 >
+	
+	<s:layout>
+		<s:VerticalLayout gap="0" />
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncClipBoard;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.modules.project.formNew.newComment;
+			import GNNC.modules.project.formView.viewComment;
+			import GNNC.sqlTables.table_comment;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.IList;
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.FlexEvent;
+
+			[Bindable] 
+			public var _length:uint = 0;
+			
+			public var _connComment:gnncAMFPhp 		= new gnncAMFPhp();
+			public var _connExec:gnncAMFPhp 		= new gnncAMFPhp();
+			public var _tableComment:table_comment 	= new table_comment();
+			public var _menuContext:ArrayCollection	= new ArrayCollection();
+			
+			private var _gnncPopUp:gnncPopUp		= new gnncPopUp();
+			
+			/** Menu Context **/
+			public var _view:Boolean 		= true;
+			public var _new:Boolean 		= true;
+			public var _edit:Boolean 		= true;
+			public var _delete:Boolean 		= true;
+			public var _refresh:Boolean 	= true;
+			public var _copy:Boolean 		= true;
+			
+			/** Sql **/
+			public var _sqlConsult:String 	= '';
+			public var _sqlColumns:Array	= null;
+			public var _sqlOrderBy:Array	= ['ID'];
+			public var _sqlWhere:Array		= null;
+			public var _sqlOrderDesc:Boolean= false;
+
+			public function set dataProvider(v:IList):void 				{ list_.dataProvider = v as IList }
+			public function get dataProvider():IList 					{ return list_.dataProvider as IList }
+
+			public function set selectedItem(v:Object):void 			{ list_.selectedItem = v }
+			public function get selectedItem():Object 					{ return list_.selectedItem }
+
+			public function set selectedIndex(v:int):void 				{ list_.selectedIndex = v }
+			public function get selectedIndex():int 					{ return list_.selectedIndex }
+
+			public function set _autoLoad(v:Boolean):void 				{ if(v) __select() }
+			
+			public function set _allowMultipleSelection(v:Boolean):void { list_.allowMultipleSelection = v }
+			public function get _allowMultipleSelection():Boolean		{ return list_.allowMultipleSelection }
+			
+			public function set _dragMoveEnabled(v:Boolean):void 		{ __dragEnabled(v) }
+			public function get _dragMoveEnabled():Boolean 				{ return __dragEnabled(list_.dragEnabled) }
+			
+			public function set _borderVisible(v:Boolean):void 			{ list_.setStyle('borderVisible',v) }
+			public function set _borderColor(v:uint):void 				{ list_.setStyle('borderColor',v) }
+			public function set _backgroundAlpha(v:Number):void 		{ list_.setStyle('contentBackgroundAlpha',v) }
+			public function set _backgroundColor(v:uint):void 			{ list_.setStyle('contentBackgroundColor',v) }
+						
+			private function __start():void
+			{
+				__menuContext();
+				__dispatchEvent();
+				__classFactory();
+				__length();
+			}
+			
+			private function __dragEnabled(enabled_:Boolean):Boolean
+			{
+				list_.dragEnabled		= enabled_; 
+				list_.dragMoveEnabled	= enabled_;
+				list_.dropEnabled		= enabled_;
+				
+				return list_.dragEnabled;
+			}
+			
+			private function __length(e:*=null):void
+			{
+				_length = list_.dataProvider.length;
+			}
+			
+			private function __classFactory():void
+			{
+				//list_.itemRenderer = new ClassFactory("GNNC.modules.attach.itemRender.itemRender_attach_forList");
+			}
+
+			private function __dispatchEvent():void
+			{
+				this.addEventListener(MouseEvent.MOUSE_DOWN					,__menuRightList);
+				this.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN			,__menuRightList);
+				
+				list_.addEventListener(MouseEvent.MOUSE_DOWN				,__menuRightList);
+				list_.addEventListener(MouseEvent.RIGHT_MOUSE_DOWN			,__menuRightList);
+				list_.addEventListener(FlexEvent.VALUE_COMMIT				,__length);
+				list_.addEventListener(FlexEvent.UPDATE_COMPLETE			,__length);
+				
+				list_.addEventListener(gnncEventGeneral._complete			,__null);
+				list_.addEventListener(gnncEventGeneral._control			,__null);
+				list_.addEventListener(gnncEventGeneral._delete 			,__null);
+				list_.addEventListener(gnncEventGeneral._edit  				,__null);
+				list_.addEventListener(gnncEventGeneral._error				,__null);
+				list_.addEventListener(gnncEventGeneral._free				,__null);
+				list_.addEventListener(gnncEventGeneral._loading			,__null);
+				list_.addEventListener(gnncEventGeneral._rightMouseUp		,__null);
+				list_.addEventListener(gnncEventGeneral._rightMouseDown		,__menuRightList);
+				list_.addEventListener(gnncEventGeneral._rightMouseClick	,__null);
+				list_.addEventListener(gnncEventGeneral._mouseDoubleClick	,__fView);
+				list_.addEventListener(gnncEventGeneral._mouseClick			,__null);
+				list_.addEventListener(gnncEventGeneral._mouseDown			,__menuRightList);
+				list_.addEventListener(gnncEventGeneral._mouseUp			,__null);
+				list_.addEventListener(gnncEventGeneral._new				,__null);
+				list_.addEventListener(gnncEventGeneral._paste				,__null);
+				list_.addEventListener(gnncEventGeneral._refresh			,__null);
+				list_.addEventListener(gnncEventGeneral._removeItemList		,__null);
+				list_.addEventListener(gnncEventGeneral._update				,__null);
+				list_.addEventListener(gnncEventGeneral._view				,__null);
+			}
+
+			private function __null(e:*=null):void
+			{
+			}
+			
+			private function __menuContext():void
+			{
+				_menuContext = new ArrayCollection(
+					[
+						{label:'Visualizar',	enabled:_view,		separator:true,		visible:true,	fName:__fView},
+						{label:'Novo',			enabled:_new,		separator:true,		visible:true,	fName:__fNew},
+						{label:'Editar',		enabled:_edit,		separator:false,	visible:true,	fName:__fEdit},
+						{label:'Excluir',		enabled:_delete,	separator:false,	visible:true,	fName:__fDelete},
+						{label:'Atualizar',		enabled:_refresh,	separator:true,		visible:true,	fName:__fRefresh},
+						{label:'Copiar',		enabled:_copy,		separator:true,		visible:true,	fName:__fCopy},
+					]
+				);
+			}
+
+			private function __menuRightList(e:*=null):void
+			{
+				var OBJ:Object					= list_.selectedItem;
+				var IDXDATP:int 				= list_.selectedIndex;
+				var IDXARRA:int 				= _connComment.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+
+				var _i:uint;
+				var _menuArray:Array 	= new Array();
+				var cm:ContextMenu 		= new ContextMenu();
+				var j:ContextMenuItem	= null;
+				
+				_menuArray.push			(new ContextMenuItem('Comentário...',false,false,true));
+
+				for(_i=0; _i<_menuContext.length; _i++) 
+				{
+					var o:Object 			= _menuContext.getItemAt(_i);
+					j						= new ContextMenuItem(o.label,o.separator,o.enabled,o.visible);
+					j.addEventListener		(Event.SELECT,o.fName); //function(e:*):void{ _function() });
+					_menuArray.push			(j);
+				}
+				
+				cm.hideBuiltInItems		();
+				cm.customItems 			= _menuArray;
+				this.contextMenu		= cm;
+			}
+			
+			public function __fView(event:*=null):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connComment.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+
+				function __fRemove(e:*):void
+				{
+				}
+				
+				var _page:viewComment		= new viewComment();
+				_page._tableComment 		= new table_comment(OBJ.ID);
+				
+				new gnncPopUp(parentApplication).__creation(_page,true,false,__fRemove);
+			}
+			
+			public function __fNew(event:Event):void
+			{
+				function __fRemove(e:*):void
+				{
+					if(_page._CHANGE)
+						__select();
+				}
+				
+				var _table:table_comment 	= new table_comment();
+				_table.ID_CLIENT 			= _tableComment.ID_CLIENT;
+				_table.ID_PROJECT 			= _tableComment.ID_PROJECT;
+				_table.ID_STEP 				= _tableComment.ID_STEP;
+				_table.ID_JOB 				= _tableComment.ID_JOB;
+				
+				_table.ID_USER 				= gnncGlobalStatic._userId;
+
+				_table.MIX 					= _tableComment.MIX;
+				_table.ID_MIX				= _tableComment.ID_MIX;
+
+				var _page:newComment 		= new newComment();
+				_page._tableComment 		= _table;
+				_page._MIX					= _tableComment.MIX;
+				
+				new gnncPopUp(parentApplication).__creation(_page,true,false,__fRemove);
+			}
+			
+			public function __fEdit(event:Event):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connComment.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+				
+				function __fRemove(e:*):void
+				{ 
+					if(_page._CHANGE)
+						__select();
+				}
+				
+				var _page:newComment		= new newComment();
+				_page._tableComment			= new table_comment(OBJ.ID);
+				
+				new gnncPopUp(parentApplication).__creation(_page,true,false,__fRemove);
+			}
+			
+			public function __fDelete(event:Event):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connComment.DATA_ARR.getItemIndex(OBJ);
+
+				if(IDXDATP < 0)
+					return;
+
+				Alert.show("Você deseja excluir este comentário definitivamente? [ID:"+OBJ.ID+"]",'Excluir...',3,null,__closeAlert);
+			}
+			
+			private function __closeAlert(event:CloseEvent):void
+			{
+				var OBJ:Object				= list_.selectedItem;
+				var IDXDATP:int 			= list_.selectedIndex;
+				var IDXARRA:int 			= _connComment.DATA_ARR.getItemIndex(OBJ);
+				
+				if(event.detail != Alert.YES)
+					return;
+				
+				_gnncPopUp.__loading('excluindo...');
+				
+				function __fFault(e:*):void
+				{ 
+					_gnncPopUp.__close();
+				}
+
+				function __fResult(e:*):void
+				{ 
+					list_.dataProvider.removeItemAt(IDXDATP);
+				}
+
+				if(OBJ.ID)
+					_connExec.__sql(new gnncSql().__DELETE(new table_comment(),[OBJ.ID],true),'','',__fResult,__fFault);
+			}
+			
+			public function __fRefresh(event:Event):void
+			{
+				__select();
+			}
+
+			private function __fCopy(event:Event):void
+			{
+				var OBJ:Object		= list_.selectedItem;
+				var IDXDATP:int 	= list_.selectedIndex;
+				var IDXARRA:int 	= _connComment.DATA_ARR.getItemIndex(OBJ);
+				
+				if(IDXDATP < 0)
+					return;
+
+				var _text:String = 
+					"Comentário de: \n" + gnncData.__firstLetterUpperCase(OBJ.NAME_USER) + "\n\n" +
+					"Data: \n" + gnncDate.__date2Legend(OBJ.DATE,null,true,true,'-',true) + "\n\n" +
+					"" + OBJ.MESSAGE;
+				
+				gnncClipBoard.__copyText(_text);
+			}
+
+			public function __select():void
+			{
+				if(!_tableComment)
+					return;
+
+				function __fFault(event:*):void
+				{
+					list_.enabled 		= true;
+				}
+				
+				function __fResult(event:*):void
+				{			
+					list_.dataProvider 	= _connComment.DATA_ARR;
+					list_.enabled 		= true;
+				}
+
+				list_.enabled 		= false;
+				
+				var colums:Array 	= 
+					[
+						"*",
+						"(select (select v.NAME from dbd_client v where v.ID like a.ID_CLIENT) from dbd_login a where a.ID like dbd_comment.ID_USER) NAME_USER ",
+						"coalesce((select (select FILE_LINK from dbd_attach WHERE MIX like 'CLIENT' and ID_MIX like a.ID_CLIENT AND (EXTENSION like 'jpg' or EXTENSION like 'png' or EXTENSION like 'gif') ORDER BY ORDER_ITEM LIMIT 0,1	) from dbd_login a where a.ID like dbd_comment.ID_USER),'') ATTACH_CLIENT"
+					];
+				
+				var _sql:String 		= _sqlConsult ? _sqlConsult : new gnncSql().__SELECT(_tableComment,false,_sqlColumns,null,null,_sqlWhere,null,_sqlOrderBy,_sqlOrderDesc);
+				_connComment.__sql		(_sql,'','',__fResult,__fFault);
+			}
+			
+			public function __insert(message_:String,fResul_:Function=null,fFault_:Function=null):void
+			{
+				if(!_tableComment || !message_)
+				{
+					if(fFault_!=null)
+						fFault_.call(null);
+					return ;
+				}
+
+				list_.enabled = false;
+
+				function __fFault(e:*):void
+				{ 
+					if(fFault_!=null)
+						fFault_.call(null);
+					list_.enabled = true;
+				}
+				
+				function __fResult(e:*):void
+				{ 
+					if(fResul_!=null)
+						fResul_.call(null);
+					__select();
+				}
+
+				var _table:Object 	= gnncData.__clone(_tableComment);
+				_table.ID_USER		= gnncGlobalStatic._userId;
+				_table.MESSAGE		= message_;
+				
+				var _sql:String = new gnncSql().__INSERT(_table,false,false,false)
+				_connExec.__sql(_sql,'','',__fResult,__fFault);
+			}
+
+			private function __filter(value_:String):void
+			{ 
+				list_.dataProvider = new gnncDataArrayCollection().__filterArray(_connComment.DATA_ARR,['MESSAGE'],value_);
+			}
+
+			public function __fSaveOrder(fResult_:Function=null,fFault_:Function=null):void
+			{
+				if(!_length)
+					return;
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<!--s:Group width="100%" height="30">
+		<elements:elementBarGray height="30" width="100%"/>
+		<s:HGroup height="25" left="5" top="3" right="3" gap="1" verticalAlign="middle">
+			
+			<s:Image source="{gnncEmbedImage.COMMENT_16}" toolTip="Comentários"/>
+			<elements:elementLabelDropShadow text="COMENTÁRIO" fontWeight="normal" fontSize="11" paddingLeft="5" paddingRight="5"/>
+			<elements:elementInputSearch id="filter_" _FILTER="true" width="80" _FUNCTION_Event_="{function(e:*):void{__filter(filter_.text)}}" />
+			
+			<s:Rect width="100%"/>
+			
+			<s:Button label="Atualizar" icon="{gnncEmbedImage.REFRESH_16}" height="25" skinClass="GNNC.skin.button.skin_buttonLink" click="{__fRefresh(null)}" />
+			
+		</s:HGroup>
+	</s:Group-->
+
+	<s:List id="list_" dataProvider="{new ArrayCollection()}" width="100%" height="100%" bottom="0" 
+			borderVisible="false" borderColor="0x999999" focusAlpha="0"
+			contentBackgroundAlpha="0" contentBackgroundColor="0xFFFFFF" horizontalScrollPolicy="off" 
+			itemRenderer="GNNC.modules.project.itemRender.itemRender_comment_forList" >
+		<s:layout>
+			<s:VerticalLayout gap="0" paddingLeft="1" paddingBottom="1" paddingRight="1" paddingTop="1" />
+		</s:layout>
+	</s:List>
+	
+</s:Group>

@@ -1,0 +1,603 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="100%" height="25"
+		  
+		  creationComplete="{__start()}"
+		  >
+	
+	<s:layout>
+		<s:HorizontalLayout gap="2" verticalAlign="middle" />
+	</s:layout>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.modules.product.formNew.newProduct;
+			import GNNC.sqlTables.table_product;
+			import GNNC.time.gnncTime;
+			
+			import mx.collections.ArrayCollection;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.StringUtil;
+			
+			import spark.events.DropDownEvent;
+			import spark.events.IndexChangeEvent;
+			
+			private var connProduct:gnncAMFPhp 					= new gnncAMFPhp();
+			private var _gnncTime:gnncTime 					= new gnncTime();
+			
+			public var _ICON:Boolean 						= true;
+			public var _ADD:Boolean 						= true;
+			public var _EDIT:Boolean 						= false;
+			public var _DELETE:Boolean 						= false;
+			
+			public var _ID_DEPARTAMENT:uint					= 0;
+			public var _ID_GROUP:uint						= 0;
+			public var _ID_CATEGORY:uint					= 0;
+			
+			public var _sqlWhereAnd:Array					= null;
+			
+			public var _charMin:uint						= 3; 	//Charcteres minimum for search 
+			public var _delayforSearch:uint					= 500; //milleseconds 
+			public var _focus:Boolean						= false; //milleseconds 
+			
+			public function setValue(name:String,id:int):void{
+				list_.dataProvider = new ArrayCollection([{NAME:name,ID:id}]);
+				callLater(function():void{
+					list_.selectedIndex = 0;
+					callLater(function():void{
+						list_.selectedIndex = 0;
+					});
+				});
+			}
+			
+			[Bindable]
+			public var log:String = '';
+			public var logLine:uint = 0;
+			
+			public function set selectedIndex(value_:int)	:void{ list_.selectedIndex = value_ };
+			public function get selectedIndex()				:int{ return list_.selectedIndex };
+			
+			public function set value(number_:uint)			:void{ __productId(number_) };
+			public function get value()						:uint{ return list_.selectedIndex>-1?list_.selectedItem.ID:0 };
+			
+			public function set nameProduct(name_:String)	:void{ list_.textInput.text = name_; };
+			public function get nameProduct()				:String{ return list_.selectedIndex>-1?list_.selectedItem.NAME:'' };
+			
+			public function get code()				        :String{ return list_.selectedIndex>-1?list_.selectedItem.CODE:'' };
+			public function get codeOriginal()				:String{ return list_.selectedIndex>-1?list_.selectedItem.CODE_ORIGINAL:'' };
+			public function get valueIn()				    :Number{ return list_.selectedIndex>-1?Number(list_.selectedItem.VALUE):0 };
+			public function get valueOut()				    :Number{ return list_.selectedIndex>-1?Number(list_.selectedItem.VALUE_OUT):0 };
+			public function get unit()				        :Number{ return list_.selectedIndex>-1?Number(list_.selectedItem.UNIT):0 };
+			public function get unitType()				    :String{ return list_.selectedIndex>-1?list_.selectedItem.UNIT_TYPE:'' };
+			public function get type()				        :String{ return list_.selectedIndex>-1?list_.selectedItem.TYPE:'' };
+			
+			private var _columns:Array						= ['ID','NAME','NICK_NAME','DESCRIPTION','ACTIVE','CODE','CODE_ORIGINAL','UNIT','UNIT_TYPE','VALUE','VALUE_OUT','TYPE'];
+			
+			private function addLog(s:String):void
+			{
+				return;
+				logLine = logLine+1;
+				log += logLine+' '+s+"\n";
+			}
+			
+			private function __start():void
+			{
+				if(this.height!=25)
+				{
+					var h:Number = this.height;
+					list_.height        = h;
+					buttonClear.height  = buttonClear.width  = h;
+					buttonNew.height    = buttonNew.width    = h;
+					buttonView.height   = buttonView.width   = h;
+				}
+				
+				list_.textInput.setStyle	("borderColor",0x888888);
+				list_.textInput.setStyle	("border-color",0x888888);
+				
+				config();
+				
+				/*if(!_ICON) 	removeElement(icon);
+				if(!_ICON) 		removeElement(margin);*/
+				
+				if(!_ADD) 		removeElement(buttonNew);
+				/*if(!_EDIT) 	removeElement(buttonEdit);
+				if(!_DELETE) 	removeElement(buttonDelete);*/
+			}
+			
+			private function config():void
+			{
+				list_.addEventListener(MouseEvent.CLICK			,__click);
+				list_.addEventListener(KeyboardEvent.KEY_UP	    ,__keyboard);
+				list_.addEventListener(FocusEvent.FOCUS_IN		,__focusIn);
+				list_.addEventListener(FocusEvent.FOCUS_OUT		,__focusOut);
+				list_.addEventListener(DropDownEvent.CLOSE		,__closeDrop);
+			}
+			
+			public function set _changeIndexEvent(e:Function):void
+			{
+				list_.addEventListener(IndexChangeEvent.CHANGE,e);
+				list_.addEventListener(IndexChangeEvent.CARET_CHANGE,e);
+			}
+			
+			private function __click(e:MouseEvent):void
+			{
+				setFocus();
+				list_.setFocus();
+				callLater(function():void{
+					callLater(function():void{
+						list_.setFocus();
+					});
+				});
+			}
+			
+			private function __colorSearch(search_:Boolean):void
+			{
+				addLog('__colorSearch-1');
+				list_.setStyle('contentBackgroundColor',search_?0xe0e4ed:0xFFFFFF);//0xBCCEFF
+				callLater(function():void{
+					addLog('__colorSearch-2');
+					list_.setStyle('contentBackgroundColor',search_?0xe0e4ed:0xFFFFFF);//0xBCCEFF
+					callLater(function():void{
+						addLog('__colorSearch-3');
+						list_.setStyle('contentBackgroundColor',search_?0xe0e4ed:0xFFFFFF);//0xBCCEFF
+					});
+				});
+			}
+			
+			private function __keyboard(event:KeyboardEvent):void
+			{
+				__colorSearch(false);
+				
+				_gnncTime.__stop();
+				connProduct.__clear();
+				connProduct.__destroy();
+				connProduct = new gnncAMFPhp();
+				
+				addLog('__keyboard-1');
+				
+				var s:String = list_.textInput.text;
+				
+				event.preventDefault();
+				addLog('__keyboard-1a');
+				event.stopImmediatePropagation();
+				addLog('__keyboard-1b');
+				event.stopPropagation();
+				addLog('__keyboard-1c');
+				
+				if( gnncKeyboard.__CONTROL(event) ){
+					addLog('__keyboard-2');
+					event.stopImmediatePropagation();
+					event.stopPropagation();
+					return;
+				}
+				
+				if( 
+					!gnncKeyboard.__DIRECTION_UP(event) && 
+					!gnncKeyboard.__DIRECTION_DOWN(event) &&
+					!gnncKeyboard.__DIRECTION_LEFT(event) &&
+					!gnncKeyboard.__DIRECTION_RIGHT(event) &&
+					!gnncKeyboard.__ENTER(event) &&
+					!gnncKeyboard.__CONTROL(event) 
+				){
+					addLog('__keyboard-3');
+					//list_.selectedIndex = -1;
+					//if(s.length >= _charMin)
+					//__colorSearch(true);
+					_connProductSearchDelay();
+					return;
+				}
+				
+				addLog('__keyboard-4');
+				
+				event.stopImmediatePropagation();
+				event.stopPropagation();
+				//event.preventDefault();
+				
+				addLog('__keyboard-5');
+			}
+			
+			private function __focusIn(event:FocusEvent):void
+			{
+				addLog('__focusIn-1');
+				
+				if(list_.dataProvider.length === 1){
+					addLog('__focusIn-2');
+					list_.selectedIndex = 0;
+					list_.closeDropDown(true);
+				}
+				
+				addLog('__focusIn-3');
+				
+				if(list_.dataProvider.length>1 && !list_.isDropDownOpen)
+					list_.openDropDown();
+				else if(list_.isDropDownOpen)
+					list_.closeDropDown	(false);
+				
+				addLog('__focusIn-4');
+				
+				_focus = true;
+			}
+			
+			private function __focusOut(event:FocusEvent):void
+			{
+				addLog('__focusOut-1');
+				
+				if(list_.dataProvider.length === 1){
+					addLog('__focusOut-2');
+					list_.selectedIndex = 0;
+					list_.closeDropDown(true);
+				}
+				
+				if(list_.isDropDownOpen && !list_.isDropDownOpen){
+					addLog('__focusOut-3');
+					list_.closeDropDown(false);
+				}
+				
+				if(!connProduct._loading){
+					addLog('__focusOut-4');
+					__colorSearch(false);
+				}
+				
+				_focus = false;
+			}
+			
+			private function _connProductSearchDelay():void
+			{
+				addLog('_connProductSearchDelay-1');
+				
+				if(list_.selectedIndex > -1){
+					var o:Object = list_.selectedItem;
+					if( String(o[list_.labelField]).indexOf(list_.textInput.text) > -1 ){
+						return;
+					}
+				}
+				
+				addLog('_connProductSearchDelay-------------------clear');
+				
+				var s:String = list_.textInput.text;
+				list_.dataProvider = new ArrayCollection();
+				list_.textInput.text = s;
+				var l:uint = list_.textInput.text.length;
+				list_.textInput.selectRange(l,l);
+				
+				addLog('_connProductSearchDelay-2');
+				_gnncTime.__stop();
+				_gnncTime.__start(_delayforSearch,_connProductList,1);
+			}
+			
+			public function __search(s:String):void
+			{
+				__clear()
+				callLater(function():void{
+					_connProductList(s);
+				});
+			}
+			
+			private function _connProductList(s:String=''):void
+			{
+				addLog('_connProductList-1');
+				if(list_.selectedIndex > -1)
+					return;
+				
+				addLog('_connProductList-2');
+				
+				__colorSearch(false);
+				
+				list_.validateDisplayList();
+				list_.validateNow();
+				list_.validateProperties();
+				
+				addLog('list_.textInput.text:'+list_.textInput.text);
+				
+				connProduct.__clear();
+				connProduct.__destroy();
+				connProduct = new gnncAMFPhp();
+				list_.dataProvider = new ArrayCollection();
+				
+				__colorSearch(true);
+				
+				list_.validateDisplayList();
+				list_.validateNow();
+				list_.validateProperties();
+				list_.textInput.validateDisplayList();
+				list_.textInput.validateNow();
+				list_.textInput.validateProperties();
+				
+				addLog('_connProductList-3');
+				
+				var _table:table_product			= new table_product();
+				_table.ID_DEPARTAMENT				= _ID_DEPARTAMENT;
+				_table.ID_GROUP						= _ID_GROUP;
+				_table.ID_CATEGORY					= _ID_CATEGORY;
+
+				var _text:String 					= s != '' ? s : list_.textInput.text;
+				var _sql:String 					= "";
+
+				addLog('_text:'+_text);
+				addLog('s:'+s);
+				addLog('list_.textInput.text:'+list_.textInput.text);
+				addLog('list_.labelField:'+list_.labelField);
+
+				_table.VISIBLE						= 0;
+				_table.ACTIVE						= 0;
+				
+				_text = gnncData.__replace			(_text,'%','');
+				_text = gnncData.__replace			(_text,';','');
+				_text = gnncData.__replace			(_text,"'",'');
+				_text = gnncData.__replace			(_text,'"','');
+				_text = gnncData.__replace			(_text,'´','');
+				_text = gnncData.__replace			(_text,'`','');
+				
+				//gnncData.__scapeText				([_text]);
+				_gnncTime.__stop();
+				//new gnncAlert('fase2');
+				
+				if(_text == '*')
+				{
+					addLog('_connProductList-4');
+					list_.textInput.enabled = false;
+					__colorSearch(true);
+					_sql = new gnncSql().__SELECT(_table,false,_columns,null,null,null,null,['NAME'],false);
+					connProduct.__sql(_sql,'','',__fResult,__fFault);
+					return;
+				}
+					
+				else if((_text.indexOf('last')>-1 || _text.indexOf('ltimo')>-1) && _text.length > 3 && _text.length < 8)
+				{
+					addLog('_connProductList-5');
+					list_.textInput.enabled = false;
+					__colorSearch(true);
+					_sql = new gnncSql().__SELECT(_table,false,_columns,null,null,null,null,['ID'],true,['0','15']);
+					connProduct.__sql(_sql,'','',__fResult,__fFault);
+					return;
+				}
+					
+					// Se o valor pesquisado maior que 2 OU se numérico de qualquer comprimento
+				else if( ( _text.length >= _charMin || gnncData.__isNumeric(_text) ) && _text != '' )
+				{
+					addLog('_connProductList-6');
+					list_.textInput.enabled = false;
+					__colorSearch(true);
+					
+					var search:Array = ["NAME like '%"+_text+"%'","CODE like '%"+_text+"%'","CODE_ORIGINAL like '%"+_text+"%'","NICK_NAME like '%"+_text+"%'","ID = '"+_text+"'"];
+					
+					var pry1:Array = _columns;
+					var pry2:Array = _columns;
+					
+					pry1.push("'1' as PRIORITY");
+					pry2.push("'0' as PRIORITY");
+					
+					//two lines
+					_sql  = new gnncSql().__SELECT(_table,false,pry1,null,null,_sqlWhereAnd,search,null,true,null,['NAME']);
+					//_sql  = " (SELECT "+pry2.join(',')+" from dbd_product WHERE NAME like '"+_text+"%' "+(_ID_GROUP?" AND ID_GROUP = '"+_ID_GROUP+"' ":'')+") UNION ("+_sql+") "; //GROUP BY ID 
+					_sql += " ORDER BY PRIORITY,NAME ASC ";
+					
+					connProduct.__sql(_sql,'','',__fResult,__fFault);
+				}
+				else
+				{
+					addLog('_connProductList-7');
+				}
+				
+				addLog('_connProductList-8');
+			}
+			
+			private function __productId(id_:uint):void
+			{
+				if(id_<1)
+					return;
+				
+				var _table:table_product = new table_product();
+				_table.ID				= id_;
+				_table.VISIBLE			= 0;
+				_table.ACTIVE			= 0;
+				
+				__colorSearch(true);
+				
+				var _sql:String = new gnncSql().__SELECT(_table,false,_columns,null,null,null,null,['NAME'],false);
+				connProduct.__sql(_sql,'','',__fResult,__fFault);
+			}
+			
+			private function __fFault(event:FaultEvent):void
+			{
+				list_.textInput.enabled = true;
+				__colorSearch(false);
+				new gnncAlert().__error	('Ocorreu um erro na pesquisa. Tente novamente.'); 
+			}
+			
+			private function __fResult(event:ResultEvent):void
+			{
+				addLog('__fResult-1');
+				
+				list_.textInput.enabled = true;
+				__colorSearch(false);
+				
+				addLog('__fResult-2');
+				
+				connProduct.DATA_ARR = new gnncDataArrayCollection().__filterDuplicateProperty(connProduct.DATA_ARR);
+				connProduct.DATA_ARR.refresh();
+				list_.dataProvider = connProduct.DATA_ARR;
+				
+				list_.validateDisplayList();
+				list_.validateNow();
+				list_.validateProperties();
+				
+				addLog('__fResult-3');
+				
+				if(!list_.dataProvider.length)// || list_.selectedIndex<-1)
+				{
+					addLog('__fResult-4');
+					__clear();
+					if(list_.isDropDownOpen){
+						addLog('__fResult-5');
+						list_.closeDropDown	(false);
+					}
+					return;
+				}
+				else if(list_.dataProvider.length == 1)
+				{
+					addLog('__fResult-6');
+					list_.selectedIndex = 0;
+					if(list_.isDropDownOpen){
+						addLog('__fResult-7');
+						list_.closeDropDown(true);
+					}
+					//if(_focus)
+					//list_.textInput.setFocus();
+					return;
+				}
+				else
+				{
+					addLog('__fResult-8');
+					list_.openDropDown();
+					return;
+				}
+			}
+			
+			public function __clear():void
+			{
+				addLog('__clear-1');
+				_gnncTime.__stop();
+				connProduct.__clear();
+				
+				connProduct.__destroy();
+				connProduct = new gnncAMFPhp();
+				
+				addLog('__clear-1');
+				__colorSearch			(false);
+				list_.selectedIndex		= -3;
+				list_.selectedIndex		= -1;
+				list_.textInput.text 	= '';
+				list_.dataProvider		= new ArrayCollection();
+				//list_.textInput.setFocus();
+				list_.enabled = true;
+				list_.alpha = 1;
+				//_changeIndexEvent(null);
+				list_.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CARET_CHANGE));
+
+				/*
+				__colorSearch			(false);
+				connProduct.__clear			();
+				_gnncTime.__stop();
+				list_.selectedIndex		= -3;
+				list_.textInput.text 	= '';
+				list_.dataProvider		= new ArrayCollection();
+				//list_.textInput.setFocus();
+				list_.enabled = true;
+				list_.alpha = 1;
+				//_changeIndexEvent(null);
+				list_.dispatchEvent(new IndexChangeEvent(IndexChangeEvent.CARET_CHANGE));
+				*/
+			}
+			
+			/*private function __change():void
+			{
+			if(connProduct.DATA_ROWS==1)
+			{
+			list_.selectedIndex = 0;
+			list_.closeDropDown	(true);
+			}
+			}*/
+			
+			private function __label(item:Object):String
+			{
+				try{
+					if(item!=null){
+						if(item.hasOwnProperty('NAME'))
+							return StringUtil.trim(gnncData.__firstLetterUpperCase(item.NAME));
+					}}catch(e:*){}
+				return '';
+			}
+			
+			private function __new():void
+			{
+				var _table:table_product 	= new table_product();
+				_table.ID_DEPARTAMENT		= _ID_DEPARTAMENT;
+				_table.ID_GROUP				= _ID_GROUP;
+				_table.ID_CATEGORY			= _ID_CATEGORY;
+				
+				var _page:newProduct 		= new newProduct();
+				_page._tableProduct 		= _table;
+								
+				new gnncPopUp().__creation(_page);
+			}
+			
+			private function __view():void
+			{
+				if(list_.selectedIndex < 0)
+					return;
+				
+				var _page:newProduct 	= new newProduct();
+				_page._tableProduct 	= new table_product(list_.selectedItem.ID);
+				new gnncPopUp().__creation	(_page);
+				
+				return;
+				
+				/*var _page:viewClient 		= new viewClient();
+				_page._tableClient 		= new table_product(list_.selectedItem.ID);
+				new gnncPopUp().__creation	(_page);*/
+			}
+			
+			private function __closeDrop(e:*):void
+			{
+				addLog('__closeDrop-1');
+				__colorSearch(false);
+				if(list_.selectedIndex < 0){
+					addLog('__closeDrop-2');
+					//_connProductList();
+					list_.textInput.text = '';
+				}
+			}
+			
+			private function __changeEvent(e:IndexChangeEvent):void
+			{
+				//connProduct.__destroy();
+				//connProduct.__clear();
+				
+				addLog('__changeEvent-1');
+				
+				return;
+				
+				if(list_.selectedIndex < 0)
+				{
+					list_.textInput.enabled = true;
+					list_.alpha = 1;
+				}
+				else
+				{
+					list_.textInput.enabled = false;
+					list_.alpha = 0.5;
+					list_.closeDropDown(false);
+				}
+			}
+		
+			
+		]]>
+	</fx:Script>
+	
+	<s:Button id="buttonView" icon="{list_.selectedIndex>-1?gnncEmbedBlackWhite.bw_view_16:null}" width="25" height="25" click="{__view()}" toolTip="{list_.selectedIndex>-1?'ID:'+list_.selectedItem.ID:'ID:0'}" enabled="{list_.selectedIndex>-1?true:false}" focusEnabled="false" tabEnabled="false" />
+	
+	<s:ComboBox id="list_" width="100%" height="25" labelField="NAME" toolTip="Pesquise o nome ou código..." change="{ __changeEvent(event)}" horizontalScrollPolicy="off"
+				focusAlpha="0" prompt="Pesquise..." dataProvider="{new ArrayCollection()}" labelFunction="__label" itemRenderer="GNNC.skin.dropDownList.itemRender.itemRender_hierarchy_forList"
+				restrict="[A-Z][a-z][Çç][ÁáÀàÂâÃã][ÊêÉé][ÍíÎî][ÓóÔôÕõ][ÚúÛû][0-9][ ]\-\_\(\)@\,\.\-\*\+\=\{\}!\?|"
+				/>
+	
+	<s:Button id="buttonClear" icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="25" toolTip="Limpar seleção" click="{__clear()}" skinClass="GNNC.skin.button.skin_buttonLink" focusEnabled="false" tabEnabled="false" />
+	<s:Button id="buttonNew" icon="{gnncEmbedBlackWhite.bw_new_16}" width="25" toolTip="Novo produto/serviço" click="{__new()}" focusEnabled="false" tabEnabled="false" />
+	
+</s:Module>

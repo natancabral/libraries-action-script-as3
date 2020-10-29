@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+
+		 width="100%" height="100%" 
+		 xmlns:elements="GNNC.UI.elements.*" 
+		 >
+	<fx:Script>
+		<![CDATA[
+			
+			public function set backgroundColor(s:uint):void { bg.color = s; };
+			public function set backgroundColorShadow(s:uint):void { bgShadow.color = s; };
+			public function set backgroundColorTitle(s:uint):void { bgTitle.color = s; };
+			
+			public function set title(s:String):void { t.text = s; };
+			public function get title():String { return t.text; };
+			
+			public function set titleColor(s:uint):void { t.setStyle('color',s); };
+			public function get titleColor():uint { return t.getStyle('color'); };
+
+			public function set titleBold(s:Boolean):void { t.setStyle('fontWeight',(s?'bold':'normal')); };
+			
+			public function set titleAlign(s:String):void { t.setStyle('textAlign',s); };
+			
+
+			public function set number(s:String):void { n.text = s; };
+			public function get number():String { return n.text; };
+
+			public function set numberSize(s:uint):void { n.setStyle('fontSize',s); };
+			public function get numberSize():uint { return n.getStyle('fontSize'); };
+
+			public function set numberColor(s:uint):void { n.setStyle('color',s); };
+			public function get numberColor():uint { return n.getStyle('color'); };
+
+			public function set numberBold(s:Boolean):void { n.setStyle('fontWeight',(s?'bold':'normal')); };
+
+		]]>
+	</fx:Script>
+	
+	<s:Rect width="100%" bottom="1" top="0" radiusX="6" radiusY="6">
+		<s:fill>
+			<s:SolidColor id="bgShadow" color="0xdddddd"/>
+		</s:fill>
+	</s:Rect>
+	<s:Rect width="100%" bottom="3" top="0" radiusX="6" radiusY="6">
+		<s:fill>
+			<s:SolidColor id="bg" color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+	<s:Rect width="100%" height="30" radiusX="6" radiusY="6"
+			bottomLeftRadiusX="0" bottomLeftRadiusY="0"
+			bottomRightRadiusX="0" bottomRightRadiusY="0">
+		<s:fill>
+			<s:SolidColor id="bgTitle" color="0xe9e9e9"/>
+		</s:fill>
+	</s:Rect>
+	<s:HGroup width="100%" height="30" verticalAlign="middle">
+		<elements:elementLabelFont id="t" width="100%" verticalAlign="middle" height="30" fontSize="12" color="0x333333" fontWeight="bold" 
+								 text="TITLE" textAlign="center" paddingLeft="10" paddingRight="10"
+								 />
+	</s:HGroup>
+	
+	<elements:elementLabelFont id="n" verticalAlign="middle" fontSize="35" color="0x333333" fontWeight="normal" 
+							 text="" textAlign="center" horizontalCenter="0" verticalCenter="15"
+							 />
+
+</s:Group>

@@ -1,0 +1,695 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="700" height="540" 
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:select="GNNC.elements.component.select.*" 
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataObject;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.file.gnncFileCsv;
+			import GNNC.data.file.gnncFilesNative;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.event.gnncCloseEvent;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			import flash.filesystem.File;
+			
+			import mx.collections.ArrayCollection;
+			import mx.controls.Alert;
+			
+			import spark.components.gridClasses.GridColumn;
+			
+			[Bindable] private var _gnncFileCsv:gnncFileCsv = new gnncFileCsv();
+			
+			[Bindable] private var _arrayTable:ArrayCollection = new ArrayCollection();
+			[Bindable] private var _arrayColunms:ArrayCollection = new ArrayCollection();
+			[Bindable] private var _arrayTableImport:ArrayCollection = new ArrayCollection();
+			
+			private var _positionTableRowAndColumn:Object;
+			private var _gnncFiles:gnncFilesNative = new gnncFilesNative();
+			
+			private const _LINE:ArrayCollection = new ArrayCollection(
+				[
+					{label:'\\n'		,data:"\n"},
+					{label:'\\r'		,data:"\r"},
+					{label:'\\n\\r'		,data:"\n\r"},
+					{label:'\\r\\n'		,data:"\r\n"},
+					{label:'\\t'		,data:"\t"},
+					{label:'],'			,data:"],"},
+					//{label:'Parag'	,data:0DOA},
+					{label:'File'		,data:File.lineEnding}
+				]
+			);
+
+			private const _SEPARATOR:ArrayCollection = new ArrayCollection(
+				[
+					{label:';'			,data:";"},
+					{label:','			,data:","},
+					{label:'-'			,data:"-"},
+					{label:'|'			,data:"|"},
+					{label:'"'			,data:'"'},
+					{label:"'"			,data:"'"},
+					{label:'/'			,data:"/"},
+					{label:'\\'			,data:'\\'},
+					{label:'_'			,data:"_"},
+
+					{label:'<'			,data:"<"},
+					{label:'>'			,data:">"},
+					
+					{label:'\\n'		,data:"\n"},
+					{label:'\\r'		,data:"\r"},
+					{label:'\\n\\r'		,data:"\n\r"},
+					{label:'\\r\\n'		,data:"\r\n"},
+					{label:'\\t'		,data:"\t"},
+					{label:'],'			,data:"],"},
+					{label:'File'		,data:File.lineEnding}
+				]
+			);
+
+			private function __start():void
+			{
+				TABLE_.addEventListener(KeyboardEvent.KEY_UP,__keyDelAction);
+			}
+
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+
+			private function __max():void
+			{
+				this.width 		= parentApplication.parent.width - 20;
+				this.height 	= parentApplication.parent.height - 20;
+				
+				new gnncPopUp().__center(this);
+			}
+
+			private function __keyDelAction(e:KeyboardEvent):void
+			{
+				if(!KEY_.selected)
+					return;
+				
+				if(e.charCode == Keyboard.C || e.charCode == 99)
+					__deleteColumn();
+					
+				if(e.charCode == Keyboard.L || e.charCode == 108)
+					__deleteLine();
+			}
+
+			private function __importFile():void
+			{
+				//public function __loadFile(functionComplete_Event_:Function=null,fileDescription:String='Text Files (txt; csv; rtf; xml)',fileExtension:String='*.txt;*.csv;*.rtf;*.xml;'):void
+				//_gnncFiles.
+				_gnncFiles.__selectWithBrowserNative(__fComplete,__fError);
+				
+				function __fComplete(e:*=null):void
+				{
+					//panelCenter_.selectedIndex = 1;
+					_gnncFileCsv.__clear();
+					_gnncFileCsv._dataStr = _gnncFiles._DATA_UTF;
+					
+					checkSeparate();
+				}
+
+				function __fError(e:*=null):void
+				{
+					panelCenter_.selectedIndex = 0;
+				}
+				
+			}
+			
+			private function checkSeparate():void
+			{
+				var a:String = _gnncFileCsv._dataStr.substr(0,400);
+				if(a.indexOf(';')>-1)
+					SEPARATOR_.selectedIndex = 0;
+				else if(a.indexOf(',')>-1)
+					SEPARATOR_.selectedIndex = 1;
+			}
+
+			private function __importUrl():void
+			{
+				//panelCenter_.selectedIndex = 1;
+				_gnncFileCsv.__clear();
+				_gnncFileCsv.__loadUrlFile(URL_.text);
+			}
+
+			private function __csv2Array():void
+			{
+				_gnncFileCsv.__csv2ArrayCollection(SEPARATOR_.selectedItem.data,LINE_.selectedItem.data,QUOTES_.selected,QUOTES_SIMPLES_.selected,SCAPE_.selected);
+				
+				TABLE_.dataProvider = new ArrayCollection(_gnncFileCsv._dataArr.source);
+				
+				__setTable();
+			}
+
+			private function __pasteButton(e:*=null):void
+			{
+				_gnncFileCsv._dataStr = TXT_.text;
+			}
+
+			private function __changeMix():void
+			{
+				if(MIX_.selectedIndex < 0)
+					return;
+				
+				_arrayTable.source = gnncDataObject.__getPropertysNames(MIX_.selectedItem.table,'_');
+				
+				//new gnncAlert().__alert(gnncDataObject.__getPropertysNames(new table_client()).length+"\n");
+			}
+
+			private function __setTable():void
+			{
+				
+				var e:uint = 0;
+				var obj:Object;
+				var col:GridColumn;
+				var colArray:ArrayCollection = new ArrayCollection();
+				
+				_arrayColunms 	= new ArrayCollection();
+				TABLE_.columns 	= new ArrayCollection();
+				
+				for ( e = 0; e < _gnncFileCsv._numberColumns; e++ ) 
+				{
+					//DropDownList
+					obj						= new Object();
+					obj['label'] 			= HEADER_.selected?TABLE_.dataProvider.getItemAt(0)['col'+e]:'col'+e;
+					obj['labelField'] 		= 'col'+e;
+					obj['columnNumber'] 	= e;
+					_arrayColunms.addItem	(obj);
+
+					//ColumnList
+					col						= new GridColumn('col'+e);
+					col.width 				= COL_WIDTH_.value;
+					col.dataField 			= 'col'+e;
+					col.headerText 			= HEADER_.selected?TABLE_.dataProvider.getItemAt(0)['col'+e]:'col'+e;
+					
+					colArray.source.push	(col);
+				}
+				
+				TABLE_.columns = colArray;
+				
+				if(HEADER_.selected)
+					TABLE_.dataProvider.removeItemAt(0);
+			}
+			
+			private function __deleteColumn():void
+			{
+				if(DEL_COL_.selectedIndex<0)
+					return;
+
+				__rowAndcolumn();
+
+				TABLE_.columns.removeItemAt	(DEL_COL_.selectedIndex);
+				_arrayColunms.removeItemAt	(DEL_COL_.selectedIndex);
+				
+				__rowAndcolumn(false);
+			}
+
+			private function __deleteLine():void
+			{
+				__rowAndcolumn();
+
+				if(DEL_LINE_.value < TABLE_.dataProviderLength)
+					TABLE_.dataProvider.removeItemAt(DEL_LINE_.value);
+				
+				__rowAndcolumn(false);
+			}
+
+			private function __changeTableSelected():void
+			{
+				DEL_COL_.selectedIndex 		= TABLE_.selectedCell.columnIndex;
+				DEL_LINE_.value 			= TABLE_.selectedCell.rowIndex;
+			}
+			
+			private function __rowAndcolumn(getValuesPositions_:Boolean=true):void
+			{
+				if(getValuesPositions_)
+				{
+					TABLE_.validateNow();
+					
+					_positionTableRowAndColumn 			= new Object();
+					_positionTableRowAndColumn['p1'] 	= TABLE_.grid.hoverRowIndex;
+					_positionTableRowAndColumn['p2'] 	= TABLE_.grid.verticalScrollPosition;
+					_positionTableRowAndColumn['p3'] 	= TABLE_.grid.selectedIndex;
+					//_positionTableRowAndColumn['p4'] 	= TABLE_.selectedCell.columnIndex;
+					//_positionTableRowAndColumn['p5'] 	= TABLE_.selectedCell.rowIndex;
+				}
+				else
+				{
+					TABLE_.grid.hoverRowIndex			= _positionTableRowAndColumn['p1'];
+					TABLE_.grid.verticalScrollPosition	= _positionTableRowAndColumn['p2'];
+					TABLE_.grid.selectedIndex			= _positionTableRowAndColumn['p3'];
+					//TABLE_.selectedCell.columnIndex		= _positionTableRowAndColumn['p4']>=0?int(int(_positionTableRowAndColumn['p4'])-1):0;
+					//TABLE_.selectedCell.rowIndex		= _positionTableRowAndColumn['p5']>=0?int(int(_positionTableRowAndColumn['p5'])-1):0;
+				}
+				
+			}	
+			
+			private function __addTableImport():void
+			{
+				if(ADD_C.selectedIndex < 0 || ADD_T.selectedIndex < 0)
+					return;
+				
+				var obj:Object				= new Object();
+				
+				obj['property'] 			= _arrayTable.getItemAt		(ADD_T.selectedIndex);				//NAME (this column name)
+				obj['value'] 				= _arrayColunms.getItemAt	(ADD_C.selectedIndex).label;		//First Name
+				obj['labelField'] 			= _arrayColunms.getItemAt	(ADD_C.selectedIndex).labelField; 	//col1
+				obj['columnNumber'] 		= _arrayColunms.getItemAt	(ADD_C.selectedIndex).columnNumber;	//index or number column order
+				obj['label'] 				= obj['property'] + " <<>> " + obj['value'] + ' ('+obj['labelField']+')'; //label
+				
+				_arrayTableImport.addItem	(obj);
+			}
+
+			private function __changeListImport():void
+			{
+				if(LIST_IMPORT_CREATE_.selectedIndex<0)
+					return;
+				
+				var _obj:Object 			= _arrayTableImport.getItemAt(LIST_IMPORT_CREATE_.selectedIndex);
+				var _col:GridColumn 		= new GridColumn(_obj.labelField);
+				_col.headerText				= _obj.value;
+				_col.dataField				= _obj.labelField;
+				var _arrc:ArrayCollection	= new ArrayCollection();
+				_arrc.source.push			(_col);
+				
+				TABLE_DATA_CHECK_.columns 	= _arrc;
+			}
+			
+			private function __import():void
+			{
+				if(MIX_.selectedIndex<0)
+					return;
+				//obj['property'] 			= _arrayTable.getItemAt		(ADD_T.selectedIndex);				//NAME 				(this column name, table_...[...])
+				//obj['value'] 				= _arrayColunms.getItemAt	(ADD_C.selectedIndex).label;		//First Name 		(label Title)
+				//obj['labelField'] 		= _arrayColunms.getItemAt	(ADD_C.selectedIndex).labelField; 	//col1 				(Name column)
+				//obj['columnNumber'] 		= _arrayColunms.getItemAt	(ADD_C.selectedIndex).columnNumber;	//index or number column order
+				//obj['label'] 				= obj['property'] + " <<>> " + obj['value'] + ' ('+obj['labelField']+')'; //label
+				//_arrayTableImport.addItem	(obj);
+				
+				var i:uint = 0;
+				var e:uint = 0;
+				var _sql:String = '';
+
+				for(e=0; e<TABLE_.dataProviderLength; e++)
+				{
+					var _table:Object		= new Object();
+					_table._TABLE 			= Object(MIX_.selectedItem.table)._TABLE;
+
+					for(i=0; i<_arrayTableImport.length; i++)
+					{
+						_table[_arrayTableImport.getItemAt(i).property] = TABLE_.dataProvider.getItemAt(e)[_arrayTableImport.getItemAt(i).labelField];
+					}
+					
+					_sql += new gnncSql().__INSERT(_table);
+					_sql += " ; \n";
+				}
+				
+				//new gnncAlert().__textArea(_sql);
+				
+				_sql = gnncData.__replace(_sql,"dbd_","[@BASE]");
+				
+				var _tableName:String = MIX_.selectedIndex > -1 ? MIX_.selectedItem.NAME : gnncDate.__date2Legend('',new Date());
+				_gnncFiles.__saveWithBrowserNative('GNNC-DayByDay-Import--'+_tableName+'--','txt',_sql,gnncFilesNative._documentDirectory);
+			}
+			
+			private function __findAndReplace():void
+			{
+				if(!FIND_.text)
+					return;
+				
+				TXT_.text = gnncData.__replace(TXT_.text,FIND_.text,REPLACE_.text);
+			}	
+			
+			private function __clearLineBlank():void
+			{
+				if(DEL_COL_.selectedIndex<0){
+					new gnncAlert().__alert('Selecione acima uma coluna.')
+					return;
+				}
+				
+				var newArray:ArrayCollection = new ArrayCollection();
+				
+				for(var e:uint=0; e<TABLE_.dataProviderLength; e++)
+				{
+					if(gnncData.__trimText(TABLE_.dataProvider.getItemAt(e)['col'+DEL_COL_.selectedIndex]))
+						newArray.addItem(TABLE_.dataProvider.getItemAt(e));
+				}
+				
+				var total:uint = uint(TABLE_.dataProvider.length - newArray.length);
+				
+				gnncAlert.__alert(
+					"Coluna: "+String(DEL_COL_.selectedItem.label).toLowerCase()+"\n"+
+					"Linhas excluídas: "+total+"\n"+
+					'Deseja mesmo apagar as linhas em branco?','Limpar',
+					function(event:gnncCloseEvent):void{
+						if(event.detail != gnncAlert.YES)
+							return;
+						TABLE_.dataProvider = newArray;
+				},[gnncAlert.YES,gnncAlert.CANCEL]);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="program"/>
+	</s:states>
+	
+	<s:Rect width="100%" height="100%">
+		<s:fill>
+			<s:SolidColor color="0xFAFAFA"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Group height="30" top="10" left="10" right="10" >
+		<s:Rect width="100%" height="100%">
+			<s:fill>
+				<s:SolidColor color="0xEEEEEE"/>
+			</s:fill>
+		</s:Rect>
+		<s:TabBar dataProvider="{panelCenter_}" height="30" />
+	</s:Group>
+	
+	<mx:ViewStack id="panelCenter_" top="60" left="20" right="20" bottom="52">
+		
+		<s:NavigatorContent label="DADOS" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1"/>
+			</s:layout>
+
+			<s:Form width="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="-10" />
+				</s:layout>
+				
+				<s:FormItem label="Caminho Url" >
+					<s:TextInput id="URL_" width="200" height="25" prompt="http://"/>
+					<s:Button label="Baixar" height="25" fontWeight="bold" click="{__importUrl()}" />
+				</s:FormItem>
+				
+				<!--- LINEW -->
+				<s:Group height="15" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- END LINEW -->
+				
+				<s:FormItem label="Arquivo" >
+					<s:Button label="Selecionar aquivo" height="25" fontWeight="bold" click="{__importFile()}" icon="{gnncEmbedBlackWhite.bw_report_16}" />
+				</s:FormItem>
+			
+				<!--- LINEW -->
+				<s:Group height="15" width="100%">
+					<s:Line width="100%" alpha=".5" verticalCenter="0">
+						<s:stroke>
+							<s:SolidColorStroke color="0x999999" weight="1"/>
+						</s:stroke>
+					</s:Line>
+				</s:Group>
+				<!--- END LINEW -->
+				
+				<s:FormItem label="Texto" >
+					<s:TextInput width="100%" id="FIND_" height="25" prompt="Procurar por..."/>
+					<s:TextInput width="100%" id="REPLACE_" height="25" prompt="Substituir por..."/>
+					<s:Button label="Substituir" height="25" icon="{gnncEmbedBlackWhite.bw_refresh_16}" click="{__findAndReplace()}" fontWeight="bold"/>
+				</s:FormItem>
+
+			</s:Form>
+			
+			<s:TextArea id="TXT_" text="{_gnncFileCsv._dataStr}" width="100%" height="100%" 
+						updateComplete="{__pasteButton()}" keyUp="{__pasteButton()}" mouseUp="{__pasteButton()}"
+						paddingBottom="20" paddingLeft="20" paddingRight="20" paddingTop="20"
+						/>
+
+			<!--- LINEW -->
+			<s:Group height="15" width="100%">
+				<s:Line width="100%" alpha=".5" verticalCenter="0">
+					<s:stroke>
+						<s:SolidColorStroke color="0x999999" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<!--- END LINEW -->
+
+			<!--s:CheckBox id="BTN_PASTE_" label="Este texto é colado e não de um arquivo..." height="25" fontWeight="bold" click="{__pasteButton()}" /-->
+			
+		</s:NavigatorContent>
+		
+		<s:NavigatorContent label="TABELA" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1"/>
+			</s:layout>
+			
+			<s:DataGrid id="TABLE_" dataProvider="{_gnncFileCsv._dataArr}" sortableColumns="true" width="100%" height="100%" rowHeight="22" selectionColor="0xEEEEEE" variableRowHeight="{LINE_BREAK_TEXT_.selected}" horizontalScrollPolicy="on" verticalScrollPolicy="on" editable="{TABLE_EDITABLE_.selected}" selectionChange="{__changeTableSelected()}" selectionMode="singleCell" />
+			
+			<!--- LINEW -->
+			<s:Group height="10" width="100%">
+				<s:Line width="100%" alpha=".5" verticalCenter="0">
+					<s:stroke>
+						<s:SolidColorStroke color="0x999999" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<!--- END LINEW -->
+			
+			<s:HGroup verticalAlign="middle">
+				<s:Label text="Configurações e Geração" color="0x777777" fontWeight="bold" verticalAlign="middle" height="20" fontSize="12"/>
+			</s:HGroup>
+			
+			<!--- LINEW -->
+			<s:Group height="10" width="100%">
+				<s:Line width="100%" alpha=".5" verticalCenter="0">
+					<s:stroke>
+						<s:SolidColorStroke color="0x999999" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<!--- END LINEW -->
+			
+			<s:HGroup verticalAlign="middle">
+
+				<s:CheckBox id="LINE_BREAK_TEXT_" height="25" label="Variar tamanho de linha" fontWeight="bold" selected="false"/>
+				<s:Rect width="10"/>
+				<s:NumericStepper id="COL_WIDTH_" value="100" width="50" minimum="30" maximum="350" height="25" toolTip="Largura da Coluna." enabled="{!LINE_BREAK_TEXT_.selected}" />
+
+				<s:DropDownList id="SEPARATOR_" width="40" height="25" dataProvider="{_SEPARATOR}" 	selectedIndex="0" toolTip="Separador de dados"/>
+				<s:DropDownList id="LINE_" 		width="40" height="25" dataProvider="{_LINE}" 		selectedIndex="0" toolTip="Quebra de linha"/>
+				
+				<s:Rect width="100%"/>
+				
+				<s:Button label="Gerar tabela" height="25" fontWeight="bold" click="{__csv2Array()}" enabled="{_gnncFileCsv._dataStr.length>10}" icon="{gnncEmbedBlackWhite.bw_refresh_16}" />
+
+			</s:HGroup>
+			
+			<!--- LINEW -->
+			<s:Group height="10" width="100%">
+				<s:Line width="100%" alpha=".5" verticalCenter="0">
+					<s:stroke>
+						<s:SolidColorStroke color="0x999999" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<!--- END LINEW -->
+			
+			<s:HGroup verticalAlign="middle">
+				<s:CheckBox id="HEADER_" height="25" label="Cabeçalho" fontWeight="bold" selected="true" toolTip="Considerar a primeira linha um cabeçalho, e removê-la."/>
+				<s:CheckBox id="SCAPE_" label="Escapamento" fontWeight="bold" selected="true" toolTip="Texto com erro de formatação."/>
+				<s:CheckBox id="QUOTES_" label="Remover aspas duplas" fontWeight="bold" selected="true"/>
+				<s:CheckBox id="QUOTES_SIMPLES_" label="Remover aspas simples" fontWeight="bold" selected="true" />
+				<s:CheckBox id="TABLE_EDITABLE_" label="Caixas editáveis" fontWeight="bold" toolTip="Clique duas vezes nos campos para editar." click="{TABLE_EDITABLE_.selected?KEY_.selected=false:null}" />
+			</s:HGroup>
+
+			<!--- LINEW -->
+			<s:Group height="10" width="100%">
+				<s:Line width="100%" alpha=".5" verticalCenter="0">
+					<s:stroke>
+						<s:SolidColorStroke color="0x999999" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<!--- END LINEW -->
+			
+			<s:HGroup verticalAlign="middle">
+				<s:Label text="Excluir" fontWeight="bold" verticalAlign="middle" height="20" fontSize="12" color="0x777777"/>
+			</s:HGroup>
+
+			<!--- LINEW -->
+			<s:Group height="10" width="100%">
+				<s:Line width="100%" alpha=".5" verticalCenter="0">
+					<s:stroke>
+						<s:SolidColorStroke color="0x999999" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<!--- END LINEW -->
+			
+			<s:HGroup verticalAlign="middle" width="100%">
+				<s:DropDownList id="DEL_COL_" dataProvider="{_arrayColunms}" width="90" height="25" prompt="Selecione..."/>
+				<s:Button label="Coluna" icon="{gnncEmbedImage.REMOVE_16}" height="25" width="90"  click="{__deleteColumn()}" fontWeight="bold"/>
+				<s:Rect width="10"/>
+				<s:NumericStepper id="DEL_LINE_" width="50" value="0" minimum="0" maximum="1000000" toolTip="Linha"/>
+				<s:Button label="Linha" icon="{gnncEmbedImage.REMOVE_16}" height="25" width="90"  click="{__deleteLine()}" fontWeight="bold"/>
+				<s:Rect width="10"/>
+				<s:Button label="Linhas em branco" height="25" fontWeight="bold" click="{__clearLineBlank()}" enabled="{DEL_COL_.selectedIndex>-1?true:false}" icon="{gnncEmbedImage.REMOVE_16}" />
+				<s:Rect width="10"/>
+				<s:CheckBox id="KEY_" label="Tecla Excluir: C,L" fontWeight="bold" selected="false" toolTip="Habilita as teclas 'C' e 'L' para deletar as (C)olunas e (L)inhas com as Teclas" enabled="{TABLE_EDITABLE_.selected?false:true}"/>
+			</s:HGroup>
+
+		</s:NavigatorContent>
+		
+		<s:NavigatorContent label="ORGANIZAÇÃO" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1"/>
+			</s:layout>
+			
+			<s:HGroup width="100%" gap="5" verticalAlign="middle" paddingBottom="3" paddingTop="3" color="0x999999">
+				<s:Label width="100%" text="Passo 1 - Tipo de Importação" fontWeight="bold" verticalAlign="middle"/>
+				<s:Label width="100%" text="Passo 2 - Relação com Tabela" fontWeight="bold" verticalAlign="middle"/>
+				<s:Label width="100%" text="Passo 3 - Finalizar" fontWeight="bold" verticalAlign="middle"/>
+			</s:HGroup>
+
+			<!--- LINEW -->
+			<s:Group height="10" width="100%">
+				<s:Line width="100%" alpha=".5" verticalCenter="0">
+					<s:stroke>
+						<s:SolidColorStroke color="0x999999" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<!--- LINEW -->
+
+			<s:HGroup width="100%" gap="5">
+				
+				<s:VGroup width="100%" gap="1">
+					<s:DropDownList id="ACT_" dataProvider="{new ArrayCollection([{label:'Cadastrar'}])}" 	width="100%" height="25" selectedIndex="0" />
+					<s:DropDownList id="MIX_" dataProvider="{gnncGlobalArrays._MIX}" labelField="NAME" 		width="100%" height="25" change="{__changeMix()}" prompt="Selecione..." />
+				</s:VGroup>
+
+				<s:VGroup width="100%" gap="1">
+					<s:DropDownList id="ADD_C" dataProvider="{_arrayColunms}"		width="100%" height="25" prompt="Selecione..."/>
+					<s:DropDownList id="ADD_T" dataProvider="{_arrayTable}" 		width="100%" height="25" prompt="Selecione..."/>
+					<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" height="25" width="100%" label="Adicionar na Lista" click="{__addTableImport()}" fontWeight="bold"/>
+				</s:VGroup>
+
+				<s:VGroup width="100%" gap="1">
+					<s:Button label="Salvar importação" width="100%" icon="{gnncEmbedBlackWhite.bw_ok_16}" fontWeight="bold" height="25"  click="{__import()}"/>
+				</s:VGroup>
+
+			</s:HGroup>
+			
+			<!--- LINEW -->
+			<s:Group height="10" width="100%">
+				<s:Line width="100%" alpha=".5" verticalCenter="0">
+					<s:stroke>
+						<s:SolidColorStroke color="0x999999" weight="1"/>
+					</s:stroke>
+				</s:Line>
+			</s:Group>
+			<!--- LINEW -->
+			
+			<s:HGroup width="100%" height="100%" gap="1">
+				<s:List id="LIST_IMPORT_CREATE_" width="100%" height="100%" dataProvider="{_arrayTableImport}" borderColor="0x999999" change="{__changeListImport()}" >
+					<s:layout>
+						<s:VerticalLayout gap="0" rowHeight="25" paddingBottom="1" paddingLeft="1" paddingRight="1" paddingTop="1" />
+					</s:layout>
+					<s:itemRenderer>
+						<fx:Component>
+							<s:ItemRenderer width="100%" height="25" autoDrawBackground="false">
+								<fx:Script>
+									<![CDATA[
+										
+										import GNNC.data.data.gnncData;
+										import GNNC.gnncEmbedImage;
+										
+										private function __del():void
+										{
+											Object(owner).dataProvider.removeItemAt(itemIndex);
+										}
+										
+									]]>
+								</fx:Script>
+								
+								<s:states>
+									<s:State name="normal" />
+									<s:State name="hovered" />
+									<s:State name="selected" />
+									<s:State name="normalAndShowsCaret"/>
+									<s:State name="hoveredAndShowsCaret"/>
+									<s:State name="selectedAndShowsCaret"/>
+								</s:states>
+								
+								<s:Rect left="1" top="1" right="1" bottom="1" includeIn="hoveredAndShowsCaret,hovered" radiusX="4">
+									<s:fill>
+										<s:SolidColor color="0xDDDDDD"/>
+									</s:fill>
+								</s:Rect>
+								
+								<s:Rect left="1" top="1" right="1" bottom="1" includeIn="selected,selectedAndShowsCaret" radiusX="4">
+									<s:fill>
+										<s:LinearGradient rotation="90">
+											<s:GradientEntry color="0x3785e2"/>
+											<s:GradientEntry color="0x2170cf"/>
+										</s:LinearGradient>
+									</s:fill>
+								</s:Rect>
+								
+								<s:Label left="8" right="30" verticalCenter="0" text="{gnncData.__firstLetterUpperCase(data.label)}" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" fontWeight="bold" showTruncationTip="true" maxDisplayedLines="1" />
+								<s:Button icon="{gnncEmbedImage.REMOVE_16}" label="Exclur da Lista" width="24" height="24" click="{__del()}" right="2" verticalCenter="0"/>
+								
+							</s:ItemRenderer>
+						</fx:Component>
+					</s:itemRenderer>			
+				</s:List>
+				
+				<s:VGroup width="200" height="100%">
+					<s:Group width="200" height="30">
+						<s:Rect fill="{new SolidColor(0xCCCCCC)}" width="100%" height="30"/>
+						<s:Label text="{LIST_IMPORT_CREATE_.selectedIndex>-1?LIST_IMPORT_CREATE_.selectedItem.property:'...'}" paddingLeft="5" paddingRight="5" fontWeight="bold" height="30" verticalAlign="middle" maxDisplayedLines="1" showTruncationTip="true"/>
+					</s:Group>
+					<s:DataGrid id="TABLE_DATA_CHECK_" width="200" height="100%" rowHeight="25" dataProvider="{TABLE_.dataProvider}"/>
+				</s:VGroup>
+				
+			</s:HGroup>
+			
+		</s:NavigatorContent>
+		
+	</mx:ViewStack>
+	
+	<s:Group width="100%" height="34" bottom="0">
+		<s:Rect width="100%" height="34">
+			<s:fill>
+				<s:SolidColor color="0xeeeeee" />
+			</s:fill>
+		</s:Rect>
+		<s:HGroup width="100%" height="34" gap="1" verticalAlign="middle" paddingLeft="5" paddingRight="5" >
+			<s:Rect width="100%" />
+			<s:Button label="Expandir" click="{__max()}" />
+			<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" />
+		</s:HGroup>
+	</s:Group>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

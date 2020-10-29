@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	width="600" height="450"
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:select="GNNC.elements.component.select.*" 
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*" 
+	xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataHtml;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_step;
+			import GNNC.sqlTables.table_web_page;
+			
+			import mx.rpc.Fault;
+			import mx.rpc.events.ResultEvent;
+			
+			private var _connWebPage:gnncAMFPhp 						= new gnncAMFPhp(); //job
+			[Bindable] public  var _tableWebPage:table_web_page 		= new table_web_page();
+			private var _gnncPopUp:gnncPopUp 							= new gnncPopUp();
+			
+			public  var _MIX:String 	= 'WEB_PAGE';
+			public  var _change:Boolean = false;
+			
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+						if(gnncKeyboard.__CONTROL_ENTER(event)) __save();
+					}
+				);
+				
+				__check();
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void 
+			{ 
+				TITLE_.setFocus();
+			}
+			
+			private function __check():void
+			{
+				if(_tableWebPage != null)
+				{
+					if(_tableWebPage.ID)
+					{
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						var _sql:String 		= new gnncSql().__SELECT(new table_web_page(_tableWebPage.ID));
+						_connWebPage.__sql	(_sql,'','',__fResultCheck,__fFaultCheck);
+					}
+				} 
+				else 
+				{
+					_tableWebPage = new table_web_page();
+				}
+			}
+			
+			protected function __fFaultCheck(e:*):void
+			{
+				_gnncPopUp.__close();
+			}
+			
+			protected function __fResultCheck(e:*):void
+			{
+				if(!_connWebPage.DATA_ROWS)
+					return;
+				
+				var _obj:Object 					= _connWebPage.DATA_ARR.getItemAt(0);
+				
+				//DESCRIPTION_.textHtml				= gnncData.__scapeTextWord(_obj.DESCRIPTION);
+
+				_tableWebPage.ID					= _obj.ID;
+				_tableWebPage.ID_WEB_MENU_LINK		= _obj.ID_WEB_MENU_LINK;
+				
+				_tableWebPage.MIX					= _obj.MIX;
+				
+				TITLE_.text							= _obj.NAME;
+				URL_FRIENDLY_.text					= _obj.URL_FRIENDLY;
+				
+				DESCRIPTION_.textFlow				= gnncDataHtml.__html2TextFlow(_obj.DESCRIPTION);
+				_tableWebPage.CONTENT				= _obj.CONTENT;
+
+				_tableWebPage.IMG1_URL				= _obj.IMG1_URL;
+
+				_tableWebPage.ORDER_ITEM			= _obj.ORDER_ITEM;
+				
+				_tableWebPage.DATE_START			= _obj.DATE_START;
+				_tableWebPage.DATE_END				= _obj.DATE_END;
+				
+				_tableWebPage.ID_DEPARTAMENT		= _obj.ID_DEPARTAMENT;
+				_tableWebPage.ID_GROUP				= _obj.ID_GROUP;
+				_tableWebPage.ID_CATEGORY			= _obj.ID_CATEGORY;
+
+				_tableWebPage.ACTIVE				= _obj.ACTIVE;
+				_tableWebPage.VISIBLE				= _obj.VISIBLE;
+				_tableWebPage.CONTROL				= _obj.CONTROL;
+				
+				_gnncPopUp.__close();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __changeName():void
+			{
+				if(!_tableWebPage.ID)
+					URL_FRIENDLY_.text = gnncData.__friendly(TITLE_.text);
+			}
+			
+			private function __save():void
+			{
+				if(!TITLE_.text || !URL_FRIENDLY_.text)
+				{
+					new gnncAlert().__alert("Nome do Link e Url Amigável são obrigatórias");
+					return;
+				}
+				
+				_gnncPopUp.__loading();
+				
+				gnncData.__scapeText([],[TITLE_,URL_FRIENDLY_]);
+				
+				//DESCRIPTION_.textHtml			= gnncData.__scapeTextWord(DESCRIPTION_.textHtml);
+				
+				var _object:table_web_page 		= new table_web_page();
+				
+				_object.ID						= _tableWebPage.ID; 
+				_object.ID_WEB_MENU_LINK		= _tableWebPage.ID_WEB_MENU_LINK;
+				_object.ID_USER					= gnncGlobalStatic._userId;
+				
+				_object.MIX						= _MIX;
+				
+				_object.TITLE					= TITLE_.text; 
+				_object.SUBTITLE				= SUBTITLE_.text; 
+				_object.URL_FRIENDLY			= URL_FRIENDLY_.text; 
+				
+				_object.DESCRIPTION				= gnncData.__scapeTextWord(gnncData.__scapeTextWord(gnncDataHtml.__textFlow2FlashHtml(DESCRIPTION_.textFlow))); //Description in List
+				_object.CONTENT					= _tableWebPage.CONTENT; //Description in List
+
+				_object.IMG1_URL				= _tableWebPage.IMG1_URL; //Description in List
+
+				_object.ORDER_ITEM				= _tableWebPage.ORDER_ITEM;
+				
+				_object.DATE_START				= gnncDate.__isValid(_tableWebPage.DATE_START) ? _tableWebPage.DATE_START : gnncDate.__date2String(new Date());
+				_object.DATE_END				= _tableWebPage.DATE_END;
+
+				_object.ID_DEPARTAMENT			= _tableWebPage.ID_DEPARTAMENT;
+				_object.ID_GROUP				= _tableWebPage.ID_GROUP;
+				_object.ID_CATEGORY				= _tableWebPage.ID_CATEGORY;
+
+				_object.ACTIVE					= _tableWebPage.ACTIVE;
+				_object.CONTROL					= _tableWebPage.CONTROL;
+				_object.VISIBLE					= _tableWebPage.VISIBLE;
+				
+				var _sql:String 				= new gnncSql().__INSERT(_object,false,true,true);
+				
+				_connWebPage.__sql	(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(event:*):void
+				{
+					_change = true;
+					_gnncPopUp.__close();
+					__close();
+				}
+				
+				function __fFault(event:*):void
+				{
+					_gnncPopUp.__close();
+				}
+				
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp />
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="0" paddingLeft="0">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" />
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1" />
+			</s:layout>
+			<s:Form width="100%" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="5" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:FormItem label="Menu Link" width="100%">
+					<s:DropDownList width="100%" height="25" prompt="Selecione..." enabled="false" />
+				</s:FormItem>
+				<s:FormItem label="Título" width="100%">
+					<s:TextInput id="TITLE_" width="100%" height="30" fontSize="15" paddingLeft="5" prompt="Nome do Link" change="{__changeName()}" keyUp="{__changeName()}" maxChars="255" />
+				</s:FormItem>
+				<s:FormItem label="Sub-título" width="100%">
+					<s:TextInput id="SUBTITLE_" width="100%" height="25" paddingLeft="5" prompt="Sub-título" maxChars="500" />
+				</s:FormItem>
+				<s:FormItem label="Url Amigável" width="100%">
+					<s:TextInput id="URL_FRIENDLY_" width="100%" height="25" paddingLeft="5" prompt="Url de formato amigável" restrict="[a-z][A-Z]\-[0-9]" maxChars="255" />
+				</s:FormItem>
+				<s:FormItem label="Descrição" width="100%">
+					<gnncTextEdit:gnncTextEdit id="DESCRIPTION_" width="100%" height="100%" />
+					<s:Rect height="10"/>
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="4" paddingRight="4" verticalAlign="middle">
+		<s:Rect width="100%" />
+		<s:Button icon="{_tableWebPage.ID?gnncEmbedBlackWhite.bw_edit_16:gnncEmbedBlackWhite.bw_new_16}" label="{_tableWebPage.ID?'Salvar Edição':'Cadastrar (Ctrl+Enter) '}" click="{__save()}" fontWeight="bold" height="25" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" height="25" />	
+	</s:HGroup>
+	
+	<s:Button top="10" right="10" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

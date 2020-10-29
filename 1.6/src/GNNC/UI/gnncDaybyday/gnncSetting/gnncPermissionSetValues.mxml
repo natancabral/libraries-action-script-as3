@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="700" height="400" 
+		  creationComplete="{__start()}"
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.sqlTables.table_permission_set;
+			
+			import mx.collections.ArrayCollection;
+			
+			[Bindable]  private var _gnncGlobal:gnncGlobalStatic 	= new gnncGlobalStatic(true);
+						private var _PERMISSION_SET:gnncAMFPhp 		= new gnncAMFPhp();
+			
+			private var _idPermissionSet:uint = 0;
+			
+			private const _method:ArrayCollection = new ArrayCollection([
+				{label:'Selecionar',	data:0},
+				{label:'Novo',			data:1},
+				{label:'Atualizar',		data:2},
+				{label:'Deletar',		data:3}
+			])
+			
+			private function __start():void
+			{
+				ID_GROUP_PERMISSION_.setFocus();
+				
+				if(!gnncGlobalStatic._userAdmin){
+					new gnncAlert().__alert('Somente administradores.');
+					__close();
+					return;
+				}
+
+				__settingRefresh();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __EXEC():void
+			{
+				if(gnncData.__trimText(ID_GROUP_PERMISSION_.text) == '' && gnncData.__trimText(ID_USER_.text) == '')
+				{
+					new gnncAlert().__alert('Grupo ou usuário precisam ser definidos.');
+					return;
+				}
+
+				if(!gnncData.__trimText(MIX_.text) || PROPERTY_.text.length < 1 || VALUE_.text.length < 1 )
+				{
+					new gnncAlert().__alert('MIX, Propriedade e Valor devem conter mais de 2 caractéres.');
+					return;
+				}
+
+				if(METHOD_.selectedIndex > -1)
+					switch(METHOD_.selectedItem.data)
+					{
+						case 1: __INSERT(); break;
+						case 2: __UPDATE(); break;
+						case 3: __DELETE(); break;
+					}
+				else
+					new gnncAlert().__alert('Selecione um método.');
+				
+				return;
+			}
+			
+			private function __settingSelected():void
+			{
+				if(SETTINGS_.selectedIndex < 0)
+					return;
+				
+				_idPermissionSet = SETTINGS_.selectedItem.ID;
+
+				ID_GROUP_PERMISSION_.text = SETTINGS_.selectedItem.ID_GROUP_PERMISSION;
+				ID_USER_.text             = SETTINGS_.selectedItem.ID_USER;
+
+				MIX_.text        = SETTINGS_.selectedItem.MIX;
+				PROPERTY_.text   = SETTINGS_.selectedItem.PROPERTY;
+				VALUE_.text 	 = SETTINGS_.selectedItem.VALUE;
+
+				IN_.selected     = String(SETTINGS_.selectedItem.IN_NOTIN) === '1'? true : false;
+				NOTIN_.selected  = String(SETTINGS_.selectedItem.IN_NOTIN) === '1'? false : true;
+				
+				//Exec
+				METHOD_.selectedIndex  	= 2;
+				SETT_.selectedIndex		= -1;
+			}
+
+			private function __settingSelectedArray():void
+			{
+				if(SETT_.selectedIndex < 0)
+					return;
+
+				ID_GROUP_PERMISSION_.text = '';
+				ID_USER_.text             = '';
+
+				//set news values in inputs
+				MIX_.text       = SETT_.selectedItem.data;
+				PROPERTY_.text  = '';
+				VALUE_.text		= '';
+
+				IN_.selected    = true;
+				NOTIN_.selected = false;
+
+				//clear selected data
+				_idPermissionSet	    = 0;
+				SETTINGS_.selectedIndex = -1;
+				
+				//Exec
+				METHOD_.selectedIndex  = 1;
+			}
+			
+			private function __settingRefresh():void
+			{
+				btnExe_.enabled = false;
+				loading_.text = 'Atualizando...';
+				SETTINGS_.dataProvider = new ArrayCollection();
+				
+				var _sql:String = new gnncSql().__SELECT(new table_permission_set());
+				//new gnncAlert(this).__alert(_sql,'sql');
+				_gnncGlobal._PERMISSION_SET.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(event:*):void
+				{
+					gnncGlobalStatic._userPermissionSet = _gnncGlobal._PERMISSION_SET.DATA_ARR;
+					//new gnncAlert(this).__dataGrid(_gnncGlobal._PERMISSION_SET.DATA_ARR,'PermitionSet');
+					SETTINGS_.dataProvider = gnncGlobalStatic._userPermissionSet;
+					btnExe_.enabled = true;
+					loading_.text = '';
+				}
+
+				function __fFault(event:*):void
+				{
+					btnExe_.enabled = true;
+					loading_.text = '';
+				}
+
+			}
+
+			protected function __fResultGlobal(event:*):void
+			{
+				//new gnncAlert(this).__dataGrid(_gnncGlobal._PERMISSION_SET.DATA_ARR,'PermitionSet');
+
+				__settingRefresh();
+				METHOD_.selectedIndex = 0;
+				SETTINGS_.enabled = true;
+				_idPermissionSet = 0;
+			}
+
+			protected function __fFaultGlobal(event:*):void
+			{
+				SETTINGS_.enabled = true;
+			}
+
+			private function __INSERT():void
+			{
+				SETTINGS_.enabled = false;
+
+				var _table:table_permission_set = new table_permission_set();
+				
+				_table.ID_GROUP_PERMISSION 	= uint(ID_GROUP_PERMISSION_.text);
+				_table.ID_USER 				= uint(ID_USER_.text);
+				
+				_table.MIX 			        = MIX_.text;
+				_table.PROPERTY 			= PROPERTY_.text;
+				_table.VALUE                = VALUE_.text;
+				
+				_table.IN_NOTIN             = IN_.selected == true ? 1 : 0 ;
+
+				var _sql:String = new gnncSql().__INSERT(_table,false,false,true);
+				
+				_PERMISSION_SET.__sql(_sql,'Parâmetros adicionados com sucesso.','',__fResultGlobal,__fFaultGlobal);
+			}
+			
+			private function __UPDATE():void
+			{
+				SETTINGS_.enabled = false;
+
+				var _table:table_permission_set 	= new table_permission_set();
+
+				_table.ID_GROUP_PERMISSION 	= uint(ID_GROUP_PERMISSION_.text);
+				_table.ID_USER 				= uint(ID_USER_.text);
+				
+				_table.MIX 			        = MIX_.text;
+				_table.PROPERTY 			= PROPERTY_.text;
+				_table.VALUE                = VALUE_.text;
+				
+				_table.IN_NOTIN             = IN_.selected == true ? 1 : 0 ;
+				
+				var _sql:String = new gnncSql().__UPDATE(_table,new table_permission_set(_idPermissionSet),true);
+				_PERMISSION_SET.__sql(_sql,'Parâmetros atualizados com sucesso.','',__fResultGlobal,__fFaultGlobal);
+			}
+			
+			private function __DELETE():void
+			{
+				if(!_idPermissionSet|| SETTINGS_.selectedIndex < 0)
+				{
+					new gnncAlert().__alert('Selecione novamente na lista o parâmetro que deseja remover.');
+					return;
+				}
+
+				SETTINGS_.enabled = false;
+
+				var _sql:String = new gnncSql().__DELETE(new table_permission_set,[_idPermissionSet],true);
+				_PERMISSION_SET.__sql(_sql,'Parâmetros removidos com sucesso.','',__fResultGlobal,__fFaultGlobal);
+			}
+			
+			private function __setIn(e:MouseEvent):void
+			{
+				IN_.selected = NOTIN_.selected = false;
+				e.currentTarget.selected = true;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:Rect width="100%" height="100%" > 
+		<s:fill>
+			<s:SolidColor color="0xFAFAFA"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:HGroup left="20" top="20" right="20" bottom="20" gap="20" >
+		<s:VGroup width="100%" gap="5">
+			<s:Label text="Permissões Avançadas" fontSize="12" fontWeight="bold" verticalAlign="middle" paddingBottom="10" />
+			<s:DropDownList id="SETT_" dataProvider="{gnncGlobalArrays._permissionSet}" width="100%" height="25" change="{__settingSelectedArray()}" prompt="Selecione..."/>
+			<s:HGroup width="100%" gap="2">
+				<s:Label text="MIX" width="100%" />
+			</s:HGroup>
+			<s:HGroup width="100%" gap="2">
+				<s:TextInput id="MIX_" width="100%" text="" height="25"/>
+			</s:HGroup>
+			<s:HGroup width="100%" gap="2">
+				<s:Label text="Grupo de Permissão:" width="100%" />
+				<s:Rect width="25" />
+				<s:Label text="Usuário: (unid)" width="100%" />
+			</s:HGroup>
+			<s:HGroup width="100%" height="25" gap="2">
+				<s:TextInput id="ID_GROUP_PERMISSION_" width="100%" text="" height="25"/>
+				<s:Label text="or" width="25" textAlign="center" height="25" verticalAlign="middle" />
+				<s:TextInput id="ID_USER_" width="100%" text="" height="25" />
+			</s:HGroup>
+			<s:HGroup width="100%" gap="2">
+				<s:Label text="Propriedade:" width="100%" />
+				<s:Rect width="25" />
+				<s:Label text="Valor(es): (,)" width="100%" />
+			</s:HGroup>
+			<s:HGroup width="100%" height="25" gap="2">
+				<s:TextInput id="PROPERTY_" width="100%" text="" height="25"/>
+				<s:Label text="=" width="25" textAlign="center" height="25" verticalAlign="middle" />
+				<s:TextInput id="VALUE_" width="100%" text="" height="25" />
+			</s:HGroup>
+			<s:Label text="Condição:" />
+			<s:HGroup width="100%" height="25" gap="2">
+				<s:CheckBox id="IN_" width="100%" label="Contém (IN)" height="25" click="{__setIn(event)}"/>
+				<s:CheckBox id="NOTIN_" width="100%" label="Não contém (NOTIN)" height="25" click="{__setIn(event)}" />
+			</s:HGroup>
+			<s:Label text="Método:" />
+			<s:HGroup width="100%" height="25" gap="2">
+				<s:DropDownList id="METHOD_" dataProvider="{_method}" width="100%" prompt="Selecione" />
+				<s:Button id="btnExe_" label="Executar" click="{__EXEC()}" />
+			</s:HGroup>
+			<s:Label text="Este parâmetro será permanentemente excluído." height="25" width="100%" color="0xCC0000" fontSize="11" fontWeight="bold" visible="{(METHOD_.selectedIndex==3)?true:false}" verticalAlign="middle" />
+			<s:Rect height="10" />
+			<s:HGroup width="100%" gap="1">
+				<s:Button label="Fechar" click="{__close()}" fontWeight="bold" height="25" />
+				<s:Button label="Atualizar" click="{__settingRefresh()}" height="25" />
+				<s:Label id="loading_" text="" verticalAlign="middle" height="25" paddingLeft="10"/>
+			</s:HGroup>
+		</s:VGroup>
+		<s:VGroup width="350" height="100%" gap="0">
+			<s:DataGrid id="SETTINGS_" dataProvider="{new ArrayCollection()}" width="350" height="100%" gridClick="{__settingSelected()}" mouseUp="{__settingSelected()}" keyUp="{__settingSelected()}" showDataTips="true" >
+				<s:columns>
+					<s:ArrayList>
+						<s:GridColumn dataField="ID_GROUP_PERMISSION" headerText="IDPG" width="30" />
+						<s:GridColumn dataField="ID_USER" headerText="IDUSR" width="30" />
+						<s:GridColumn dataField="MIX"     headerText="MIX" />
+						<s:GridColumn dataField="PROPERTY" headerText="Propriedade" width="60"  />
+						<s:GridColumn dataField="IN_NOTIN" headerText="Contém" width="30" />
+						<s:GridColumn dataField="VALUE" headerText="Valor" />
+					</s:ArrayList>
+				</s:columns>
+			</s:DataGrid>
+		</s:VGroup>
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

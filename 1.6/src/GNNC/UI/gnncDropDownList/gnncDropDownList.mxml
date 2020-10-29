@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="100%" height="25" creationComplete="__start()"
+		 >
+	<s:layout>
+		<s:HorizontalLayout/>
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.keyboard.gnncKeyboard;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			private function __start():void
+			{
+				if(this.height!=25)
+				{
+					var h:Number = this.height;
+					list_.height        = h;
+				}
+				list_.addEventListener(IndexChangeEvent.CARET_CHANGE,__changeIndex);
+				list_.addEventListener(FlexEvent.VALUE_COMMIT,__changeCommit);
+				list_.addEventListener("stopPropagationCheck",__stopPropagationCheck);
+			}
+
+			[Bindable] public function set dataProvider(value_:ArrayCollection):void{ list_.dataProvider = value_; };
+			public function get dataProvider()				:ArrayCollection{ return new ArrayCollection(list_.dataProvider.toArray()) };
+
+			public function set itemRenderer(value_:IFactory):void{ list_.itemRenderer = value_ };
+			public function get itemRenderer()				:IFactory{ return list_.itemRenderer };
+
+			public function set selectedIndex(value_:int)	:void{ list_.selectedIndex = value_ };
+			public function get selectedIndex()				:int{ return list_.selectedIndex };
+
+			public function set value(number_:uint)			:void{ __selectId(number_) };
+			public function get value()						:uint{ return list_.selectedIndex>-1?list_.selectedItem.ID:0 };
+			
+			private function __selectId(id_:Object):void
+			{
+				if(!id_)
+					return;
+				list_.selectedIndex = new gnncDataArrayCollection().__getIndex(new ArrayCollection(list_.dataProvider.toArray()),'ID',id_);
+			}
+
+			private function __changeIndex(e:*=null):void
+			{
+			}
+			
+			private function __changeCommit(e:*=null):void
+			{
+			}
+
+			private function __stopPropagationCheck(e:*=null):void
+			{
+				gnncKeyboard.__stopPropagation(e);
+				e.data;
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:DropDownList id="list_" dataProvider="{new ArrayCollection()}" height="25" width="100%" prompt="Selecione..." />
+	
+</s:Group>

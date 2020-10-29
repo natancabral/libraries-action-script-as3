@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  creationComplete="__start();"
+		  
+		  width="100%" height="100%" xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*"
+		  >
+
+	<fx:Declarations>
+		<fx:String id="htmlSample">
+			<![CDATA[<p textIndent="15">Here is a sample of some HTML code with a little <span fontWeight="bold">bold text</span> and <span fontStyle="italic">italics</span> thrown in for good measure.</p>
+			<p textIndent="15">You can even place graphics inline like <img source="http://polygeek.com/images/pG_logos/polyGeek_AIR_logo_16.png" width="16" height="16" alt="polyGeek AIR logo" /> this.</p>
+			<p textIndent="15">This is <span fontFamily="Times New Roman">Times New Roman.</span></p>
+		]]></fx:String>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			
+			//http://polygeek.com/flex/2249_displayHTMLText_SparkTextArea/srcview/index.html
+			
+			import mx.collections.ArrayCollection;
+			import flashx.textLayout.formats.TextLayoutFormat;
+			import spark.utils.TextFlowUtil;
+			
+			private var _workingText:String;
+			private var _codeTLF:TextLayoutFormat;
+			private var _defaultTLF:TextLayoutFormat;
+			
+			[ Bindable ] private var _fontFamilyAC:ArrayCollection;
+			[ Bindable ] private var _fontSizeAC:ArrayCollection;
+			
+			private function __start():void {
+				
+				gatherFonts();
+				
+				// define the TextLayoutFormat for code
+				_codeTLF = new TextLayoutFormat();
+				_codeTLF.color = 0x990000;
+				_codeTLF.fontWeight = 'normal';
+				
+				// define the TextLayoutFormat for default text
+				_defaultTLF = new TextLayoutFormat();
+				_defaultTLF.color = 0x000000;
+				_defaultTLF.fontWeight = 'normal';
+				
+				htmlInput.text = htmlSample;
+				onHTMLInputChange();
+			}
+			
+			// Get a list of all the fonts on the users machine and 
+			// place them in the fontFamily DropDownList.
+			private function gatherFonts():void {
+				_fontFamilyAC = new ArrayCollection();
+				var fonts:Array = Font.enumerateFonts( true );
+				var len:int = fonts.length;
+				for( var i:int = 0; i < len; i++ ) {
+					
+					_fontFamilyAC.addItem( fonts[i] );
+				}
+				
+				_fontSizeAC = new ArrayCollection();
+				for( var n:int = 8; n < 32; n += 2 ) {
+					var o:Object = new Object();
+					o.fontSize = n;
+					_fontSizeAC.addItem( o );
+				}
+				
+				fontFamilyDDL.selectedIndex = 0;
+				fontSizeDDL.selectedIndex = 0;
+			}
+			
+			// The htmlInput has to have the CHANGE listener turned off while 
+			// the html code is being highlighted or else there will be a StackOverflow.
+			private function setChangeListener( isListening:Boolean ):void {
+				if( isListening ) {
+					htmlInput.addEventListener( Event.CHANGE, onHTMLInputChange );
+				} else {
+					htmlInput.removeEventListener( Event.CHANGE, onHTMLInputChange );
+				}
+			}
+			
+			private function onHTMLInputChange( e:Event=null ):void 
+			{
+				// If the text isn't properly formated it will produce an error.
+				// That's why there is the try/catch below. In the catch I'm displaying 
+				// the last string of text that did render without errors and then
+				// turning on the error message.
+				try 
+				{
+					htmlDisplay.textFlow 			= TextFlowUtil.importFromString( htmlInput.text );
+					htmlDisplay2.textFlow 	= TextFlowUtil.importFromString( htmlInput.text );
+					_workingText 					= htmlInput.text;
+					msg.visible = true;
+				} 
+				catch ( e:Error ) 
+				{
+					htmlDisplay.textFlow 			= TextFlowUtil.importFromString( _workingText );
+					htmlDisplay2.textFlow 	= TextFlowUtil.importFromString( _workingText );
+					msg.visible 					= false;
+				}
+				
+				highlightTextHTMLcode(); // highlights the HTML code
+			}
+			
+			private function highlightTextHTMLcode():void 
+			{
+				setChangeListener( false ); // Turn the change listener off while we are working on htmlInput field.
+				
+				// Set all of the text format to default.
+				htmlInput.setFormatOfRange( _defaultTLF, 0, htmlInput.text.length );
+				
+				var currentIndex:int = 0;
+				var s:String = htmlInput.text;
+				
+				// Highlight the code sections between the <> characters.
+				while( s.indexOf( '<', currentIndex ) != -1 ) {
+					var startIndex:int = s.indexOf( '<', currentIndex );
+					var endIndex:int = s.indexOf( '>', startIndex );
+					currentIndex = endIndex;
+					htmlInput.setFormatOfRange( _codeTLF, startIndex, endIndex + 1 );
+				}
+				setChangeListener( true ); // Turn the change listener back on.
+			}
+			
+			/**
+			 *     Generic stylize method for changing: fontSize, fontFamily, bold, italics, link
+			 */
+			
+			private function onStylize( name:String, style:String ):void 
+			{
+				if(htmlInput.selectionActivePosition == htmlInput.selectionAnchorPosition)
+					return;
+
+				var selectedText:String = htmlInput.text.substring( htmlInput.selectionAnchorPosition, htmlInput.selectionActivePosition );
+				htmlInput.insertText( '<span ' + name + '="' + style + '">' + selectedText + '</span>' );
+				onHTMLInputChange();
+			}
+			
+			private function onLink():void 
+			{
+				if(htmlInput.selectionActivePosition == htmlInput.selectionAnchorPosition)
+					return;
+
+				var selectedText:String = htmlInput.text.substring( htmlInput.selectionAnchorPosition, htmlInput.selectionActivePosition );
+				htmlInput.insertText( '<a href="' + linkInput.text + '">' + selectedText + '</a>' );
+				onHTMLInputChange();
+			}
+			
+			private function onLineBreak():void 
+			{
+				if(htmlInput.selectionActivePosition != htmlInput.selectionAnchorPosition)
+					return;
+
+				var selectedText:String = htmlInput.text.substring( htmlInput.selectionAnchorPosition, htmlInput.selectionActivePosition );
+				htmlInput.insertText( '<br/>' );
+				onHTMLInputChange();
+			}
+			
+			private function onParagraph():void 
+			{
+				if(htmlInput.selectionActivePosition == htmlInput.selectionAnchorPosition)
+					return;
+
+				var selectedText:String = htmlInput.text.substring( htmlInput.selectionAnchorPosition, htmlInput.selectionActivePosition );
+				htmlInput.insertText( '<p>' + selectedText + '</p>' );
+				onHTMLInputChange();
+			}
+			
+			
+		]]>
+	</fx:Script>
+	
+	<!--comps:AppBorder w="{ this.width }" h="{ this.height }" bgAlpha="0"/-->
+	
+	<s:VGroup width="100%" height="100%" paddingLeft="10" paddingRight="15" paddingTop="10" paddingBottom="5">
+		
+		<s:HGroup gap="1">
+			<s:Button label="italics" fontStyle="italic" click="onStylize( 'fontStyle', 'italic' )" />
+			<s:Button label="bold" fontWeight="bold" click="onStylize( 'fontWeight', 'bold' )" />
+			<s:Button label="underline" click="onStylize( 'textDecoration', 'underline' )" />
+			<mx:ColorPicker id="colorPicker" 	change="onStylize( 'color', '#' + colorPicker.selectedColor.toString(16) )" />
+			<s:DropDownList id="fontFamilyDDL" 	dataProvider="{ _fontFamilyAC }" labelField="fontName" width="175" change="onStylize( 'fontFamily', fontFamilyDDL.selectedItem.fontName )" />
+			<s:DropDownList id="fontSizeDDL" 	dataProvider="{ _fontSizeAC }" labelField="fontSize" width="75" change="{ onStylize( 'fontSize', fontSizeDDL.selectedItem.fontSize ) }" />
+		</s:HGroup>
+		
+		<s:HGroup width="100%" gap="1">
+			<s:Button label="&lt;br/&gt;" click="onLineBreak();" />
+			<s:Button label="&lt;p&gt;" click="onParagraph();" />
+			<s:TextInput id="linkInput" width="150" text="http://" />
+			<s:Button label="link" color="#0000FF" click="onLink()" />
+		</s:HGroup>
+		
+		<s:TextArea id="htmlInput"  width="100%" height="100%" />
+		
+		<s:Group>
+			<s:Label id="msg" text="Displaying HTML code from above." fontSize="9" />
+			<s:Label text="Error displaying HTML code from above. Just keep adding code until it's correct and well formatted." color="#FF0000" visible="{ !msg.visible }" fontSize="9" />
+		</s:Group>
+
+		<gnncTextEdit:gnncTextEdit id="htmlDisplay2" width="100%" height="100%" />
+		
+		<s:TextArea id="htmlDisplay" width="100%" height="100%" editable="true" />
+		
+	</s:VGroup>
+	
+</s:Module>

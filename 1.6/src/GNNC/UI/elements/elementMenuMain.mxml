@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group  xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			xmlns:s="library://ns.adobe.com/flex/spark" 
+			xmlns:mx="library://ns.adobe.com/flex/mx" 
+			height="100%" 
+			xmlns:elements="GNNC.UI.elements.*" 
+			creationComplete="{start()}"
+			>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.elements.elementLoading;
+			import GNNC.UI.gnncLoading.gnncLoading;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.time.gnncTime;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.ICollectionView;
+			import mx.collections.IList;
+			import mx.events.EffectEvent;
+			import mx.events.FlexEvent;
+			import mx.events.TreeEvent;
+			import mx.graphics.SolidColor;
+			
+			private var dp:ArrayCollection = new ArrayCollection();
+			private var historyPageLoading:Array = new Array();			
+			private var blockAction:Boolean = false;
+			
+			public var initialIndex:uint = 0;
+			public var moduleStackCenterIndex:uint = 0;
+			public var moduleAccondionLeftIndex:uint = 0;
+
+			public var loadingPaddingLeft:int = 0;//68+200;
+			public var loadingPaddingRight:int = 0;
+			public var loadingPaddingTop:int = 0;
+			public var loadingPaddingBottom:int = 0;
+			
+			[Bindable]
+			public var barWidth:uint = 68;
+
+			public function set backgroundColor(v:uint):void{
+				bgColorRect.fill = new SolidColor(v);
+			}
+			
+			public function start():void{
+			}
+			
+			public function createPageLoad():void
+			{
+				var s:String = String(initialIndex+moduleStackCenterIndex+moduleAccondionLeftIndex);
+				var t:uint = 1300;
+				
+				/*if(historyPageLoading.indexOf(s)!==-1){
+					dispatchEvent(new gnncEventGeneral(gnncEventGeneral._selectItem));
+					return;
+				}
+				historyPageLoading.push(s);
+				*/
+
+				//top="35" left="68" right="0" bottom="10"
+				var p:elementLoading = new elementLoading();
+				p.backgroundColor = 0xeeeeee;
+				p.top = loadingPaddingTop;
+				p.left = loadingPaddingLeft;
+				p.right = loadingPaddingRight;
+				p.bottom = loadingPaddingBottom;
+				p.setStyle('loading','true');
+				gnncGlobalStatic._parent.addElement(p);
+				
+				callLater(function():void{
+					dispatchEvent(new gnncEventGeneral(gnncEventGeneral._selectItem))
+				});
+				
+				new gnncTime().__start(t,function():void{ 
+					var n:uint = gnncGlobalStatic._parent.numElements-1;
+					if(gnncGlobalStatic._parent.getElementAt(n).getStyle('loading')=='true'){
+						gnncGlobalStatic._parent.removeElementAt(n); 
+					}
+				},2);
+			}
+			
+			public function set dataProvider(v:ArrayCollection):void{
+				dp = v;
+				applyDP();
+			}
+			
+			public function applyDP():void{
+				menuV.dataProvider = dp as Object;
+				menuV.selectedIndex = 0;
+			}
+
+			public function get dataProvider():ArrayCollection{
+				return dp as ArrayCollection ;
+			}
+
+			public function open():void{
+				
+				if(blockAction == true)
+					return;
+				blockAction = true;
+
+				//menuVertical.width = (menuVertical.width == 200 ? 35 : 200); menuVerticalTree.selectedIndex = (menuVertical.width == 200 ? 0 : 1); 
+				//this.width = menuVertical.width = 200; 
+				menuVerticalTree.selectedIndex = 0; 
+					resizerOpen.play();
+			}
+
+			public function close():void{
+				
+				if(blockAction == true)
+					return;
+				blockAction = true;
+
+				//menuVertical.width = (menuVertical.width == 200 ? 35 : 200); menuVerticalTree.selectedIndex = (menuVertical.width == 200 ? 0 : 1); 
+				//this.width = menuVertical.width = barWidth; 
+				menuVerticalTree.selectedIndex = 1; 
+				resizerClose.play();
+				hitsCount = 0;
+			}
+
+			private var hitsCount:uint = 0;
+			public function closeTimes(hitsToClose:uint=15):void{
+				hitsCount += 1;
+				if(hitsCount<hitsToClose)
+					return;
+				close();
+			}
+
+			private function treeIconFunc(item:Object):Class 
+			{
+				var iconClass:Class = null;
+				switch (item.icon) {
+					case "flex":
+					case null:
+						iconClass = gnncEmbedBlackWhite.bw_project_job_16;
+						break;
+				}
+				if(iconClass!=null)
+					return iconClass;
+				if(item.icon is Class || item.icon is Object)
+					return Class(item.icon);
+				return iconClass;
+			}
+			
+			private function treeItemClick(evt:*):void 
+			{
+				if (menuV.selectedIndex<0)
+					return;
+
+				var item:Object = Tree(evt.currentTarget).selectedItem;
+				var eventType:String;
+				var b:Boolean = false;
+				
+				if(item.index!=null)
+					initialIndex = item.index;
+				if(item.stackCenterIndex!=null)
+					moduleStackCenterIndex = item.stackCenterIndex;
+				if(item.accordionLeftIndex!=null)
+					moduleAccondionLeftIndex = item.accordionLeftIndex;
+				
+				if(item.index!=null)
+				createPageLoad();
+
+				if (Tree(evt.currentTarget).dataDescriptor.isBranch(item)){
+					b = Tree(evt.currentTarget).isItemOpen(item);
+					Tree(evt.currentTarget).expandItem(item, !b, true);
+					// Clicking on anything other than the arrow doesn't dispatch the
+					// normal Tree events, so manually dispatch...
+					eventType = b ? TreeEvent.ITEM_OPEN : TreeEvent.ITEM_CLOSE;
+					var event:TreeEvent = new TreeEvent(eventType);
+					event.item = item;
+					Tree(evt.currentTarget).dispatchEvent(event);
+				}
+				
+				
+			}
+			
+			private function treeKeyBoard(evt:KeyboardEvent):void 
+			{
+				evt.preventDefault();
+				evt.stopPropagation();
+			}
+			
+			private function treeLabelFuncXML(item:XML):String 
+			{
+				var children:ICollectionView;
+				var suffix:String = "";
+				if (menuV.dataDescriptor.isBranch(item)) {
+					children = menuV.dataDescriptor.getChildren(item);
+					suffix = " (" + children.length + ")";
+				}
+				return item[menuV.labelField] + suffix;
+			}
+			
+			private function treeLabelFunc(item:Object):String 
+			{				
+				var suffix:String = "";
+				var label:String = item[menuV.labelField];
+				
+				return label;
+				
+				if(menuV.selectedIndex < 0)
+					return label;
+				if (!item.hasOwnProperty('children'))
+					return label;
+				if(item.children == null)
+					return label;
+				if(item.children is ArrayCollection){
+					suffix = " (" + ArrayCollection(item.children).length + ")";
+				}
+				return label + suffix;
+			}
+			
+			private function treeCreationComplete(e:FlexEvent):void
+			{
+				applyDP();
+			}
+			
+			protected function effectEndHandler(event:EffectEvent):void
+			{
+				blockAction = false;
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<s:Resize id="resizer" target="{menuVertical}" duration="0" effectEnd="effectEndHandler(event)" />
+		<s:Resize id="resizerOpen" target="{this,menuVertical}" widthTo="250" duration="0" effectEnd="effectEndHandler(event)"/>
+		<s:Resize id="resizerClose" target="{this,menuVertical}" widthTo="{barWidth}" duration="0" effectEnd="effectEndHandler(event)"/>
+		<mx:Fade id="f" duration="300"/> 
+	</fx:Declarations>
+	<s:RectangularDropShadow width="{menuVertical.width}" height="100%" alpha=".4" angle="75"
+							 blurX="7" blurY="7" distance="1" brRadius="0" tlRadius="0" blRadius="0" trRadius="0"
+							 />
+	<s:Rect id="bgColorRect" width="100%" height="100%" fill="{new SolidColor(0x777777)}"/>
+	<!-- s:Rect width="100%" height="100%" fill="{new SolidColor(0x111111)}" blendMode="colorburn" alpha=".3"/ -->
+	
+	<s:Scroller id="menuVertical" width="250" height="100%" horizontalScrollPolicy="off" >
+		<s:Group width="100%" height="100%">
+			<mx:ViewStack id="menuVerticalTree" width="100%" height="100%" hideEffect="{f}" showEffect="{f}"
+						  backgroundAlpha="0" contentBackgroundAlpha="0"
+						  >
+				<s:NavigatorContent width="100%" height="100%" creationPolicy="all" backgroundAlpha="0" contentBackgroundAlpha="0" >
+					<s:Group width="100%" height="100%">
+						<s:layout>
+							<s:VerticalLayout gap="0" padding="0" paddingTop="70"/>
+						</s:layout>
+						<!-- s:Group width="100%" height="40" buttonMode="true" click="{ close() }">
+						<elements:elementBarStatus height="40" colorStart="0x555555" colorEnd="0x484848"/>
+						<s:HGroup width="100%" height="40" gap="1" paddingLeft="10" paddingRight="5"
+						verticalAlign="middle">
+						
+						<s:Rect width="10"/>
+						
+						<s:VGroup width="25" padding="5" gap="2">
+						<s:Rect width="100%" radiusX="0" radiusY="0" fill="{new SolidColor(0xffffff)}" height="2"/>
+						<s:Rect width="100%" radiusX="0" radiusY="0" fill="{new SolidColor(0xffffff)}" height="2"/>
+						<s:Rect width="100%" radiusX="0" radiusY="0" fill="{new SolidColor(0xffffff)}" height="2"/>
+						</s:VGroup>
+						
+						<elements:elementLabelFont width="100%" fontSize="16" text="MENU"
+						fontWeight="normal" paddingLeft="6"
+						paddingTop="2" color="0xffffff"/>
+						
+						<elements:elementLabelFont fontSize="11" text="FECHAR" paddingTop="1" paddingLeft="3" paddingRight="15"
+						color="0xffffff"
+						/>
+						
+						</s:HGroup>
+						</s:Group -->
+						<mx:Tree id="menuV" width="100%" height="100%" horizontalScrollPolicy="off" 
+								 contentBackgroundAlpha="1"
+								 contentBackgroundColor="0x269083"
+								 color="0xffffff"
+								 labelField="name"
+								 showRoot="false" 
+								 borderStyle="none"
+								 borderVisible="false" 
+								 selectionColor="0x777777"
+								 selectionDisabledColor="{null}"
+								 
+								 selectionDuration="200"
+								 openDuration="200"
+								 
+								 iconFunction="treeIconFunc"
+								 itemRenderer="GNNC.UI.elements.itemRender.itemRender_menu_forTree"
+								 labelFunction="treeLabelFunc"
+								 itemClick="treeItemClick(event)"
+								 creationComplete="treeCreationComplete(event)"
+								 keyDown="treeKeyBoard(event)"
+								 >
+						</mx:Tree>
+					</s:Group>
+					<elements:elementLabelFont fontSize="11" text="FECHAR" paddingTop="10" paddingLeft="3" paddingRight="10" right="0" top="0"
+											   color="0xffffff" click="{close()}" buttonMode="true"
+											   />
+				</s:NavigatorContent>
+				<s:NavigatorContent width="100%" height="100%" creationPolicy="all">
+					<s:layout>
+						<s:VerticalLayout gap="1" paddingTop="68"/>
+					</s:layout>
+					<s:Group width="100%" height="40" click="{ open() }" rollOver="{ open() }" buttonMode="true">
+						<s:VGroup width="25" padding="5" gap="2" horizontalCenter="0" verticalCenter="0">
+							<s:Rect width="100%" radiusX="0" radiusY="0" fill="{new SolidColor(0xffffff)}" height="2"/>
+							<s:Rect width="100%" radiusX="0" radiusY="0" fill="{new SolidColor(0xffffff)}" height="2"/>
+							<s:Rect width="100%" radiusX="0" radiusY="0" fill="{new SolidColor(0xffffff)}" height="2"/>
+						</s:VGroup>
+					</s:Group>
+				</s:NavigatorContent>
+			</mx:ViewStack>
+		</s:Group>
+	</s:Scroller>
+</s:Group>

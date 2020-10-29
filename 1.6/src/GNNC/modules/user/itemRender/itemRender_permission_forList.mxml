@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				
+				width="100%" height="30"
+				rightMouseDown="{__menuRight(event)}" 
+				
+				autoDrawBackground="false" 
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.event.gnncCloseEvent;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.gnncEmbedLogo;
+			import GNNC.modules.user.formNew.newPermissionHost;
+			import GNNC.sqlTables.table_permission;
+			
+			private var connExec:gnncAMFPhp 	= new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp 	= new gnncPopUp();
+			
+			private function __menuRight(e:MouseEvent):void
+			{
+				var n:String = gnncData.__firstLetterUpperCase(gnncGlobalArrays.__programName(data.ID_PROGRAM));
+				var itemUser:ContextMenuItem  		= new ContextMenuItem(n,false,false);
+				itemUser.addEventListener			(Event.SELECT,function(e:Event):void{  });
+				
+				// Create custom context menu. 
+				var cm:ContextMenu 	= new ContextMenu();
+				cm.hideBuiltInItems	();
+				cm.customItems 		= [itemUser];
+				
+				this.contextMenu 	= cm;
+			}
+			
+			private function __dispatche(send_:String):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(send_,data));
+			}
+
+			private function __changeProgram(id_:uint):Object
+			{
+				return gnncEmbedLogo['LOGO_'+gnncGlobalArrays.__programName(id_)+'_16'];
+			}
+
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="hovered"/>
+		<s:State name="selected"/>
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Rect includeIn="hoveredAndShowsCaret,hovered" left="0" right="1" top="0" bottom="0"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect includeIn="selected,selectedAndShowsCaret" left="0" right="1" top="0" bottom="0"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:HGroup left="1" top="1" right="1" bottom="2" gap="5" verticalAlign="middle" paddingLeft="6" paddingRight="3" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF">
+		
+		<s:Image source="{gnncEmbedBlackWhite.bw_permission_16}" toolTip="{'Permissão, Id: '+data.ID}"/>
+		<s:Group width="16">
+			<s:Rect width="16" height="16" radiusX="3" radiusY="3">
+				<s:fill>
+					<s:SolidColor color="0xeeeeee"/>
+				</s:fill>
+			</s:Rect>
+			<s:Image source="{__changeProgram(data.ID_PROGRAM)}"/>
+		</s:Group>
+		
+		<s:Label text="{data.ID_PROGRAM==11?'ManagerBB (administradores)':gnncData.__firstLetterUpperCase(gnncGlobalArrays.__programName(data.ID_PROGRAM))}" fontWeight="bold" fontSize="12" width="100%" maxDisplayedLines="1" showTruncationTip="true" paddingTop="1" />
+		
+	</s:HGroup>
+	
+	<elements:elementHLine bottom="0" left="0" right="0" alpha=".5"/>
+	
+</s:ItemRenderer>

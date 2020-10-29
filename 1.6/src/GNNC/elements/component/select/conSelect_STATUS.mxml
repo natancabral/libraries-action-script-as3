@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 
+		 creationComplete="{__start()}" 
+		 
+		 width="100%" height="25" 
+		 >
+	<s:layout>
+		<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+	</s:layout>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.category.formNew.newCategory;
+			import GNNC.sqlTables.table_category;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.IndexChangedEvent;
+			import mx.events.PropertyChangeEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			public var   _iconComponent:Object 				= null;
+			public const _iconClear:Object 					= gnncEmbedBlackWhite.bw_clear_14_selection;
+			public const _component:String 					= 'STATUS';
+			public const _name:String 						= 'Status Atual';
+			
+			public var _ICON:Boolean 						= true;
+			public var _CLEAR:Boolean 						= true;
+			
+			public function set selectedIndex(value_:int)	:void{ LIST_.selectedIndex = value_; __changeEvent(null); };
+			public function get selectedIndex()				:int{ return LIST_.selectedIndex };
+			
+			public function set value(value_:int)			:void{ __selectedValue(value_) };
+			public function get value()						:int{ return LIST_.selectedIndex>-1?LIST_.selectedItem.data:0 };
+			
+			public var _CHANGE_EVENT:Function = function(e:IndexChangeEvent):void{};
+			
+			private function __start():void
+			{
+				if(this.height!=25)
+				{
+					var h:Number = this.height;
+					LIST_.height        = h;
+					buttonClear.height  = buttonClear.width = h;
+				}
+
+				if(!_ICON) 			removeElement(icon);
+				if(!_ICON) 			removeElement(margin);
+				if(!_ICON)			icon.source = _iconComponent;
+				
+				if(!_CLEAR)			removeElement(buttonClear);
+			}
+			
+			private function __selectedValue(value_:int):void
+			{
+				if(LIST_.dataProvider.length)
+					LIST_.selectedIndex = value_;
+				
+				__changeEvent(null);
+			}
+			
+			public function __clear():void
+			{
+				value 				= 0;
+				LIST_.selectedIndex = -1;
+				icon.source			= gnncEmbedImage.STATUS_NULL_16;
+			}
+			
+			public function __changeEvent(e:IndexChangeEvent):void
+			{
+				icon.source 		= selectedIndex<0?gnncEmbedImage.STATUS_NULL_16:selectedIndex==0?gnncEmbedImage.STATUS_RED_16:selectedIndex==1?gnncEmbedImage.STATUS_GREEN_16:selectedIndex==2?gnncEmbedImage.STATUS_YELLOW_16:gnncEmbedImage.STATUS_GREY_16;
+				
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:Image id="icon" source="{gnncEmbedImage.STATUS_NULL_16}" toolTip="{_name}" width="16" />
+	<s:Rect id="margin" width="3" />
+	
+	<s:DropDownList id="LIST_" width="100%" minWidth="100" height="25" prompt="Selecione..."  
+					dataProvider="{gnncGlobalArrays._CLIENT_STATUS}"
+					labelField="label" change="{__changeEvent(event); _CHANGE_EVENT(event)}" 
+					enabled="{LIST_.dataProvider.length>0?true:false}"
+					 
+					/>
+	
+	<s:Button id="buttonClear" icon="{_iconClear}" width="25" toolTip="Limpar seleção" click="{__clear()}" skinClass="GNNC.skin.button.skin_buttonLink" />
+	
+</s:Group>

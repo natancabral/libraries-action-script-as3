@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<flexLibProperties includeAllClasses="true" useMultiPlatformConfig="false" version="3">
+  <includeClasses>
+    <classEntry path="GNNC.audio.gnncAudio"/>
+    <classEntry path="GNNC.UI.gnncPaint.ControlPanel"/>
+    <classEntry path="GNNC.UI.gnncPaint.DrawingStateChangeEvent"/>
+    <classEntry path="GNNC.UI.gnncPaint.DrawingCanvasElement"/>
+    <classEntry path="GNNC.UI.gnncPaint.ShaperlyNew"/>
+    <classEntry path="GNNC.UI.gnncDateButton.gnncDateButton"/>
+    <classEntry path="GNNC.UI.gnncImage.gnncImageCD"/>
+    <classEntry path="GNNC.UI.elements.conElement_TimerProjectJob"/>
+    <classEntry path="GNNC.UI.elements.conElement_projectCommentJonAndDiscussion"/>
+    <classEntry path="GNNC.UI.elements.elementMenuMain"/>
+    <classEntry path="GNNC.UI.elements.itemRender.itemRender_menu_forTree"/>
+    <classEntry path="GNNC.data.bitmap.gnncBitmapGif"/>
+    <classEntry path="GNNC.UI.components.componentLoadingBoxText"/>
+    <classEntry path="GNNC.data.globals.gnncGlobalStaticProjects"/>
+  </includeClasses>
+  <includeResources/>
+  <namespaceManifests/>
+</flexLibProperties>

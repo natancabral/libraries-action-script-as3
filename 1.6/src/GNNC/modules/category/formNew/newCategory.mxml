@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  xmlns:series="GNNC.elements.component.series.*" 
+		  creationComplete="{__start()}" 
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.elements.component.series.conNewSeries_class;
+			import GNNC.sqlTables.table_category;
+			
+			[Bindable] public var _TABLE_CATEGORY:table_category 	= new table_category();
+			[Bindable] public var _MIX:String 						= 'CATEGORY';
+			
+			/*
+			//[HostComponent(GNNC.elements.component.series.conNewSeries_class)]
+
+			
+			http://stackoverflow.com/questions/4293118/how-to-put-mxml-child-nodes-within-a-custom-flex-4-component
+			
+			If you add <fx:Metadata>[DefaultProperty("content")]</fx:Metadata> to MyComponent.mxml 
+			you can remove the <myComponents:content> tags when you use the class. See above. –  Stephenr Jun 18 at 
+			
+			*/
+			private function __start():void
+			{
+				seriesComponent_._MIX 			= _MIX;
+				seriesComponent_._tableClass 	= _TABLE_CATEGORY;
+			}			
+			
+		]]>
+	</fx:Script>
+
+	<series:conNewSeries_class id="seriesComponent_" />
+
+</s:Module>

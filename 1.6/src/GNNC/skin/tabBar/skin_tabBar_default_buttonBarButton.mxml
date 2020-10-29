@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:SparkButtonSkin xmlns:fx="http://ns.adobe.com/mxml/2009" 
+                   xmlns:s="library://ns.adobe.com/flex/spark" 
+                   xmlns:fb="http://ns.adobe.com/flashbuilder/2009"
+                   minWidth="22" minHeight="22" 
+                   alpha.disabled="0.5" xmlns:ELEMENTS="gNial.ELEMENTS.*" xmlns:elements="GNNC.UI.elements.*" >
+    
+    <!-- host component -->
+    <fx:Metadata>
+        <![CDATA[ 
+        /** 
+         * @copy spark.skins.spark.ApplicationSkin#hostComponent
+         */
+        [HostComponent("spark.components.ButtonBarButton")]
+        ]]>
+    </fx:Metadata>
+    
+    <!-- states -->
+    <s:states>
+        <s:State name="up" />
+        <s:State name="over" stateGroups="overStates" />
+        <s:State name="down" stateGroups="downStates" />
+        <s:State name="disabled" stateGroups="disabledStates" />
+        <s:State name="upAndSelected" stateGroups="selectedStates, selectedUpStates" />
+        <s:State name="overAndSelected" stateGroups="overStates, selectedStates" />
+        <s:State name="downAndSelected" stateGroups="downStates, selectedStates" />
+        <s:State name="disabledAndSelected" stateGroups="selectedUpStates, disabledStates, selectedStates" />
+    </s:states>
+
+	<s:Group left="1" right="1" top="1" bottom="1">
+		<s:Group left="1" right="1" top="1" bottom="1"/>
+	</s:Group>
+
+	<!--s:Rect left="0" right="0" top="0" bottom="0" alpha=".5" includeIn="upAndSelected,up">
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF" />
+		</s:fill>
+	</s:Rect-->
+
+	<s:Rect left="1" right="1" top="1" bottom="1" includeIn="down,downAndSelected,downStates,selectedStates" radiusX="2">
+		<s:fill>
+			<s:SolidColor color="0xFAFAFA" />
+		</s:fill>
+	</s:Rect>
+
+	<!--s:Rect left="0" right="0" top="0" height="2" includeIn="down,downAndSelected,downStates,selectedStates">
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF" />
+		</s:fill>
+	</s:Rect-->
+
+	<s:Rect left="1" right="1" top="1" bottom="1" alpha=".5" includeIn="over,overAndSelected,overStates" radiusX="2">
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF" />
+		</s:fill>
+	</s:Rect>
+
+    <!--- @copy spark.components.supportClasses.ButtonBase#labelDisplay -->
+	<!--
+	color.down="0xFFFFFF" color.downAndSelected="0xFFFFFF" 
+	color.downStates="0xFFFFFF" color.selectedStates="0xFFFFFF" color.over="0xFFFFFF" 
+	fontSize="12"
+	-->
+    <elements:elementLabelDropShadow id="labelDisplay"  
+
+						color="0x555555"
+						color.selectedUpStates="0x000000"
+						color.selectedStates="0x000000"
+
+						trackingLeft=".1" trackingRight=".1"
+
+						textAlign="center"
+			            verticalAlign="middle"
+			            maxDisplayedLines="1"
+			            horizontalCenter="0" verticalCenter="1"
+						
+						paddingLeft="10" paddingRight="10"
+			            left="0" right="0" top="2" bottom="2" 
+	/>
+	
+</s:SparkButtonSkin>

@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="700" height="500" 
+		  
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.UI.gnncView.gnncViewHtml;
+			import GNNC.UI.gnncView.gnncViewImage;
+			import GNNC.data.file.gnncFilesNative;
+			import GNNC.data.file.gnncFilesRemote;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedExtension;
+			import GNNC.sqlTables.table_attach;
+			
+			import spark.components.Image;
+			import spark.components.TextArea;
+			
+			public var _TABLE_ATTACH:table_attach 	= new table_attach();
+			public var _urlAttach:String 			= '';
+			
+			private var _pageImage:gnncViewImage;
+			private var _pageHtml:gnncViewHtml	= new gnncViewHtml();
+			private var _txt:TextArea 			= new TextArea();
+			
+			//private var _gnncFiles:gnncFiles	= new gnncFiles();
+			private var _gnncFiles:gnncFilesNative	= new gnncFilesNative();
+			
+			public var _change:Boolean = false;
+			
+			private function __start():void
+			{
+				__maximizePopUP();
+				__menuContext(null);
+				__fView();
+				__setValues();
+				__btnZoom(false);
+				
+				new gnncPopUp().__toFront(this);
+			}
+			
+			private function __menuContext(e:MouseEvent):void
+			{
+				var itemClose:ContextMenuItem 	= new ContextMenuItem('Fechar',false,true);
+				itemClose.addEventListener		(Event.SELECT,function(e:Event):void{ __close() });
+				
+				var cm:ContextMenu 				= new ContextMenu();
+				cm.hideBuiltInItems				();
+				cm.customItems 					= [itemClose];
+				box_.contextMenu 				= cm;
+			}
+			
+			
+			protected function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			protected function __maximizePopUP():void
+			{
+				//this.width 	= parentApplication.parent.width;
+				//this.height = parentApplication.parent.height;
+				new gnncPopUp(this).__center(this);
+			}
+			
+			protected function __attachLoaction(cache_:Boolean=true,getUrlString_:Boolean=false):String
+			{
+				if(getUrlString_)
+					return _urlAttach;
+				else
+					return _TABLE_ATTACH.FILE_HTTP+'ATTACH/'+gnncGlobalStatic._dataBase.toUpperCase()+'/'+_TABLE_ATTACH.FILE_LINK+((cache_)?'?'+Math.random():'');
+			}
+			
+			protected function __setValues():void
+			{
+				updateCompletePendingFlag 	= true;
+				drawFocus					(true);
+				//iconExt_.setFocus			();
+				
+				//iconExt_.source 			= gnncEmbedExtension.__fileExtension(_TABLE_ATTACH.EXTENSION,32);
+				NAME_.text 					= _TABLE_ATTACH.NAME.toLowerCase();
+				//SIZE_.text 					= '(' + gnncFiles.__bytes2Legend(_TABLE_ATTACH.SIZE)+')';
+				SIZE_.text 					= '(' + gnncFilesRemote.__bytes2Legend(_TABLE_ATTACH.SIZE)+')';
+			}
+			
+			protected function __btnZoom(visible_:Boolean):void
+			{
+				btnZoomIn_.visible 			= visible_;
+				btnZoomOut_.visible 		= visible_;
+			}
+			
+			protected function __fView():void
+			{
+				if(_urlAttach)
+				{
+					_pageImage 				= new gnncViewImage(_urlAttach);
+					groupStage_.addElement	(_pageImage);
+					__btnZoom				(true);
+					return;
+				}
+				
+				if(!_TABLE_ATTACH)
+					return;
+				
+				if(!_TABLE_ATTACH.ID)
+					return;
+				
+				switch(_TABLE_ATTACH.EXTENSION.toLowerCase())
+				{
+					case 'jpg':
+					case 'jpeg':
+					case 'gif':
+					case 'png':
+						
+						_pageImage 				= new gnncViewImage(__attachLoaction());
+						groupStage_.addElement	(_pageImage);
+						__btnZoom				(true);
+						break;
+					
+					/*
+					case 'htm':
+					case 'html':
+						
+						_pageHtml.top			= 40;
+						_pageHtml.bottom		= 40;
+						_pageHtml.left			= 40;
+						_pageHtml.right			= 40;
+						_pageHtml.__create		(__attachLoaction());
+						groupStage_.addElement	(_pageHtml);
+						break;
+					*/
+					
+					/*case 'pdf':
+						
+						_pageHtml.top			= 40;
+						_pageHtml.bottom		= 40;
+						_pageHtml.left			= 40;
+						_pageHtml.right			= 40;
+						_pageHtml.__create		(__attachLoaction());
+						groupStage_.addElement	(_pageHtml);
+						break;*/
+					
+					case 'txt':
+					case 'ini':
+					case 'as':
+					case 'css':
+					case 'gnnc':
+					case 'xml':
+						
+						_txt.top				= 15;
+						_txt.bottom				= 15;
+						_txt.left				= 15;
+						_txt.right				= 15;
+						_txt.setStyle			('fontSize',13);
+						_txt.setStyle			('fontWeight','normal');
+						_txt.setStyle			('contentBackgroundAlpha',0);
+						_txt.setStyle			('borderVisible',false);
+						_txt.editable			= false;
+						_txt.text				= 'Aguarde...';
+						groupStage_.addElement	(_txt);
+						
+						//_gnncFiles.__download	(__attachLoaction(false),'a','txt','',false,false,'TMP',__fResultLoadText,__fFaultLoadText);
+						_gnncFiles.__loadUrl	(__attachLoaction(false),__fResultLoadText,__fFaultLoadText);
+						
+						break;
+					
+					default:
+						
+						var _img:Image 			= new Image();
+						_img.horizontalCenter 	= 0;
+						_img.verticalCenter 	= 0;
+						_img.source 			= gnncEmbedExtension.__fileExtension(_TABLE_ATTACH.EXTENSION,128);
+						groupStage_.addElement	(_img);
+				}
+				
+				groupStage_.setFocus	();
+				
+			}
+			
+			private function __fResultLoadText		(e:*=null):void{ _txt.text = _gnncFiles._DATA_UTF.toString() }
+			private function __fFaultLoadText		(e:*=null):void{ _txt.text = 'Erro.' }
+			
+			protected function __fileDownload():void
+			{
+				if(!_TABLE_ATTACH)
+					return;
+				
+				if(!_TABLE_ATTACH.ID)
+					return;
+				
+				var NAME:Array = _TABLE_ATTACH.NAME.split(".");
+				//new gnncFiles().__downloadWithBrowser(__attachLoaction(),NAME[0],_TABLE_ATTACH.EXTENSION);
+				new gnncFilesNative().__saveUrlWithBrowserNative(__attachLoaction(),NAME[0],_TABLE_ATTACH.EXTENSION,gnncFilesNative._documentDirectory);
+			}
+			
+			protected function __fileOpen():void
+			{
+				var NAME:Array = _TABLE_ATTACH.NAME.split(".");
+				//new gnncFiles().__download(__attachLoaction(),NAME[0].toString(),_TABLE_ATTACH.EXTENSION.toString(),'GNNC',true);
+				new gnncFilesNative().__loadUrlAndWriteFile(__attachLoaction(),NAME[0],_TABLE_ATTACH.EXTENSION.toString(),'GNNC',true);
+			}
+			
+			protected function __ZOOM_LESS():void
+			{
+				if(!_TABLE_ATTACH)
+					return;
+				
+				if(!_TABLE_ATTACH.ID)
+					return;
+				
+				_pageImage.zoomOut();
+			}
+			
+			protected function __ZOOM_MORE():void
+			{
+				if(!_TABLE_ATTACH)
+					return;
+				
+				if(!_TABLE_ATTACH.ID)
+					return;
+				
+				_pageImage.zoomIn();
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBox id="box_" width="100%" height="100%"/>
+	
+	<s:Rect width="100%" height="100%">
+		<s:fill>
+			<s:SolidColor color="0xffffff"/>
+		</s:fill>
+	</s:Rect>
+
+	<s:Group width="100%" height="100%"/>
+	
+	<s:Group left="10" top="10" right="10" bottom="45">
+		<mx:Canvas id="groupStage_" width="100%" height="100%" horizontalScrollPolicy="off" verticalScrollPolicy="off" backgroundAlpha="0" />
+	</s:Group>
+
+	<elements:elementBarStatus left="0" bottom="0" right="0" height="35" alpha=".7" />
+	<s:HGroup left="1" bottom="1" right="1" height="35" gap="1" verticalAlign="middle" fontSize="11" paddingLeft="7" paddingRight="5" >
+		
+		<!-- s:Image id="iconExt_" source="" / -->
+		<s:Label id="SIZE_" text="" fontSize="11" maxDisplayedLines="1" paddingTop="3" paddingRight="3" />
+		<s:Label id="NAME_" text="" fontSize="11" width="100%" showTruncationTip="true" maxDisplayedLines="1" fontWeight="bold" color="0x000000" paddingTop="3" />
+		
+		<s:Button id="btnZoomOut_" icon="{gnncEmbedBlackWhite.bw_zoom_16_out}" width="25" height="25" toolTip="Diminuir Zoom" click="__ZOOM_LESS()" />
+		<s:Button id="btnZoomIn_" icon="{gnncEmbedBlackWhite.bw_zoom_16_in}" width="25" height="25" toolTip="Aumentar Zoom" click="__ZOOM_MORE()" />
+		
+		<s:Rect width="5"/>
+		
+		<s:Button icon="{gnncEmbedBlackWhite.bw_view_16}" label="Abrir" height="25" fontWeight="bold" click="{__fileOpen()}"/>
+		<s:Button icon="{gnncEmbedBlackWhite.bw_download_16}" label="Salvar" height="25"  fontWeight="bold" click="{__fileDownload()}"/>
+		
+		<s:Rect width="5"/>
+		
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" height="25"  click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink"/>
+		
+	</s:HGroup>
+	
+</s:Module>

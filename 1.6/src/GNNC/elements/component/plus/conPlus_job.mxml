@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="25" height="25" 
+		 creationComplete="{__start()}" 
+		 xmlns:stage="GNNC.elements.stage.*" 
+		 xmlns:elements="GNNC.UI.elements.*"
+		 >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.gnncEmbedImage;
+			
+			import mx.collections.ArrayCollection;
+			import mx.utils.ArrayUtil;
+			import mx.utils.ObjectUtil;
+			
+			public function set _BUTTON_LINK(value_:Boolean):void
+			{
+				if(!value_)
+					button_.setStyle('skinClass','GNNC.skin.button.skin_buttonLink');
+			}
+			
+			private const _DELETE:ArrayCollection = new ArrayCollection 
+				([
+					{	label: 'Deletar', 				action: 'DELETE',		icon: gnncEmbedImage.REMOVE_16		,array: null	}
+				]);
+			
+			private const _CONTROL:ArrayCollection = new ArrayCollection 
+				([
+					{	label: 'Aprovar', 				action: 'CONTROL_OK',	icon: gnncEmbedImage.CONTROL_16_OK	,array: null	},
+					{	label: 'Desaprovar', 			action: 'CONTROL',		icon: gnncEmbedImage.CONTROL_16		,array: null	}
+				]);
+			
+			private const _ACTIVE:ArrayCollection = new ArrayCollection 
+				([
+					{	label: 'Normal', 				action: 'LEVEL_0',		icon: gnncEmbedImage.JOB_16			,array: null	},
+					{	label: 'Urgente', 				action: 'LEVEL_1',		icon: gnncEmbedImage.URGENT_16		,array: null	},
+					{	label: 'Alerta Erro', 			action: 'LEVEL_2',		icon: gnncEmbedImage.ALERT_16		,array: null	}
+				]);
+			
+			private const _SEND:ArrayCollection = new ArrayCollection 
+				([
+					{	label: 'Aos Favoritos', 		action: 'STAR',			icon: gnncEmbedImage.STAR_16		,array: null	},
+					{	label: 'Arquivos (0)', 			action: 'ATTACH',		icon: gnncEmbedImage.ATTACH_16		,array: null	},
+					{	label: 'Comentários (0)', 		action: 'COMMENT',		icon: gnncEmbedImage.COMMENT_16_NEW	,array: null	}
+				]);
+			
+			private const _FINAL:ArrayCollection = new ArrayCollection 
+				([
+					{	label: 'Finalizar', 			action: 'DATE_FINAL',	icon: gnncEmbedImage.OK_16			,array: null	},
+					{	label: 'Remover Finalização',	action: 'DATE_FINAL_NO',icon: gnncEmbedImage.OK_16_BW		,array: null	}
+				]);
+			
+			private const _LIST:ArrayCollection = new ArrayCollection
+				([
+					{	label: 'Visualizar', 			action: 'VIEW',			icon: gnncEmbedImage.VIEW_16		,array: null		},
+					{	label: 'Editar', 				action: 'EDIT',			icon: gnncEmbedImage.EDIT_16		,array: null		},
+					{	label: 'Delete', 				action: '',				icon: gnncEmbedImage.REMOVE_16		,array: _DELETE		},
+					{	label: 'Favoritos', 			action: 'STAR',			icon: gnncEmbedImage.STAR_16		,array: null		},
+					{	label: 'Novo Arquivos (0)', 	action: 'ATTACH',		icon: gnncEmbedImage.ATTACH_16		,array: null		},
+					{	label: 'Novo Comentários (0)', 	action: 'COMMENT',		icon: gnncEmbedImage.COMMENT_16_NEW	,array: null		},
+					{	label: 'Finalizar', 			action: '',				icon: gnncEmbedImage.OK_16			,array: _FINAL		},
+					{	label: 'Controle', 				action: '',				icon: gnncEmbedImage.CONTROL_16		,array: _CONTROL	},
+					{	label: 'Tipos', 				action: '',				icon: gnncEmbedImage.JOB_16			,array: _ACTIVE		}
+				]);
+			
+			private function __start():void
+			{
+				LIST_.dataProvider = new ArrayCollection(_LIST.source);
+			}
+			
+			private function __openMenu(value_:Boolean):void
+			{
+				MENU_.displayPopUp = value_; //!MENU_.displayPopUp;
+				LIST_.selectedIndex	= -1;
+			}
+			
+			private function __selectItem():void
+			{
+				var IDX:int = LIST_.selectedIndex;
+				if(IDX>-1)
+				{
+					new gnncAlert(parentApplication).__alert(LIST_.dataProvider.getItemAt(LIST_.selectedIndex).action);
+					
+					if(LIST_.dataProvider.getItemAt(IDX).action!='')
+						__openMenu(false);
+					
+					LIST_.dataProvider = new ArrayCollection(_LIST.source);
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<s:Button id="button_" icon="{gnncEmbedImage.MORE_16}" left="0" top="0" right="0" bottom="0" click="{__openMenu(true)}" skinClass="GNNC.skin.button.skin_buttonLink" />
+	<s:PopUpAnchor id="MENU_" width="200" popUpHeightMatchesAnchorHeight="false" displayPopUp="false" popUpPosition="topLeft" rollOut="{__openMenu(false)}">
+		<s:Group width="200" top="0" bottom="0">
+			<elements:elementStageBox/>
+			<s:VGroup width="200" gap="0" paddingBottom="5" rollOut="{__openMenu(false)}">
+				<s:Group width="200" height="30">
+					<elements:elementBarGray radiusX="3"/>
+					<elements:elementLabelDropShadow x="27" y="9" fontSize="11" fontWeight="normal" text="SOLICITAÇÃO (JOB)"/>
+					<s:BitmapImage source="{gnncEmbedImage.MORE_16}" top="6" left="5"/>
+					<!--s:Button icon="{gnncEmbedImage.LESS_16}" width="20" height="20" click="{__openMenu()}" skinClass="gNial.SKIN.BUTTON.SKIN_BUTTON_LINK" top="5" right="5" /-->
+				</s:Group>
+				<s:Rect height="5"/>
+				<s:List id="LIST_" labelField="label" width="200" borderVisible="false" height="{_LIST.length*25}" rollOverColor="0xCCCCCC" contentBackgroundAlpha="0" mouseUp="{__selectItem()}" >
+					<s:layout>
+						<s:VerticalLayout gap="0" paddingLeft="5" paddingRight="5"/>
+					</s:layout>
+					<s:itemRenderer>
+						<fx:Component>
+							<s:ItemRenderer height="{data.label=='-'?2:25}" width="190" enabled="{data.label=='-'?false:true}" >
+								<fx:Script>
+									<![CDATA[
+										
+										private function __removeSelect():void
+										{
+											if(LIST_INTER_.selectedIndex>-1)
+											{
+												Object(owner).dataProvider.getItemAt(itemIndex).action = LIST_INTER_.dataProvider.getItemAt(LIST_INTER_.selectedIndex).action;
+												LIST_INTER_.selectedIndex = -1;
+											}
+										}
+										
+									]]>
+								</fx:Script>
+								<s:states>
+									<s:State name="normal" />
+									<s:State name="hovered" />
+									<s:State name="selected" />
+									<s:State name="normalAndShowsCaret"/>
+									<s:State name="hoveredAndShowsCaret"/>
+									<s:State name="selectedAndShowsCaret"/>
+								</s:states>
+								<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret">
+									<s:fill>
+										<s:LinearGradient rotation="90">
+											<s:GradientEntry color="0x3785e2"/>
+											<s:GradientEntry color="0x2170cf"/>
+										</s:LinearGradient>
+									</s:fill>
+								</s:Rect>
+								<elements:elementHLine _COLOR="0xCCCCCC" left="0" right="0" bottom="1"/>
+								<elements:elementHLine _COLOR="0xFFFFFF" left="0" right="0" bottom="0"/>
+								<s:BitmapImage source="{data.icon}" top="4" left="6"  alpha=".5" alpha.hoveredAndShowsCaret="1" alpha.hovered="1" alpha.selectedAndShowsCaret="1" visible="{String(data.label).indexOf(':')>-1?false:true}"/>
+								<s:BitmapImage source="{data.icon}" top="4" right="6" alpha=".5" alpha.hoveredAndShowsCaret="1" alpha.hovered="1" alpha.selectedAndShowsCaret="1" visible="{String(data.label).indexOf(':')>-1?true:false}"/>
+								<s:Label text="{data.label}" fontWeight="bold" fontWeight.normalAndShowsCaret="normal" fontWeight.normal="normal" fontSize="11" color="0x111111" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" color.hovered="0x111111" left="30" top="7" right="10" showTruncationTip="true" />
+								<s:List id="LIST_INTER_" dataProvider="{data.array}" top="0" right="0" height="24" width="{data.array.length*24}" borderVisible="false" alpha=".5" alpha.hoveredAndShowsCaret="1" alpha.hovered="1" alpha.selectedAndShowsCaret="1" mouseDown="{__removeSelect()}">
+									<s:layout>
+										<s:HorizontalLayout gap="0" columnWidth="24"/>
+									</s:layout>
+									<s:itemRenderer>
+										<fx:Component>
+											<s:ItemRenderer height="24" width="24">
+												<s:Button icon="{data.icon}" width="24" height="24" toolTip="{data.label}" />
+											</s:ItemRenderer>
+										</fx:Component>
+									</s:itemRenderer>
+								</s:List>
+							</s:ItemRenderer>
+						</fx:Component>
+					</s:itemRenderer>
+				</s:List>
+			</s:VGroup>
+		</s:Group>
+	</s:PopUpAnchor>
+</s:Group>

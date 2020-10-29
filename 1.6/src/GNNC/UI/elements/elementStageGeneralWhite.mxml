@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="100%" height="100%" 
+		 xmlns:stage="GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*" 
+		 >
+	<s:layout>
+		<s:BasicLayout/>
+	</s:layout>
+	
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.IList;
+			
+			public function set dataProvider(value_:IList):void{		tabBar.dataProvider = value_;	}
+			public function set colorStart(value_:uint):void{			c1.color = value_;	}
+			public function set colorEnd(value_:uint):void{				c2.color = value_;	}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" >
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect left="0" top="0" right="0" height="70">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0xFFFFFF" id="c1"/>
+				<s:GradientEntry color="0xECECEC" id="c2"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<elements:elementHDropShadow top="70" alpha=".4"/>
+	
+	<s:TabBar id="tabBar" height="70" skinClass="GNNC.skin.tabBar.skin_tabBar_forMenuWhite" iconPlacement="top" horizontalCenter="0" />
+
+	<!--- Bottom bar -->
+	<s:Rect left="0" bottom="0" right="0" height="10">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0xBBBBBB"/>
+				<s:GradientEntry color="0xAAAAAA"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	<!--- Bottom bar end -->
+
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha=".2">
+		<s:stroke>
+			<s:SolidColorStroke color="0x666666" />
+		</s:stroke>
+	</s:Rect>
+
+</s:Group>

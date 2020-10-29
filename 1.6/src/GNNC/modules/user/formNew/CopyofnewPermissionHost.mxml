@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="600" height="500" 
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:select="GNNC.elements.component.select.*" 
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.gnncEmbedBank;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.gnncEmbedLogo;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_permission;
+			
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			private var _PERMISSION:gnncAMFPhp = new gnncAMFPhp();
+			[Bindable] private var _PERMISSION_PROGRAM:gnncAMFPhp = new gnncAMFPhp();
+			[Bindable] public var _TABLE_PERMISSION:table_permission = new table_permission();
+			
+			public const _MIX:String = 'PERMISSION';
+			
+			public var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			public var _change:Boolean = false;
+
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+						if(gnncKeyboard.__CONTROL_ENTER(event)) __SAVE();
+					}
+				);
+
+				__check();
+				__changeProgram();
+				callLater(__firstInput);
+				
+				GROUP_.LIST_.addEventListener(IndexChangeEvent.CARET_CHANGE,__permissionProgramList);
+			}
+			
+			public function __firstInput():void 
+			{ 
+			}
+			
+			private function __permissionProgramList(e:*=null):void
+			{
+				_PERMISSION_PROGRAM.__clear();
+				
+				var _f:Function = function(e:*):void
+				{
+					if(_PERMISSION_PROGRAM.DATA_ROWS)
+						currentState = 'program';
+					else
+						currentState = 'normal';
+				}
+				
+				var _table:table_permission = new table_permission();
+				_table.ID_GROUP 			= GROUP_.value;
+				var _sql:String 			= new gnncSql().__SELECT(_table);
+				
+				_PERMISSION_PROGRAM.__sql(_sql,'','',_f,_f);
+			}
+			
+			private function __check():void
+			{
+				if(_TABLE_PERMISSION != null)
+				{
+					if(_TABLE_PERMISSION.ID)
+					{
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var _sql:String = new gnncSql().__SELECT(new table_permission(_TABLE_PERMISSION.ID));
+						_PERMISSION.__sql(_sql,'','',__FRESULT_CHECK,__FFAULT_CHECK);
+					}
+				} 
+				else 
+				{
+					_TABLE_PERMISSION = new table_permission();
+				}
+			}
+			
+			protected function __FFAULT_CHECK(event:FaultEvent):void
+			{
+				gnncPopUp.__close();
+				__CLOSE();
+			}
+			
+			protected function __FRESULT_CHECK(event:ResultEvent):void
+			{
+				gnncPopUp.__close();
+				
+				if(!_PERMISSION.DATA_ROWS)
+				{
+					new gnncAlert().__error('Permissão não encontrada.');
+					__CLOSE();
+					return;
+				}
+				
+				BTN_SAVE_.label = 'Salvar Edição';
+				BTN_SAVE_.setStyle('icon',gnncEmbedImage.EDIT_16);
+				
+				var OBJ:Object				= _PERMISSION.DATA_ARR.getItemAt(0);
+
+				_TABLE_PERMISSION.ID		= OBJ.ID;
+				
+				PROGRAM_.selectedIndex		= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._PROGRAMS,'ID',OBJ.ID_PROGRAM);
+				GROUP_.value				= OBJ.ID_GROUP;
+				//NAME_MODULE.text			= OBJ.NAME_MODULE;
+				
+				ACC_.selected 				= OBJ.ACC;
+				
+				SEL_.selected 				= OBJ.ACC;
+				INS_.selected 				= OBJ.INS;
+				UPD_.selected 				= OBJ.UPD;
+				DEL_.selected 				= OBJ.DEL;
+				
+				MAI_.selected 				= OBJ.MAI;
+				ATT_.selected 				= OBJ.ATT;
+				ATS_.selected 				= OBJ.ATS;
+				
+				USR_.selected 				= OBJ.USR;
+				
+				//_TABLE_PERMISSION.SHO		= OBJ.SHO;
+				
+				/** PLUS **/
+				
+				PROGRAM_.enabled = false;
+				GROUP_.enabled = false;
+			}
+			
+			private function __CLOSE():void
+			{
+				new gnncPopUp().__close(this);
+			}
+
+			private function __SAVE():void
+			{
+				if(GROUP_.selectedIndex<0 || PROGRAM_.selectedIndex<0 || !ACC_.selected)
+				{
+					new gnncAlert().__error('A permissão em grupo, o aplicativo, e o acesso (padrão) são obrigatórios.');
+					return;
+				}
+				
+				//If program exist
+				if(_TABLE_PERMISSION.ID)
+					__SAVE_DATA();
+				else
+					__CONFIRM();
+			}
+			
+			private function __CONFIRM():void
+			{
+				var __fResult:Function	= function(e:*):void
+				{	
+					_gnncPopUp.__close(); 
+					
+					if(_PERMISSION.DATA_ROWS) 
+						new gnncAlert().__error('Este aplicativo já está cadastrado neste grupo.'); 
+					else
+						__SAVE_DATA(); 
+				};
+				
+				var __fFault:Function		= function(e:*):void
+				{	
+					_gnncPopUp.__close(); 
+				};
+				
+				_gnncPopUp.__loading		('Conferindo permissão do programa...');
+				var _table:table_permission = new table_permission();
+				_table.ID_GROUP				= GROUP_.value;
+				_table.ID_PROGRAM			= PROGRAM_.selectedItem.ID;
+				var _sql:String 			= new gnncSql().__SELECT(_table);
+				_PERMISSION.__sql			(_sql,'','',__fResult,__fFault);
+
+			}
+
+			private function __SAVE_DATA():void
+			{
+				_gnncPopUp.__loading();
+				
+				var _TABLE:table_permission = new table_permission();
+				_TABLE.ID					= _TABLE_PERMISSION.ID;
+				
+				_TABLE.ID_PROGRAM			= PROGRAM_.selectedItem.ID;
+				_TABLE.ID_GROUP				= GROUP_.value;
+				_TABLE.NAME_MODULE			= '*';
+				
+				/*_TABLE.ACC					= ACC_.selected ? 1 : 0;
+				
+				_TABLE.SEL					= SEL_.selected ? 1 : 0;
+				_TABLE.INS					= INS_.selected ? 1 : 0;
+				_TABLE.UPD					= UPD_.selected ? 1 : 0;
+				_TABLE.DEL					= DEL_.selected ? 1 : 0;
+				
+				_TABLE.MAI					= MAI_.selected ? 1 : 0;
+				_TABLE.ATT					= ATT_.selected ? 1 : 0;
+				_TABLE.ATS					= ATS_.selected ? 1 : 0;
+
+				_TABLE.USR					= USR_.selected ? 1 : 0;
+
+				_TABLE.SHO					= _TABLE_PERMISSION.SHO;*/
+
+				var _SQL:String 			= new gnncSql().__INSERT(_TABLE,false,true,true);
+
+				_PERMISSION.__sql			(_SQL,'','',__fResult,__fFault);
+			}
+
+			protected function __fFault(event:FaultEvent):void
+			{
+				gnncPopUp.__close();
+			}
+			
+			protected function __fResult(event:ResultEvent):void
+			{
+				_change = true;
+				gnncPopUp.__close();
+				__CLOSE();
+			}
+			
+			protected function __changeProgram(event:*=null):void
+			{
+				IMGP_.source = gnncEmbedLogo['LOGO_'+PROGRAM_.selectedItem.NAME+'_32'];
+				
+				ACC_.selected = 
+				
+				SEL_.selected = 
+				INS_.selected = 
+				UPD_.selected = 
+				DEL_.selected = 
+				
+				MAI_.selected = 
+				ATT_.selected = 
+				ATS_.selected = 
+				
+				USR_.selected = 
+			
+				false;
+			}
+			
+
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="program"/>
+	</s:states>
+	
+	<elements:elementStageBoxPopUp />
+	<elements:elementLabelFont id="titlePopUp_" text="PERMISSÃO" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+		<s:Rect width="100%"/>
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%">
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-10" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="10" />
+				</s:layout>
+				<s:FormItem label="Permissão em grupo" required="true"  >
+					<s:Image source="{gnncEmbedImage.PERMISSION_32}"/>
+					<select:conSelect_GROUP id="GROUP_" width="304" _ICON="false" _MIX="PERMISSION"/>
+				</s:FormItem>
+				<s:FormItem label="Cadastrados" required="true" includeIn="program" >
+					<s:layout>
+						<s:BasicLayout/>
+					</s:layout>
+					<s:List dataProvider="{_PERMISSION_PROGRAM.DATA_ARR}" width="100%" height="20" borderVisible="false" contentBackgroundAlpha="0">
+						<s:layout>
+							<s:HorizontalLayout gap="1"/>
+						</s:layout>
+						<s:itemRenderer>
+							<fx:Component>
+								<s:ItemRenderer width="20" height="20" autoDrawBackground="false">
+									<fx:Script>
+										<![CDATA[
+											import GNNC.data.globals.gnncGlobalArrays;
+											import GNNC.gnncEmbedLogo;
+											
+											private function __changeProgram(id_:uint):Object
+											{
+												return gnncEmbedLogo['LOGO_'+gnncGlobalArrays.__programName(id_)+'_16'];
+											}
+
+											private function __changeName(id_:uint):String
+											{
+												return gnncGlobalArrays.__programName(id_);
+											}
+
+										]]>
+									</fx:Script>
+									<s:Image source="{__changeProgram(data.ID_PROGRAM)}" width="16" height="16" horizontalCenter="0" verticalCenter="0" smooth="true" toolTip="{__changeName(data.ID_PROGRAM)}" />
+								</s:ItemRenderer>
+							</fx:Component>
+						</s:itemRenderer>
+					</s:List>
+					<s:Label text="Aguarde..." visible="{_PERMISSION_PROGRAM._loading}" height="25" verticalAlign="middle"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Aplicativo" visible="{GROUP_.LIST_.selectedIndex>-1}" >
+					<s:Group width="32" height="32">
+						<s:Image source="{gnncEmbedLogo.LOGO_GNNC_32}"/>
+						<s:Image id="IMGP_"/>
+					</s:Group>
+					<s:DropDownList id="PROGRAM_" labelField="NAME" dataProvider="{gnncGlobalArrays._PROGRAMS}" width="250" height="25" selectedIndex="0" fontWeight="bold" change="{__changeProgram()}"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" visible="{GROUP_.LIST_.selectedIndex>-1}" />
+				<s:FormItem label="" visible="{GROUP_.LIST_.selectedIndex>-1}" enabled="{PROGRAM_.selectedIndex>-1}">
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_ACCESS}"/>
+					<s:CheckBox id="ACC_" label="Acesso (padrão)" fontWeight="bold" width="170"/>
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_USER}"/>
+					<s:CheckBox id="USR_" label="Usuários (criar)" fontStyle="italic" enabled="{PROGRAM_.selectedIndex==-1?false:PROGRAM_.selectedItem.NAME=='USER'?true:false}"/>
+					<s:Image source="{gnncEmbedImage.URGENT_16}" toolTip="Atenção: Este item somente para usuário administradores, permitirá extremo acesso a todos os sistemas e também usuários."/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" visible="false" />
+				<s:FormItem label="" visible="{GROUP_.LIST_.selectedIndex>-1}" enabled="{ACC_.selected}">
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_SELECT}"/>
+					<s:CheckBox id="SEL_" label="Pesquisar" width="170"/>
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_INSERT}"/>
+					<s:CheckBox id="INS_" label="Cadastrar"/>
+				</s:FormItem>
+				<s:FormItem label="" visible="{GROUP_.LIST_.selectedIndex>-1}" enabled="{ACC_.selected}">
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_UPDATE}"/>
+					<s:CheckBox id="UPD_" label="Editar" width="170"/>
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_DELETE}"/>
+					<s:CheckBox id="DEL_" label="Excluir"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" visible="false" />
+				<s:FormItem label="" visible="{GROUP_.LIST_.selectedIndex>-1}" enabled="{ACC_.selected}">
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_MAIL}"/>
+					<s:CheckBox id="MAI_" label="Emails (enviar pelo sistema)"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" visible="false" />
+				<s:FormItem label="" visible="{GROUP_.LIST_.selectedIndex>-1}" enabled="{ACC_.selected}">
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_ATTACH}"/>
+					<s:CheckBox id="ATT_" label="Arquivos (visualizar e baixar)" width="170"/>
+					<s:BitmapImage source="{gnncEmbedImage.PERMISSION_ATTACH_SEND}"/>
+					<s:CheckBox id="ATS_" label="(enviar)"/>
+				</s:FormItem>
+			</s:Form>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%" />
+		<s:Button id="BTN_SAVE_" icon="{gnncEmbedBlackWhite.bw_permission_16_allow}" label="Cadastrar" click="{__SAVE()}" fontWeight="bold" >
+			<s:keyDown>
+				<![CDATA[
+				if( gnncKeyboard.__ENTER(event) && !gnncKeyboard.__CONTROL_ENTER(event) ) 
+				__SAVE()
+				]]>
+			</s:keyDown>
+		</s:Button>
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__CLOSE()}" />	
+	</s:HGroup>
+
+	<s:Button top="4" right="4" click="{__CLOSE()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+
+</s:Module>

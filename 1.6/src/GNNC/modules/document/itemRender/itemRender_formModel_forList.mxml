@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				width="100%" height="25" 
+				
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				xmlns:stage="GNNC.elements.stage.*"
+				doubleClickEnabled="true" xmlns:elements="GNNC.UI.elements.*" 
+				>
+	<!---
+	
+	For request Dispatch
+	
+	ATTACH_.addEventListener(gnncEventGeneral._view,__ATTACH_VIEW);
+	ATTACH_.addEventListener(gnncEventGeneral._delete,__ATTACH_DELETE);
+	ATTACH_.addEventListener(gnncEventGeneral._edit,__ATTACH_EDIT);
+	ATTACH_.addEventListener(gnncEventGeneral._refresh,__ATTACH_LIST);
+	
+	-->
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.date.gnncDate;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedImage;
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="hoveredAndShowsCaret,hovered" radiusX="4">
+		<s:fill>
+			<s:SolidColor color="0xDDDDDD"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" radiusX="4">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:HGroup left="5" top="0" right="5" bottom="0" gap="4" verticalAlign="middle" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" fontWeight.selected="bold" fontWeight.selectedAndShowsCaret="bold" >
+		<s:Image source="{gnncEmbedImage.FORM_16}" width="16" toolTip="{'Formulário, ID:'+data.ID}" />
+		<s:Label text="{data.TITLE}" showTruncationTip="true" maxDisplayedLines="1" fontSize="11" width="100%" paddingTop="1" paddingLeft="5" />
+		<s:Label text="{data.TYPE}" showTruncationTip="true" maxDisplayedLines="1" fontSize="11" width="40" paddingTop="1" paddingLeft="5" fontWeight="bold" />
+		<s:Label text="{gnncDate.__date2Legend(data.DATE)}" maxDisplayedLines="1" showTruncationTip="true" fontSize="10" paddingTop="1" width="75" />
+	</s:HGroup>
+	
+	<elements:elementHLine alpha=".2" bottom="0"/>
+	
+</s:ItemRenderer>

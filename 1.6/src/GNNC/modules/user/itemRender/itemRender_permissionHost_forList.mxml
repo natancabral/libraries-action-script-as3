@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				
+				width="100%" height="{Number(data.levl)==0?45:35}"
+				autoDrawBackground="false" xmlns:stage="GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+		
+			//denied
+			//allow
+			
+			/*private function __p(e:Event,s:String):void
+			{
+				var t:String = e.currentTarget.selected ? 'allow' : 'denied' ;
+				e.currentTarget.setStyle('icon',gnncEmbedBlackWhite['permission_16_'+s+'_'+t]);
+			}
+
+			//pNew:1, pEdt:1, pViw:1, pDel:1, pExc:0
+			
+			private function __pAll():void
+			{
+				pN.selected = !data.pNew ? false : pA.selected
+				pE.selected = !data.pEdt ? false : pA.selected
+				pV.selected = !data.pViw ? false : pA.selected
+				pD.selected = !data.pDel ? false : pA.selected
+				pX.selected = !data.pExc ? false : pA.selected
+				
+				pN.dispatchEvent(new Event(Event.CHANGE));
+				pE.dispatchEvent(new Event(Event.CHANGE));
+				pV.dispatchEvent(new Event(Event.CHANGE));
+				pD.dispatchEvent(new Event(Event.CHANGE));
+				pX.dispatchEvent(new Event(Event.CHANGE));
+			}*/
+			
+			private function model(o:Object,slice:uint,alpha:Boolean=true):*
+			{
+				var a:Array = String(o).split(',');
+				if(alpha)
+					return a[slice] == 'false' ? .1 : 1 ;
+				else
+					return a[slice] == 'false' ? false : true ;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="hovered"/>
+		<s:State name="selected"/>
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Rect left="0" right="1" top="0" bottom="0" visible="{Number(data.levl)==0?true:false}"
+			radiusX="3" radiusY="3">
+		<s:fill>
+			<s:SolidColor color="0xf7f7f7"/>
+		</s:fill>
+	</s:Rect>
+	
+	<!-- s:Rect includeIn="hoveredAndShowsCaret,hovered" left="0" right="1" top="0" bottom="0"
+			radiusX="3" radiusY="3">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect includeIn="normal" left="0" right="1" top="0" bottom="0" visible="{data.dang==true?true:false}"
+			radiusX="3" radiusY="3" alpha=".4">
+		<s:fill>
+			<s:SolidColor color="#ffcc00"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect includeIn="selected,selectedAndShowsCaret" left="0" right="1" top="0" bottom="0"
+			radiusX="3" radiusY="3">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect -->
+	
+	<s:HGroup left="1" top="1" right="1" bottom="2" gap="-1" verticalAlign="middle" paddingLeft="7" paddingRight="5" 
+			  color="0x333333"  >
+		
+		<s:VGroup gap="3" verticalAlign="middle" width="100%">
+			<s:Label text="{data.nick}" fontWeight="bold" fontSize="{Number(data.levl)==0?13:11}" width="250" maxDisplayedLines="1" showTruncationTip="true" paddingTop="1" paddingRight="4" 
+					 paddingLeft="{10*Number(data.levl)}"
+					 />
+			<s:Label text="{data.desc}" fontWeight="normal" fontSize="10" width="100%" maxDisplayedLines="1" showTruncationTip="true" paddingTop="0" paddingRight="4" 
+					 paddingLeft="{10*Number(data.levl)}" alpha=".5"
+					 />
+		</s:VGroup>
+		
+		<s:HGroup gap="1">
+			<s:Image source="{gnncEmbedBlackWhite.bw_access_16_lock}" width="16" height="16" alpha="{model(data.model,0,true)}"/>
+			<s:CheckBox enabled="{model(data.model,0,false)}" alpha="{model(data.model,0,true)}" scaleX=".9" scaleY=".9" toolTip="Permmissão de Acesso" />
+			<s:Rect width="1"/>
+			
+			<s:Image source="{gnncEmbedBlackWhite.bw_new_16}" width="16" height="16" alpha="{model(data.model,1,true)}"/>
+			<s:CheckBox enabled="{model(data.model,1,false)}" alpha="{model(data.model,1,true)}" scaleX=".9" scaleY=".9" toolTip="Cadastrar" />
+			<s:Rect width="1"/>
+			
+			<s:Image source="{gnncEmbedBlackWhite.bw_edit_16}" width="16" height="16" alpha="{model(data.model,2,true)}"/>
+			<s:CheckBox enabled="{model(data.model,2,false)}" alpha="{model(data.model,2,true)}" scaleX=".9" scaleY=".9" toolTip="Editar" />
+			<s:Rect width="1"/>
+			
+			<s:Image source="{gnncEmbedBlackWhite.bw_view_16}" width="16" height="16" alpha="{model(data.model,3,true)}"/>
+			<s:CheckBox enabled="{model(data.model,3,false)}" alpha="{model(data.model,3,true)}" scaleX=".9" scaleY=".9" toolTip="Visualizar" />
+			<s:Rect width="1"/>
+			
+			<s:Image source="{gnncEmbedBlackWhite.bw_delete_16}" width="16" height="16" alpha="{model(data.model,4,true)}"/>
+			<s:CheckBox enabled="{model(data.model,4,false)}" alpha="{model(data.model,4,true)}" scaleX=".9" scaleY=".9" toolTip="Excluir" />
+		</s:HGroup>
+		
+		<!-- s:Image source="{gnncEmbedBlackWhite.bw_all_16}"/ -->
+
+		<!--
+		'levl' => 0,
+		'dang' => false,
+		'name' => 'module-account',
+		'nick' => 'Módulo Contas',
+		'desc' => 'Visualização geral das contas',
+		'model'=> array(true,false,false,false,false)),
+		-->
+
+		<!-- s:ToggleButton width="25" height="25" icon="{gnncEmbedBlackWhite.permission_16_execute}"  />
+		<s:ToggleButton width="25" height="25" icon="{gnncEmbedBlackWhite.permission_16_new}"  />
+		<s:ToggleButton width="25" height="25" icon="{gnncEmbedBlackWhite.permission_16_edit}" />
+		<s:ToggleButton width="25" height="25" icon="{gnncEmbedBlackWhite.permission_16_view}"  />
+		<s:ToggleButton width="25" height="25" icon="{gnncEmbedBlackWhite.permission_16_delete}"  />
+		<s:ToggleButton width="25" height="25" icon="{gnncEmbedBlackWhite.bw_all_16}"  / -->
+
+	</s:HGroup>
+	
+	<elements:elementHLine bottom="0" left="0" right="0" alpha=".3" height="1"/>
+	
+</s:ItemRenderer>

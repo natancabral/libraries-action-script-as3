@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  xmlns:series="GNNC.elements.component.series.*" 
+		  width="750" height="400"
+		  creationComplete="{__start()}" 
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.sqlTables.table_series;
+			
+			[Bindable] public var _TABLE_SERIES:table_series = new table_series();
+			[Bindable] public var _MIX:String 				= 'SERIES';
+			
+			private function __start():void
+			{
+				seriesComponent_._MIX 			= _MIX;
+				seriesComponent_._tableClass 	= _TABLE_SERIES;
+			}			
+			
+		]]>
+	</fx:Script>
+	
+	<series:conNewSeries_class id="seriesComponent_" height="450"/>
+	
+</s:Module>

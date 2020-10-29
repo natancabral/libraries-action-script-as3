@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:VGroup xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="100%" height="100%"
+		  creationComplete="{start()}"
+		  gap="7"
+		  showEffect="{f}"
+		  hideEffect="{f}"
+		  effectStart="effectStartHandler(event)"
+		  effectEnd="effectEndHandler(event)"
+		  effectStop="effectEndHandler(event)"
+		  
+		  >
+	<fx:Script>
+		<![CDATA[
+			import mx.events.EffectEvent;
+			import mx.graphics.SolidColor;
+
+			public var colorElement:uint = 0xcccccc;
+			public var lineHeight:uint = 0xcccccc;
+			public var lineWidth:uint = 0xcccccc;
+			public var boxHeight:uint = 0xcccccc;
+			public var boxWidth:uint = 0xcccccc;
+			public var lineRows:uint = 5;
+
+			private function start():void
+			{
+				visible = false;
+				setStyle('loading','true');
+			}
+			
+			public function set stopLoading(v:Boolean):void 
+			{
+				setStyle('loading',v == true ? 'false' : 'true' );
+				box.fill = new SolidColor(colorElement);
+				box.width = boxWidth;
+				box.height = boxHeight;
+				
+				var len:uint = numElements;
+				for(var i:uint=0;i<len;i++){
+				}
+			}
+			public function stopLoadingAndRemove():void 
+			{
+				Object(parent).removeElement(this);
+			}
+			
+			protected function effectStartHandler(event:EffectEvent):void
+			{
+			}
+			
+			protected function effectEndHandler(event:EffectEvent):void
+			{
+				if(getStyle('loading')=='false')
+					return;
+				
+				callLater(function():void{
+					visible = !visible;
+				});
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Fade id="f" target="{this}" duration="2000" />
+	</fx:Declarations>
+	<s:HGroup gap="{gap}" width="100%">
+		<s:Rect id="box" width="70" height="70" fill="{new SolidColor(0xcccccc)}" radiusX="3" radiusY="3"/>
+		<s:VGroup gap="{gap}" width="100%">
+			<s:Rect width="98%" height="15" fill="{new SolidColor(0xcccccc)}" radiusX="3" radiusY="3"/>
+			<s:Rect width="70%" height="15" fill="{new SolidColor(0xcccccc)}" radiusX="3" radiusY="3"/>
+			<s:Rect width="90%" height="15" fill="{new SolidColor(0xcccccc)}" radiusX="3" radiusY="3"/>
+		</s:VGroup>
+	</s:HGroup>
+	<s:Rect width="50%" height="15" fill="{new SolidColor(0xcccccc)}" radiusX="3" radiusY="3"/>
+	<s:Rect width="85%" height="15" fill="{new SolidColor(0xcccccc)}" radiusX="3" radiusY="3"/>
+</s:VGroup>

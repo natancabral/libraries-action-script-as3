@@ -1,0 +1,520 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	width="500" height="480"
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:select="GNNC.elements.component.select.*" 
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*" 
+	xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*" 
+	xmlns:gnncDateButton="GNNC.UI.gnncDateButton.*" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.sqlTables.table_product_stock;
+			import GNNC.sqlTables.table_product_stock_lot;
+			
+			import mx.rpc.Fault;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+
+			public var _tableProductStock:table_product_stock = new table_product_stock();
+			public var _change:Boolean = false;
+			
+			private var _connProduct:gnncAMFPhp = new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			
+			private var idProductStockLot:uint = 0;
+			
+			private function __start():void
+			{
+				
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						/*if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}*/
+					}
+				);
+				
+				UNIT_TYPE_.addEventListener(IndexChangeEvent.CARET_CHANGE,__changeUnit);
+				PRODUCT_._changeIndexEvent = __changeIndexProduct;
+				__check();
+				
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void 
+			{ 
+				if(uint(_tableProductStock.ID_PRODUCT_STOCK_LOT)==0)
+					VALUE_OUT_.enabled = true;
+
+				if(uint(_tableProductStock.ID)==0)
+					PRODUCT_.value = _tableProductStock.ID_PRODUCT;
+			}
+			
+			public function __changeIndexProduct(e:*=null):void 
+			{ 
+				var unit:Number = Number(UNIT_.text);
+				var idPr:uint   = uint(PRODUCT_.value);
+				
+				if(idPr>0){
+					//if(unit==0)
+					//UNIT_.text = '1';
+					inputsValues_.visible = true;
+				}else{
+					inputsValues_.visible = false;
+				}
+				
+				UNIT_TYPE_.selectedIndex =  new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._UNIT_TYPE2,'data',PRODUCT_.unitType); 
+				if(UNIT_TYPE_.selectedIndex < 0)
+					return;
+				
+				if(UNIT_TYPE_.selectedItem.data == 'GG' || UNIT_TYPE_.selectedItem.data == 'ML'){
+					DECIMAL_.text = '3';
+					UNIT_.text = gnncDataNumber.__weightString(PRODUCT_.unit,3)+'';
+				}else{
+					DECIMAL_.text = '0';
+					UNIT_.text = gnncDataNumber.__safeClear(PRODUCT_.unit,0)+'';
+				}
+				
+				if(PRODUCT_.type == 'IN'){
+					VALUE_OUT_.enabled = true;
+				}else{
+					VALUE_OUT_.enabled = false;
+				}
+				
+				_gnncPopUp.__close();
+				
+				UNIT_.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN));
+				callLater(function():void{
+					UNIT_.setFocus();
+				});
+			}
+			
+			private function __check():void
+			{
+				var _SQL:String = '';
+				if(_tableProductStock != null){
+					if(_tableProductStock.ID){
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						_SQL = new gnncSql().__SELECT(new table_product_stock(_tableProductStock.ID),false,['*','(select NAME from dbd_product p where p.ID = dbd_product_stock.ID_PRODUCT) NAME','(select p.NAME_DYNAMIC from dbd_product_stock_lot p where p.ID = dbd_product_stock.ID_PRODUCT_STOCK_LOT limit 1) NAME_DYNAMIC','(select UNIT_TYPE from dbd_product p where p.ID = dbd_product_stock.ID_PRODUCT) UNIT_TYPE']);
+						_connProduct.__sql		(_SQL,'','',__fResultEdit,__fFaultEdit);
+					}else if(_tableProductStock.ID_PRODUCT_STOCK_LOT){
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						_SQL = new gnncSql().__SELECT(new table_product_stock_lot(_tableProductStock.ID_PRODUCT_STOCK_LOT),false,['NAME','NAME_DYNAMIC','DATE_EXPIRATION','DATE_FABRICATION','DATE_INSERT_STORAGE','ID']);
+						_connProduct.__sql		(_SQL,'','',__fResultEditLot,__fFaultEdit);
+					}else{
+						//ACTIVE_.value = 1;
+					}
+				} else {
+					_tableProductStock = new table_product_stock();
+					//ACTIVE_.value = 1;
+				}
+			}
+
+			protected function __fFaultEdit(event:*):void
+			{
+				_gnncPopUp.__close();
+				gnncPopUp(this).__close(this);
+			}
+
+			protected function __fResultEditLot(event:*):void
+			{
+				if(!_connProduct.DATA_ROWS)
+					return;
+				
+				var o:Object = _connProduct.DATA_ARR.getItemAt(0);
+				idProductStockLot = o.ID;
+
+				NAME_DYNAMIC_.text = o.NAME_DYNAMIC;
+
+				DATE_FABRICATION_.selectedDate     = gnncDate.__isNull(o.DATE_FABRICATION)    ? null:gnncDate.__string2Date(o.DATE_FABRICATION);
+				DATE_EXPIRATION_.selectedDate      = gnncDate.__isNull(o.DATE_EXPIRATION)     ? null:gnncDate.__string2Date(o.DATE_EXPIRATION);
+				DATE_INSERT_STORAGE_.selectedDate  = gnncDate.__isNull(o.DATE_INSERT_STORAGE) ? new Date():gnncDate.__string2Date(o.DATE_INSERT_STORAGE);
+
+				DATE_FABRICATION_.enabled    = false;
+				DATE_EXPIRATION_.enabled     = false;
+				DATE_INSERT_STORAGE_.enabled = false;
+				
+				new gnncNotification().__show('Lote','Lote selecionado',gnncEmbedBlackWhite.bw_tag_32);
+				_gnncPopUp.__close();
+			}
+			
+			protected function __fResultEdit(event:*):void
+			{
+				if(!_connProduct.DATA_ROWS)
+					return;
+				
+				var o:Object = _connProduct.DATA_ARR.getItemAt(0);
+				
+				_tableProductStock.ID		= o.ID; 
+				//PRODUCT_.value				= o.ID_PRODUCT;
+				PRODUCT_.setValue(o.NAME,o.ID_PRODUCT);
+				idProductStockLot           = o.ID_PRODUCT_STOCK_LOT;
+				
+				NAME_DYNAMIC_.text          = o.NAME_DYNAMIC;
+				
+				VALUE_OUT_.text				= o.VALUE_OUT;
+				UNIT_.text					= o.UNIT;
+				UNIT_TYPE_.selectedIndex	= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._UNIT_TYPE2,'data',o.UNIT_TYPE); 
+				
+				DATE_INSERT_STORAGE_.selectedDate  = gnncDate.__isNull(o.DATE_INSERT_STORAGE) ? new Date():gnncDate.__string2Date(o.DATE_INSERT_STORAGE);
+				DATE_FABRICATION_.selectedDate     = gnncDate.__isNull(o.DATE_FABRICATION)    ? null:gnncDate.__string2Date(o.DATE_FABRICATION);
+				DATE_EXPIRATION_.selectedDate      = gnncDate.__isNull(o.DATE_EXPIRATION)     ? null:gnncDate.__string2Date(o.DATE_EXPIRATION);
+				
+				_gnncPopUp.__close();
+				new gnncNotification().__show('Estoque','Estoque selecionado',gnncEmbedBlackWhite.bw_stock_32_storage);
+			}
+
+			private function __save():void
+			{
+				if(PRODUCT_.value==0){
+					new gnncNotification().__show('Produto','Selecione um produto ou serviço.');
+					return;
+				}
+				if(gnncDataNumber.__safeClear(UNIT_.text)<0){
+					new gnncNotification().__show('Unidade','Insira o valor da unidade do novo estoque.');
+					return;
+				}
+
+				_gnncPopUp.__loading();
+
+				var _sql:String = '';
+				
+				/*if(PRODUCT_.type == 'IN'){
+
+					var oIn:table_product_stock_lot_prodution = new table_product_stock_lot_prodution();
+					
+					oIn.ID			= _tableProductStock.ID;
+					oIn.ID_PRODUCT	= PRODUCT_.value;
+					oIn.ID_PRODUCT_STOCK_LOT = idProductStockLot;
+					
+					oIn.TYPE = 'IN';
+					
+					oIn.UNIT			= gnncDataNumber.__safeClear(UNIT_.text,0);
+					oIn.UNIT_TYPE       = PRODUCT_.unitType;
+					oIn.VALUE = gnncDataNumber.__safeClear(VALUE_OUT_.text);
+					oIn.DATE_INSERT_STORAGE = DATE_INSERT_STORAGE_.selectedDate == null ? '' : DATE_INSERT_STORAGE_.selectedDateString;
+					
+					_sql = new gnncSql().__INSERT(oIn,false,true,true);
+					_connProduct.__sql	(_sql,'','',__fResult,__fFault);
+
+				}else{*/
+
+					var o:table_product_stock 	= new table_product_stock();
+					
+					o.ID			= _tableProductStock.ID;
+					o.ID_PRODUCT	= PRODUCT_.value;
+					o.ID_PRODUCT_STOCK_LOT = idProductStockLot;
+
+					o.UNIT			= gnncDataNumber.__safeClear(UNIT_.text,0);
+					o.UNIT_TYPE     = PRODUCT_.unitType;
+					o.VALUE_OUT		= gnncDataNumber.__safeClear(VALUE_OUT_.text);
+					
+					o.TYPE_STORAGE = 'IN';
+					
+					o.DATE_FABRICATION    = DATE_FABRICATION_.selectedDate    == null ? '' : DATE_FABRICATION_.selectedDateString;
+					o.DATE_EXPIRATION     = DATE_EXPIRATION_.selectedDate     == null ? '' : DATE_EXPIRATION_.selectedDateString;
+					o.DATE_INSERT_STORAGE = DATE_INSERT_STORAGE_.selectedDate == null ? '' : DATE_INSERT_STORAGE_.selectedDateString; 
+					
+					_sql = new gnncSql().__INSERT(o,false,true,true);
+					_connProduct.__sql	(_sql,'','',__fResult,__fFault);
+
+				//}
+
+			}
+
+			protected function __fResult(event:ResultEvent):void
+			{
+				_change = true;
+				_gnncPopUp.__close();
+				__close();
+			}
+			
+			protected function __fFault(event:Fault):void
+			{
+				_gnncPopUp.__close();
+			}
+
+			public function __price():void
+			{
+				//VALUE_CONVERT_.text 		= gnncDataNumber.__safeReal(VALUE_.text);
+				VALUE_CONVERT_OUT_.text 	= gnncDataNumber.__safeReal(gnncData.__replace(VALUE_OUT_.text,',','.'));
+				//VALUE_PERCENT_.text 		= gnncDataNumber.__safeReal(Number(Number(VALUE_CONVERT_.text)*Number(RETURN_PERCENT_.text)/100));
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+
+			private function __changeUnit(e:*=null):void
+			{
+				if(UNIT_TYPE_.selectedIndex < 0){
+					return;
+				}
+				
+				if(UNIT_TYPE_.selectedItem.data == 'GG' || UNIT_TYPE_.selectedItem.data == 'ML'){
+					DECIMAL_.text = '3';
+					UNIT_.text = gnncDataNumber.__safeClearString(UNIT_.text,3);
+					//STOCK_MIN_.text = gnncDataNumber.__safeClearString(STOCK_MIN_.text,3);
+				}else{
+					DECIMAL_.text = '0';
+					UNIT_.text = gnncDataNumber.__safeClearString(UNIT_.text,0)+'';
+					//STOCK_MIN_.text = gnncDataNumber.__safeClearString(STOCK_MIN_.text,0)+'';
+				}
+				UNIT_.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN));
+				//STOCK_MIN_.dispatchEvent(new KeyboardEvent(KeyboardEvent.KEY_DOWN));
+				callLater(function():void{
+					UNIT_.setFocus();
+				});
+			}
+
+			/*private function getUnit(d:Object,returnHightWeight:Boolean=true,setUnitMetric:Boolean=true,returnNumber:Boolean=false):Object
+			{
+				var t:String = String(d.UNIT_TYPE).toLowerCase();
+				var n:Number = Number(d.UNIT);
+				var x:Object = n;
+				if(returnHightWeight==true)
+				{
+					x = n/1000;
+					if(t=='gg')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,1,'')+(!setUnitMetric?'':'Kg');
+					else if(t=='ml')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,2,'')+(!setUnitMetric?'':'L');
+				}
+				else if(returnHightWeight==false)
+				{
+					if(t=='gg')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,0,'')+(!setUnitMetric?'':'g');
+					else if(t=='ml')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,0,'')+(!setUnitMetric?'':'ml');
+				}
+				return String(d.UNIT);
+			}*/
+			
+			private function __valueProduct():void
+			{
+				if(PRODUCT_.selectedIndex<0){
+					//__clearData();
+					return;
+				}
+				if(gnncDataNumber.__weight(UNIT_.text)<0.001){
+					//__clearData();
+					return;
+				}
+				
+				var unit:Number = 0;
+				var u:Number = 0;
+				
+				if(UNIT_TYPE_.selectedIndex < 0)
+					UNIT_TYPE_.selectedIndex = 0;
+				
+				var o:Object = new Object();
+				o.UNIT      = PRODUCT_.unit;
+				o.UNIT_TYPE = PRODUCT_.unitType;
+				
+				//regra de 3 = (a*b)/c
+				//quero encontrar o valor R$, então é x.
+				//0.300g(a) - R$10,00(b)
+				//0.500g(c) - x
+				//(c*b)/a
+				
+				var a:Number = 0;
+				var b:Number = 0;
+				var c:Number = 0;
+				var x:Number = 0;
+				var v:Number = 0;
+				
+				if(PRODUCT_.type=='IN')
+					v = PRODUCT_.valueOut;
+				else
+					v = PRODUCT_.valueIn;
+
+				//sempre preço de custo
+				v = PRODUCT_.valueOut;
+
+				if(o.UNIT_TYPE=='GG' || o.UNIT_TYPE=='ML')
+				{
+					if(UNIT_.text.indexOf(',')>-1 || UNIT_.text.indexOf('.')>-1)
+						a = gnncDataNumber.__safeClear(PRODUCT_.unit)/1000;//gramas
+					else
+						a = gnncDataNumber.__safeClear(PRODUCT_.unit);//gramas
+					b = gnncDataNumber.__safeClear(v);//real
+					c = gnncDataNumber.__safeClear(UNIT_.text);//gramas
+					x = (c*b)/a;
+					
+					if(c==0)
+						x = 0;
+					
+					o.UNIT = c;
+					
+					//gnncGlobalLog.__add(Number((a*c)/b),'a1');
+					//gnncGlobalLog.__add(Number((a*b)/c),'a2');
+					
+					callLater(function():void{
+						callLater(function():void{
+							DECIMAL_.text = '3';
+							VALUE_OUT_.text = x.toFixed(Number(DECIMAL_.text)).replace('.',',');
+							//UNIT_STRING_.text   = String(getUnit(o,true,true,false));
+						});
+					});
+					
+				}
+				else
+				{
+					a = gnncDataNumber.__safeClear(PRODUCT_.unit);//gramas
+					b = gnncDataNumber.__safeClear(v);//real
+					c = gnncDataNumber.__safeClear(UNIT_.text);//gramas
+					x = (c*b)/a;
+					
+					if(c==0)
+						x = 0;
+					
+					o.UNIT = c;
+					
+					callLater(function():void{
+						callLater(function():void{
+							DECIMAL_.text = '0';
+							VALUE_OUT_.text = x.toFixed(Number(DECIMAL_.text)).replace('.',',');
+							//UNIT_STRING_.text   = String(getUnit(o,true,true,false));
+						});
+					});
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp/>
+	<elements:elementLabelFont id="titlePopUp_" text="ENTRADA DE ESTOQUE" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+		<s:Rect width="100%"/>
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%">
+			<s:layout>
+				<s:VerticalLayout gap="5" padding="20" />
+			</s:layout>
+
+			<s:Label text="Lote" width="100%" fontSize="12" fontWeight="bold" height="20" verticalAlign="middle"/>
+			<elements:elementLabelBackgroudColor id="NAME_DYNAMIC_" _colorBackground="0xeeeeee" _color="0x333333" _fontWeight="normal"
+				text="Diretamento no estoque (sem lote)" _fontSize="15"
+				width="100%" _paddingLeftText="15" _paddingRightText="15"
+				height="40"
+				/>
+
+			<s:HGroup width="100%" gap="1" verticalAlign="middle">
+				<s:Label text="Entrada" width="100%" fontSize="11" fontWeight="bold" height="20" verticalAlign="middle"/>
+				<s:Label text="Fabricação" width="100%" fontSize="11" fontWeight="bold" height="20" verticalAlign="middle"/>
+				<s:Label text="Validade" width="100%" fontSize="11" fontWeight="bold" height="20" verticalAlign="middle"/>
+			</s:HGroup>
+			<s:HGroup width="100%" gap="1" verticalAlign="middle">
+				
+				<gnncDateButton:gnncDateButton width="100%" height="30" id="DATE_INSERT_STORAGE_" selectedDate="{new Date()}" />
+				<s:Button icon="{gnncEmbedBlackWhite.bw_calendar_16_today}" width="30" height="30" click="{DATE_INSERT_STORAGE_.selectedDate = new Date()}" toolTip="Data de Hoje"/>
+				<gnncDateButton:gnncDateButton width="100%" height="30" id="DATE_FABRICATION_" selectedDate="{new Date()}" />
+				<s:Button icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="30" height="30" click="{DATE_FABRICATION_.selectedDate = null}"/>
+				<gnncDateButton:gnncDateButton width="100%" height="30" id="DATE_EXPIRATION_" />
+				<s:Button icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="30" height="30" click="{DATE_EXPIRATION_.selectedDate = null}"/>
+				<!-- select:conDateButton width="100%" height="30"/ -->
+				
+			</s:HGroup>
+
+			<s:Label text="Produto" width="100%" fontSize="11" fontWeight="bold" height="20" verticalAlign="middle"/>
+			<s:HGroup width="100%" gap="2">
+				<s:Button icon="{gnncEmbedBlackWhite.bw_all_16}" label="Listar Matéria-Prima e Produtos" width="30" height="30"
+						  click="{PRODUCT_.__search('*')}"
+						  />
+				<select:conSelect_PRODUCT id="PRODUCT_" height="30" width="100%" _ADD="false" fontSize="12"/>
+			</s:HGroup>
+
+			<s:HGroup width="100%" gap="5" verticalAlign="top" id="inputsValues_" visible="false">
+				<s:VGroup width="100%" gap="5"> 
+
+					<s:Label text="Unidade" width="100%" fontSize="11" fontWeight="bold" height="20" verticalAlign="middle"/>
+					<s:TextInput id="UNIT_" text="" width="100%" height="50" maxChars="50" restrict="[0-9][\.][\,]" fontSize="25" paddingLeft="10" paddingRight="10" prompt="Unid."
+								 keyUp="{gnncDataNumber.__safeKeyEvent(event,true,null,Number(DECIMAL_.text));__valueProduct()}"
+								 keyDown="{gnncDataNumber.__safeKeyEvent(event,true,null,Number(DECIMAL_.text));__valueProduct()}"
+								 textAlign="right"
+								 />
+					<s:HGroup width="100%" gap="1" verticalAlign="middle" height="20">
+						<s:TextInput id="DECIMAL_" text="3" visible="false" width="10" height="20" />
+						<s:Rect width="100%"/>
+						<s:Label text="{(String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='ml')?gnncDataNumber.__safeClearString(UNIT_.text,1)+'L':(String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='gg')?gnncDataNumber.__safeClearString(UNIT_.text,1)+' kg':''}" paddingLeft="1" fontWeight="bold"/>
+						<s:Label text="/" paddingLeft="2" paddingRight="2"/>
+						<s:Label text="{gnncData.__replace(UNIT_.text,'.',',')+((String(UNIT_TYPE_.selectedItem.data).toLowerCase()=='gg')?' g':String(UNIT_TYPE_.selectedItem.data).toLowerCase())}" paddingLeft="1" fontWeight="bold"/>
+					</s:HGroup>
+
+				</s:VGroup>
+				<s:VGroup width="85%" gap="5">
+					
+					<s:Label text="Preço de Custo" width="100%" fontSize="11" fontWeight="bold" height="20" verticalAlign="middle"/>
+					
+					<s:TextInput id="VALUE_OUT_" text="0,00" width="100%" height="50" prompt="Valor" restrict="[0-9][\.][\,]"
+								 focusOut="{__price()}" change="{__price()}" fontSize="25" paddingLeft="10" paddingRight="10"
+								 keyUp="{gnncDataNumber.__safeKeyEvent(event,true);__price()}" 
+								 keyDown="{gnncDataNumber.__safeKeyEvent(event,true)}"
+								 textAlign="right"
+								 enabled="false"
+								 />
+					<s:HGroup width="100%" gap="1" verticalAlign="middle" height="20">
+						<s:Label text="Custo do estoque" paddingLeft="0" width="100%" verticalAlign="middle" height="20"/>
+						<s:Label id="VALUE_CONVERT_OUT_" text="R$ 0,00" paddingLeft="5" fontWeight="bold" verticalAlign="middle"/>
+					</s:HGroup>
+
+				</s:VGroup>
+			</s:HGroup>
+
+			<elements:elementHLine height="10" alpha=".7" />
+
+			<s:Label text="* Custo do estoque é aconselhado para revenda de produtos." paddingLeft="0" width="100%" verticalAlign="middle" height="30" alpha=".75"
+					 maxDisplayedLines="1" showTruncationTip="true"
+					 />
+
+		</s:NavigatorContent>
+
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="3" paddingRight="5" verticalAlign="middle">
+		<s:DropDownList id="UNIT_TYPE_" width="90" dataProvider="{gnncGlobalArrays._UNIT_TYPE2}" height="25" selectedIndex="0" enabled="false"/>
+		<s:Rect width="100%" />
+		<s:Button icon="{gnncEmbedBlackWhite.bw_all_16}" label="Listar Matéria-Prima e Produtos" click="{PRODUCT_.__search('*')}" height="25"
+				  skinClass="GNNC.skin.button.skin_buttonLink"
+				  />
+		<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" label="Cadastrar" click="{__save()}" fontWeight="bold" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" />	
+	</s:HGroup>
+		
+	<s:Button top="10" right="10" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

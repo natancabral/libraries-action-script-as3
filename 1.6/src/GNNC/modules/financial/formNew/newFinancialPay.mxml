@@ -1,0 +1,1423 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="295" height="350" 
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:gnncDateField4="GNNC.UI.gnncDateField4.*"
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalLog;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.permission.gnncPermission;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.daybyday.money.gnncMoneyFinancialAccount;
+			import GNNC.event.gnncCloseEvent;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.modules.financial.formView.viewFinancial;
+			import GNNC.skin.button.skin_button;
+			import GNNC.sqlTables.table_financial;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			import spark.events.IndexChangeEvent;
+
+			[Bindable] private var _gnncGlobal:gnncGlobalStatic = new gnncGlobalStatic(true);
+			[Bindable] private var _safeIn:Boolean = false;
+
+			private var _financial:gnncAMFPhp = new gnncAMFPhp();
+			private var _exec:gnncAMFPhp = new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+
+			public var _tableFinancial:table_financial = null;
+			public var _change:Boolean = false;
+			public var selectedItem:Object = null;
+			public var _keyFinancial:Array = null;
+
+			private var ac:Object = null; //account
+			private var dt:Object = null; //document type
+			private var dn:Object = null; //document number
+			private var pt:Object = null; //pay type
+			private var pf:Object = null; //pay flag
+			private var tx:Object = null;
+			
+			private var value:Number         = 0;
+			private var valueCalc:Number     = 0;
+			private var valueFinalPay:Number = 0;
+			
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__CONTROL_ENTER(event)) __save();
+						if ((event.charCode == Keyboard.B || event.charCode == 98) && event.ctrlKey == true) __save();
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+					}
+				);
+
+				changeViewStack();
+				__check();
+
+				DOCUMENT_TYPE_ .addEventListener(IndexChangeEvent.CARET_CHANGE,payTypeCheck);
+				PAY_TYPE_      .addEventListener(IndexChangeEvent.CARET_CHANGE,payTypeCheck);
+
+				DOCUMENT_TYPE2_.addEventListener(IndexChangeEvent.CARET_CHANGE,payTypeCheck);
+				PAY_TYPE2_     .addEventListener(IndexChangeEvent.CARET_CHANGE,payTypeCheck);
+
+				callLater(__settings);
+				callLater(__firstInput);
+			}
+			
+			private function __firstInput():void
+			{
+				if(panelCenter_.selectedIndex==0)
+					btnSave_.setFocus();
+				else if(panelCenter_.selectedIndex==1)
+					VALUE_.setFocus();
+			}
+
+			private function __settings():void
+			{
+				//init date - today
+				DATE_FINAL_.selectedDate  = new Date();
+				DATE_TODAY_.text = gnncDate.__date2Legend('',new Date());
+				DATE_DIFF_.text = '';
+				dateFinalButtun_.label  = gnncDate.__date2Legend('',DATE_FINAL_.selectedDate);
+			}
+
+			private function __refreshDate():void
+			{
+				dateFinalButtun_.label = gnncDate.__date2Legend('',DATE_FINAL_.selectedDate);
+				updateValuesSafe(true);
+			}
+
+			private function changeViewStack():void
+			{
+				if( panelCenter_.selectedIndex == 0 ){
+					ac = FINANCIAL_ACCOUNT2_;
+					dt = DOCUMENT_TYPE2_;
+					dn = DOCUMENT_NUMBER2_;
+					pt = PAY_TYPE2_;
+					pf = payTypeFlagCard2_;
+					tx = addTax2_;
+					
+				}else{
+					ac = FINANCIAL_ACCOUNT_;
+					dt = DOCUMENT_TYPE_;
+					dn = DOCUMENT_NUMBER_;
+					pt = PAY_TYPE_;
+					pf = payTypeFlagCard_;
+					tx = addTax_;
+					
+					__checkId();
+				}
+			}
+
+			private function __close():void{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __check():void
+			{
+				if(selectedItem != null){
+					__checkObject();
+				}else if(_tableFinancial != null){
+					__checkId();
+				}
+			}
+			
+			private function __checkObject():void
+			{
+				//new gnncAlert().__alert("abc");
+				
+				if(selectedItem != null){
+					if(selectedItem.hasOwnProperty('ID')){
+						if(Number(selectedItem.ID)>0)
+						{
+							if(_tableFinancial == null)
+								_tableFinancial = new table_financial();
+
+							_tableFinancial.ID           = selectedItem.ID;
+							_tableFinancial.DATE_END     = selectedItem.DATE_END;
+							_tableFinancial.FINE_VALUE   = selectedItem.FINE_VALUE;
+							_tableFinancial.FINE_PERCENT = selectedItem.FINE_PERCENT;
+							_tableFinancial.VALUE_IN     = selectedItem.VALUE_IN;
+							_tableFinancial.VALUE_OUT    = selectedItem.VALUE_OUT;
+
+							if(Number(selectedItem.VALUE_IN)>0)
+								_safeIn = true; 
+							else if(Number(selectedItem.VALUE_OUT)>0)
+								_safeIn = false; 
+
+							value                = gnncDataNumber.__safeClear( _safeIn==true ? selectedItem.VALUE_IN : selectedItem.VALUE_OUT );
+							valueCalc            = gnncDataNumber.__safeClear( _safeIn==true ? selectedItem.VALUE_IN : selectedItem.VALUE_OUT );
+							valueFinalPay        = gnncDataNumber.__safeClear( _safeIn==true ? selectedItem.VALUE_IN : selectedItem.VALUE_OUT );
+							
+							VALUE_SAFE_.text     = gnncDataNumber.__safeReal( value , 2 , '' );
+							
+							valueSimple_.text    = gnncDataNumber.__safeReal( value );
+							valueSimple_._colorBackground = _safeIn==true ? 0x009900 : _safeIn == false ? 0xcc0000 : 0x444444 ;
+							
+							ac.selectedIndex 	 = new gnncDataArrayCollection().__getIndex(_gnncGlobal._FINANCIAL_ACCOUNT.DATA_ARR,'ID',selectedItem.ID_FINANCIAL_ACCOUNT);
+							dn.text 			 = selectedItem.DOCUMENT_NUMBER;
+							dt.selectedIndex 	 = new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._FINANCIAL_DOCUMENT_TYPE,'data',selectedItem.DOCUMENT_TYPE);
+							pt.selectedIndex 	 = new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._FINANCIAL_PAY_TYPE,'data',selectedItem.PAY_TYPE);
+							
+							advancedBtnFine();
+						}
+					}
+				}
+			}
+
+			private function __checkId():void
+			{
+				if(_tableFinancial != null){
+					if(Number(_tableFinancial.ID) > 0 || _tableFinancial.ID_KEY)
+					{
+						btnSave_.enabled = false;
+						panelCenter_.enabled = false;
+						_gnncPopUp.__close(); 
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var _where:String = Number(_tableFinancial.ID) > 0 ? " f.ID = '"+_tableFinancial.ID+"' " : (_tableFinancial.ID_KEY) ? " f.ID_KEY = '"+_tableFinancial.ID_KEY+"' " : "" ;
+						var _sql:String = "" +
+							" select *" +
+							//" ( select NAME from dbd_financial_account a where a.ID = f.ID_FINANCIAL_ACCOUNT ) as NAME_FINANCIAL_ACCOUNT " +
+							" from dbd_financial f where "+_where;
+						if(_where)
+							_financial.__sql(_sql,'','',__fResultCheck,__fFaultCheck);
+					}
+					else{
+						new gnncAlert().__alert('Sem IDentificador.');
+						_gnncPopUp.__close(); 
+						__close();
+					}
+				} 
+				else{
+					_gnncPopUp.__close(); 
+					__close();
+				}
+			}
+
+			protected function __fFaultCheck(event:FaultEvent):void
+			{
+				btnSave_.enabled = false;
+				panelCenter_.enabled = true;
+				panelCenter_.selectedIndex = 0;
+				advanced();
+				_gnncPopUp.__close();
+				new gnncAlert().__alert('O lançamento não foi encontrado. Verifique se o mesmo não foi Cancelado ou Excluído.','Problema na conexão');
+				__close();
+			}
+			
+			protected function __fResultCheck(event:ResultEvent):void
+			{
+				if(_financial.DATA_ROWS==0){
+					new gnncAlert().__error('Lançamento financeiro não encontrado. Verifique se o mesmo não foi Cancelado ou Excluído.');
+					_gnncPopUp.__close();
+					__close();
+					return;
+				}
+
+				btnSave_.enabled = true;
+				panelCenter_.enabled = true;
+
+				var o:Object = _financial.DATA_ARR.getItemAt(0);
+
+				if(Number(o.VALUE_IN)>0)
+					_safeIn = true; 
+				else if(Number(o.VALUE_OUT)>0)
+					_safeIn = false; 
+
+				_tableFinancial.ID					= _tableFinancial.ID>0 ? _tableFinancial.ID : o.ID;
+
+				_tableFinancial.ID_KEY			    = o.ID_KEY;
+				_tableFinancial.ID_PAY_PART			= o.ID_PAY_PART;
+				_tableFinancial.IDS_REFERENCE       = o.IDS_REFERENCE;
+
+				//para lançamentos parcelados
+				_tableFinancial.KEY_FINANCIAL	 	= o.KEY_FINANCIAL;
+
+				_tableFinancial.ID_CLIENT	 		= o.NAME_CLIENT;
+				_tableFinancial.ID_PROJECT			= o.ID_PROJECT;
+				_tableFinancial.ID_CONTRACT 		= o.ID_CONTRACT;
+				_tableFinancial.MIX 				= o.MIX;
+
+				_tableFinancial.IS_TAX				= o.IS_TAX_;
+				_tableFinancial.IS_TRANS			= o.IS_TRANS;
+				_tableFinancial.IS_PAY_PART			= o.IS_PAY_PART; //se o pagamento foi separado em mais pedados
+				_tableFinancial.IS_REVERSAL         = o.IS_REVERSAL;
+				
+				_tableFinancial.IS_FIXED_COST       = o.IS_FIXED_COST;
+				
+				_tableFinancial.NUMBER_FINAL_PAY    = o.NUMBER_FINAL_PAY;
+				dn.text 			                = o.DOCUMENT_NUMBER;
+
+				_tableFinancial.VALUE_IN			= o.VALUE_IN;
+				_tableFinancial.VALUE_OUT			= o.VALUE_OUT;
+				
+				_tableFinancial.DATE_END			= o.DATE_END;
+				DATE_END_.text						= gnncDate.__date2Legend(o.DATE_END);
+				
+				_tableFinancial.ID_DEPARTAMENT		= o.NAME_DEPARTAMENT;
+				_tableFinancial.ID_GROUP			= o.NAME_GROUP;
+				_tableFinancial.ID_CATEGORY		    = o.NAME_CATEGORY;
+				
+				//_tableFinancial.ID_PRODUCT 		= o.ID_PRODUCT;
+				
+				_tableFinancial.ACTIVE 			    = o.ACTIVE;
+				_tableFinancial.VISIBLE 			= o.VISIBLE;
+				_tableFinancial.CONTROL 			= o.CONTROL;
+
+				/** safe **/
+				value                               = _safeIn == true ? o.VALUE_IN : o.VALUE_OUT ;
+				VALUE_SAFE_.text                    = gnncDataNumber.__safeReal( value ,2,'' );
+				VALUE_SAFE_.setStyle				('color',Number(o.VALUE_IN)>0?0x009900:Number(o.VALUE_OUT)>0?0xcc0000:0x444444);
+
+				/** discount **/
+				DISCOUNT_PUNCTUALITY_.text 			= gnncDataNumber.__safeReal(o.DISCOUNT_PUNCTUALITY,2,'R$ ',',','.','',''); 
+
+				/** fine **/
+				FINE_VALUE_.text 					= gnncDataNumber.__safeReal(o.FINE_VALUE,2,'R$ ',',','.','','');
+				FINE_VALUE_PERCENT_.text 			= gnncDataNumber.__safeReal((Number(o.FINE_VALUE_PERCENT)/100)*value,3,'R$ ',',','.','','');
+				FINE_VALUE_PERCENT_IN_PERCENT.text  = ' ('+o.FINE_VALUE_PERCENT+'%)';
+				FINE_PERCENT_.text 					= o.FINE_PERCENT;
+				FINE_PERCENT_TIME_.text 			= o.FINE_PERCENT_TIME>0?String(new gnncDataArrayCollection().__filterNumeric(gnncGlobalArrays._FINANCIAL_FINE_PERCENT,'data',o.FINE_PERCENT_TIME).getItemAt(0).label):'';
+
+				_tableFinancial.FINE_PERCENT_TIME	= o.FINE_PERCENT_TIME>0?o.FINE_PERCENT_TIME:1;
+
+				//verifica se já foi baixado, isso porque a internet pode falhar e não atualizar a linha do lançamento baixado
+				if(gnncDate.__isValid(o.DATE_FINAL)){
+					_change = true;
+					_gnncPopUp.__close();
+					__close();
+					new gnncNotification().__show('Baixado (faturado)','Este lançamento já está baixado (faturado) pelo sistema.');
+					return;
+				}
+
+				payTypeCheck();
+				_gnncPopUp.__close();
+				callLater(updateValuesSafe,[true]);
+			}
+			
+			private function __financialView():void
+			{
+				var p:viewFinancial 	= new viewFinancial();
+				p._tableFinancial  		= new table_financial(_tableFinancial.ID);
+				new gnncPopUp().__creation	(p,true,false);
+			}
+
+			/*private function alertNewFinancialTax():void{
+				gnncFunctions.delayedCall(function():void{
+					gnncAlert.__alert('Este próximo lançamento é uma <b>taxa adicional</b>.');
+				},100);
+			}*/
+			
+			private function payTypeCheck(e:*=null):void
+			{	
+				if(pt.selectedIndex == 1 || pt.selectedIndex == 2)
+					pf.visible = true;
+				else
+					pf.visible = false;
+				
+				if(dt.selectedIndex<0){
+					pf.selectedIndex = -1;
+					dt.setFocus();
+					dt.openDropDown();
+					dt.setFocus();
+					return;
+				}
+				if(dt.selectedItem.data == 9){ //dinheiro
+					pt.selectedIndex = 0;           //dinheiro
+					pf.selectedIndex = -1;
+					return;
+				}
+				if(dt.selectedItem.data == 6){ //cheque
+					pt.selectedIndex = 3;           //cheque
+					pf.selectedIndex = -1;
+					return;
+				}
+				if(dt.selectedItem.data == 8){ //deposito cc
+					pt.selectedIndex = 5;           //deposito cc
+					pf.selectedIndex = -1;
+					return;
+				}
+				if(dt.selectedItem.data == 3){ //credit
+					pt.selectedIndex = 1;           //credit
+					//payTypeFlagCard_.setFocus();
+					//payTypeFlagCard_.openDropDown();
+					return;
+				}
+				if(dt.selectedItem.data == 4){ //debit
+					pt.selectedIndex = 2; //debit
+					//payTypeFlagCard_.setFocus();
+					//payTypeFlagCard_.openDropDown();
+					return;
+				}	
+			}
+
+			private function advancedBtnFine():void
+			{
+				if( Number(_tableFinancial.FINE_PERCENT) > 0 || Number(_tableFinancial.FINE_VALUE) > 0 || Number(_tableFinancial.FINE_VALUE_PERCENT) > 0 || Number(_tableFinancial.DISCOUNT_PUNCTUALITY) > 0 ){
+					btnSave_.label = 'Baixar';
+					btnSave_.visible = false;
+					btnAdvanced2_.label = 'Contém + juro/multa';
+					btnAdvanced2_.setStyle('icon',gnncEmbedBlackWhite.bw_financial_16_type_money);
+				}else{
+					btnSave_.label = 'Baixar';
+					btnSave_.visible = true;
+					btnAdvanced2_.label = 'Avançado';
+					btnAdvanced2_.setStyle('icon',null);
+				}
+				
+				if(panelCenter_.selectedIndex==1)
+					btnSave_.visible = true;
+			}
+			
+			private function advanced():void
+			{
+				advancedBtnFine();
+				
+				if(panelCenter_.selectedIndex==0){
+					//big and advanced
+					this.width  = 800;
+					this.height = 360;
+					panelCenter_.selectedIndex = 1;
+					panelCenter_.bottom = 79;
+					btnView_.width = NaN;
+					//btnAdvanced_.visible = true;
+					_gnncPopUp.__center(this);
+
+					btnSave_.visible = true; //only big
+
+					cloneData(0,true);
+					cloneData(1,true);
+					cloneData(2,true);
+					cloneData(3,true);
+					cloneData(4,true);
+					cloneData(5,true);
+				}
+				else{
+					//small 
+					this.width  = 295;
+					this.height = 350;
+					panelCenter_.selectedIndex = 0;
+					panelCenter_.bottom = 35;
+					btnView_.width = 25;
+					//btnAdvanced_.visible = false;
+					_gnncPopUp.__center(this);
+
+					cloneData(0,false);
+					cloneData(1,false);
+					cloneData(2,false);
+					cloneData(3,false);
+					cloneData(4,false);
+					cloneData(5,false);
+				}
+			}
+			
+			private function cloneData(type:uint,setInOriginal:Boolean):void
+			{
+				switch(type)
+				{
+					case 0: 
+						if(setInOriginal)
+							FINANCIAL_ACCOUNT_.selectedIndex = FINANCIAL_ACCOUNT2_.selectedIndex;
+						else
+							FINANCIAL_ACCOUNT2_.selectedIndex = FINANCIAL_ACCOUNT_.selectedIndex;
+						break;
+					case 1: 
+						if(setInOriginal)
+							DOCUMENT_TYPE_.selectedIndex  = DOCUMENT_TYPE2_.selectedIndex;
+						else
+							DOCUMENT_TYPE2_.selectedIndex = DOCUMENT_TYPE_.selectedIndex;
+						break;
+					case 2: 
+						if(setInOriginal)
+							DOCUMENT_NUMBER_.text  = DOCUMENT_NUMBER2_.text;
+						else
+							DOCUMENT_NUMBER2_.text = DOCUMENT_NUMBER_.text;
+						break;
+					case 3: 
+						if(setInOriginal){
+							PAY_TYPE_.selectedIndex = PAY_TYPE2_.selectedIndex;
+							payTypeFlagCard_.visible = payTypeFlagCard2_.visible;
+						}else{
+							PAY_TYPE2_.selectedIndex = PAY_TYPE_.selectedIndex;
+							payTypeFlagCard2_.visible = payTypeFlagCard_.visible;
+						}
+						break;
+					case 4: 
+						if(setInOriginal){
+							payTypeFlagCard_.selectedIndex = payTypeFlagCard2_.selectedIndex;
+							payTypeFlagCard_.visible = payTypeFlagCard2_.visible;
+						}else{
+							payTypeFlagCard2_.selectedIndex = payTypeFlagCard_.selectedIndex;
+							payTypeFlagCard2_.visible = payTypeFlagCard_.visible;
+						}
+						break;
+					case 5: 
+						if(setInOriginal)
+							addTax_.selected = addTax2_.selected;
+						else
+							addTax2_.selected = addTax_.selected;
+						break;
+					default:
+						break;
+				}
+			}
+
+			private function __financialNew(isTax:Boolean=false,blockTax:Boolean=false):void
+			{
+				var A:Number 				= valueCalc;
+				var B:Number 				= valueFinalPay;
+				
+				var _object:Object			= null;
+				var _name:String            = '';
+				var _arr:ArrayCollection    = null;
+
+				
+				var t:table_financial	= new table_financial();
+				
+				if(panelCenter_.selectedIndex==0)
+					_object = selectedItem;
+				else if(panelCenter_.selectedIndex==1)
+					_object = _financial.DATA_ARR.getItemAt(0);
+
+				if(_object.KEY_FINANCIAL)
+					_tableFinancial.KEY_FINANCIAL = _object.KEY_FINANCIAL; 
+				else if(!_tableFinancial.KEY_FINANCIAL)
+					_tableFinancial.KEY_FINANCIAL = gnncDataRand.__key(); 
+
+				if(isTax==false){
+					if(_safeIn)
+						t.VALUE_IN 	= gnncDataNumber.__safeClear(A-B);
+					else
+						t.VALUE_OUT = gnncDataNumber.__safeClear(A-B);
+				}else{
+					//safe_in_ = false;
+				}
+				
+				t.ID_KEY               = gnncDataRand.__key();
+				//para lançamentos parcelados
+				if(!isTax)
+					t.KEY_FINANCIAL    = _tableFinancial.KEY_FINANCIAL ;
+				//para lançamentos quebrados (pagou menos e é preciso novo lançamento complementar do valor em débito)
+				t.IS_PAY_PART          = 1;
+				t.IS_FIXED_COST        = isTax == true ? 0 : _object.IS_FIXED_COST;
+				t.IS_TAX               = isTax == true ? 1 : 0 ;
+				
+				//SE ASSIM PEGA REFERENCIA DIRETA COM O LANCAMENTO, FAZENDO CASCATA
+				//t.ID_PAY_PART            = _object.ID;
+				//SE ASSIM PEGA O PRIMEIRO ID DA CASCATA
+				t.ID_PAY_PART          = _object.ID_PAY_PART > 0 ? _object.ID_PAY_PART : _object.ID ;
+				t.IDS_REFERENCE        = String(_object.IDS_REFERENCE).length>0 ? _object.IDS_REFERENCE : _object.ID ;
+				
+				t.ID_FINANCIAL_ACCOUNT = _object.ID_FINANCIAL_ACCOUNT;
+				t.ID_CLIENT			   = _object.ID_CLIENT;
+				t.ID_DEPARTAMENT	   = _object.ID_DEPARTAMENT;
+				t.ID_GROUP			   = _object.ID_GROUP;
+				t.ID_CATEGORY		   = _object.ID_CATEGORY;
+				
+				//curso or project
+				t.ID_PROJECT           = _object.ID_PROJECT;
+				
+				t.MIX				   = 'FINANCIAL';
+				
+				if(!isTax){
+					t.DESCRIPTION	   = _object.DESCRIPTION;
+					t.NUMBER_LETTER	   = _object.NUMBER_LETTER;
+					t.DOCUMENT_NUMBER  = _object.DOCUMENT_NUMBER;
+					t.DOCUMENT_TYPE	   = _object.DOCUMENT_TYPE;
+				}
+				
+				var _page:newFinancial = new newFinancial();
+				_page._idAccount       = _object.ID_FINANCIAL_ACCOUNT;
+				if(!isTax)
+					_page._safeIn 	   = _safeIn;
+				_page._tableFinancial = t;
+				
+				
+				/*if(!isTax && t.KEY_FINANCIAL){
+					var _sql:String = 
+						" LOCK TABLES dbd_financial WRITE,dbd_financial a WRITE,dbd_financial b READ " + 
+						gnncGlobalStatic._breakSql + 
+						" UPDATE dbd_financial a " +
+						" SET a.KEY_FINANCIAL = '"+t.KEY_FINANCIAL+"' where a.ID = '"+_object.ID+"' "+
+						gnncGlobalStatic._breakSql + 
+						" UNLOCK TABLES " +
+						gnncGlobalStatic._breakSql;
+					
+					var exec:gnncAMFPhp = new gnncAMFPhp();
+					exec.__sql(_sql);
+					new gnncAlert().__alert('sql:'+_sql);
+				}*/
+				
+				new gnncPopUp().__creation(_page,true,false,function(e:FlexEvent):void{
+
+					if(_keyFinancial == null)
+						_keyFinancial = new Array();
+					if(t.ID_KEY)
+						_keyFinancial.push(t.ID_KEY);
+					//CRIAR AQUI A TAX
+					if(addTax_.selected==true && !blockTax){
+						__financialNew(true,true);
+						//alertNewFinancialTax();
+					}else{
+						_gnncPopUp.__close(); 
+						__close();
+					}
+				});
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			private function __save():void
+			{
+				if(!gnncPermission.__access('safe-final','a',true))
+					return;
+				
+				if(!_safeIn){
+					if(!new gnncMoneyFinancialAccount().checkOver(ac.selectedIndex,_safeIn,valueFinalPay))
+						return;
+				}
+				if(valueFinalPay==0){
+					btnSave_.setFocus();					
+					return;
+				}
+				if(dt.selectedIndex<0){
+					dt.openDropDown();
+					return;
+				}
+				if(pt.selectedIndex<0){
+					pt.openDropDown();
+					return;
+				}
+				if((pt.selectedIndex == 1 || pt.selectedIndex == 2) && pf.selectedIndex<0){
+					pf.openDropDown();
+					return;
+				}
+
+				//não pode dar baixa com a data de amanhã
+				var DToday:Date		= gnncGlobalStatic._dateToday !== null ? gnncData.__clone(gnncGlobalStatic._dateToday) as Date : new Date();
+				var DFinal:Date		= gnncData.__clone(DATE_FINAL_.selectedDate) as Date;
+				
+				//Zera as horas
+				DToday.hours 		= 0;
+				DToday.minutes 		= 0;
+				DToday.seconds 		= 0;
+				DToday.milliseconds = 0;
+				//Zera as horas
+				DFinal.hours 		= 0;
+				DFinal.minutes 		= 0;
+				DFinal.seconds 		= 0;
+				DFinal.milliseconds = 0;
+				
+				//gnncGlobalLog.__add('6');
+				if(!gnncPermission.__access('safe-final-future','a',false))
+					if(DFinal.time > DToday.time){
+						new gnncAlert().__alert("O sistema não permite que a baixa (faturar) seja em futuras datas, "+gnncDate.__date2Legend('',DFinal)+". ");
+						return;
+					}
+				//gnncGlobalLog.__add('7');				
+				if(!gnncPermission.__access('safe-final-past','a',false))
+					if(DFinal.time < DToday.time){
+						new gnncAlert().__alert("O sistema não permite que a baixa (faturar) seja em datas passadas, "+gnncDate.__date2Legend('',DFinal)+". ");
+						return;
+					}
+
+				//gnncGlobalLog.__add('8');
+				
+				var A:Number = valueCalc;
+				var B:Number = valueFinalPay;
+				
+				if(A<B)
+				{
+					gnncAlert.__alert("O lançamento é maior que o valor calculado.<br><b>Deseja continuar</b>?\n\n" +
+						"<b>" + gnncData.__firstLetterUpperCase(ac.selectedItem.NAME)         + "</b>\n" +
+						"Valor inicial: "          + gnncDataNumber.__safeReal(value)         + "\n" +
+						"Valor calculado: "        + gnncDataNumber.__safeReal(valueCalc)     + "\n" +
+						"Valor pago (fatura): <b>" + gnncDataNumber.__safeReal(valueFinalPay) + '</b>',
+						"Lançamento em maior valor",
+						function(event:gnncCloseEvent):void
+						{
+							if(event.detail == gnncAlert.YES){
+								__saveAction(false);
+							}else{
+								VALUE_.setFocus();
+							}							
+						},[gnncAlert.YES,gnncAlert.CANCEL]);
+					
+				}
+				else if(A>B)
+				{
+					var f:String = gnncDataNumber.__safeReal( Number( valueCalc - valueFinalPay ) );
+					
+					gnncAlert.YES_LABEL 	= 'Desconto';
+					gnncAlert.NO_LABEL 		= 'Novo lançamento R$ '+f;
+					gnncAlert.CANCEL_LABEL 	= 'Cancelar';
+					
+					gnncAlert.__alert("O valor da fatura está menor do que o valor calculado. "+
+						"Dar o <b>desconto</b> ou gerar <b>novo lançamento</b> com o valor restante?\n\n" +
+						"<b>" + gnncData.__firstLetterUpperCase(ac.selectedItem.NAME)      + "</b>\n" +
+						"Valor inicial: "       + gnncDataNumber.__safeReal(value)         + "\n" +
+						"Valor calculado: "     + gnncDataNumber.__safeReal(valueCalc)     + "\n" +
+						"Valor pago (fatura): " + gnncDataNumber.__safeReal(valueFinalPay) + "\n" +
+						"Valor restante: <b> "+f+"</b>",
+						"Faturamaneto em menor valor",
+						function(event:gnncCloseEvent):void
+						{
+							if(event.detail == gnncAlert.YES){
+								__saveAction(true);
+							}
+							else if(event.detail == gnncAlert.NO){
+								var _object:Object = _financial.DATA_ARR.getItemAt(0);
+								__saveAction(false,true);
+							}
+							else if(event.detail == gnncAlert.CANCEL){
+								VALUE_.setFocus();
+							}
+							
+						},[gnncAlert.YES,gnncAlert.NO,gnncAlert.CANCEL]);
+				}
+				else
+				{
+					gnncAlert.__alert("Deseja baixar (faturar) este lançamento?\n"+
+						"<b>" + gnncData.__firstLetterUpperCase(ac.selectedItem.NAME) + "</b>\n" +
+						"<b>" + gnncDataNumber.__safeReal(valueFinalPay) + "</b>",
+						'Baixar (faturar)',
+						function (event:gnncCloseEvent):void{
+							if(event.detail == gnncAlert.YES)
+								__saveAction(false);
+						},[gnncAlert.YES,gnncAlert.CANCEL]);
+				}
+			}
+			
+			private function __saveAction(discount_:Boolean,newSafe_:Boolean=false):void
+			{
+				if(DATE_FINAL_.selectedDate==null){
+					new gnncAlert().__alert('Verifique a data de pagamento.');
+					return;
+				}
+				if(dt.selectedIndex<0 || ac.selectedIndex<0 || pt.selectedIndex<0){
+					new gnncAlert().__alert('A conta, o tipo de documento e o tipo de pagamento são obrigatórios.');
+					return;
+				}
+
+				//this.enabled = false;
+				_gnncPopUp.__loading();
+
+				var xac:String = ac.selectedItem.ID;				
+				var xdt:String = dt.selectedItem.data;
+				var xdn:String = dn.text;
+				var xpt:String = pt.selectedItem.data;
+				var xpf:String = pf.visible==false?'':pf.selectedIndex<0?'':pf.selectedItem.data;
+				
+				var xvi:String = _safeIn==true  ? valueFinalPay + '' : '0';
+				var xvo:String = _safeIn==false ? valueFinalPay + '' : '0';
+				var xdf:String = gnncDate.__date2String(DATE_FINAL_.selectedDate);
+				
+				var xdp:Number = 0; //discount
+				var xfp:Number = 0; //fine
+
+				if( valueFinalPay - valueCalc < 0 ){ //desconto
+					xdp = valueCalc - valueFinalPay;
+				}
+				if( valueFinalPay - value > 0 ){ //juro/multa
+					xfp = valueFinalPay - value;
+				}
+
+				var updateArr:Array = new Array
+					([
+						"ID_FINANCIAL_ACCOUNT = '"+xac+"'",
+						"VALUE_IN_PAY 		  = '"+xvi+"'",
+						"VALUE_OUT_PAY 		  = '"+xvo+"'",
+						"PAY_TYPE 			  = '"+xpt+"'",
+						"FLAG_CARD 			  = '"+xpf+"'",
+						"DOCUMENT_TYPE 		  = '"+xdt+"'",
+						"DOCUMENT_NUMBER 	  = '"+xdn+"'",
+						
+						//"DISCOUNT_VALUE     = '0'",//'"+DV+"'",
+						//"DISCOUNT_PERCENT   = '0'",//'"+DP+"'",
+
+						"DISCOUNT_PAY         = '"+xdp+"'",//desconto pago
+						"FINE_PAY             = '"+xfp+"'",//juros pago
+						
+						"DATE_FINAL 		  = '"+xdf+"'"
+					]);
+				
+				/*gnncAlert.__alert(updateArr.toString());
+				gnncAlert.__alert(
+					',value:'+value+
+					',valueCalc:'+valueCalc+
+					',valueFinalPay:'+valueFinalPay+
+					',xdp:'+xdp+',xfp:'+xfp+
+					''
+				);*/
+
+				var _sql:String = new gnncSql().__UPDATE(new table_financial(_tableFinancial.ID),null,false,updateArr);
+				
+				if(!_tableFinancial.NUMBER_FINAL_PAY)
+					_sql = 
+						_sql + 
+						gnncGlobalStatic._breakSql + 
+						" LOCK TABLES dbd_financial WRITE,dbd_financial a WRITE,dbd_financial b READ " + 
+						gnncGlobalStatic._breakSql + 
+						" UPDATE dbd_financial a " +
+						" JOIN (SELECT MAX(NUMBER_FINAL_PAY) AS NUMBER_NEW FROM dbd_financial where "+(_safeIn?'VALUE_IN':'VALUE_OUT')+" > 0 limit 1) b " +
+						" SET a.NUMBER_FINAL_PAY = if(b.NUMBER_NEW<10000,10001,b.NUMBER_NEW+1) where ID = '"+_tableFinancial.ID+"' "+
+						gnncGlobalStatic._breakSql + 
+						" UNLOCK TABLES ";
+
+				_exec.__sql(_sql,'','',__fResult,__fFault);
+
+				function __fResult(e:ResultEvent):void
+				{	
+					_change = true; 
+					if(newSafe_){
+						__financialNew(false,false);
+					}else if(addTax_.selected){
+						__financialNew(true,true);
+						//alertNewFinancialTax();
+					}else{
+						_gnncPopUp.__close();
+						__close();
+					}
+					new gnncMoneyFinancialAccount().updateData(ac.selectedIndex,_safeIn,valueFinalPay);
+				}
+
+				function __fFault(e:FaultEvent):void{	
+					_gnncPopUp.__close();
+				}
+
+			}
+			
+			private function updateValuesSafe(setInputEdit:Boolean=false):void
+			{
+				/*
+				VALUE_.text;
+
+				VALUE_SAFE_.text;
+				VALUE_FINE_.text;
+				VALUE_CALC_.text;
+				VALUE_ADD_.text;
+				VALUE_DISCOUT_.text;
+				VALUE_FINAL_.text;
+
+				FINE_PERCENT_.text;
+				FINE_PERCENT_TIME_.text;
+				FINE_VALUE_.text;
+
+				DISCOUNT_PERCENT_.text;
+				DISCOUNT_VALUE_.text;
+				*/
+
+				//safes
+				var va:Number = gnncDataNumber.__safeClear(VALUE_.text);
+				var vs:Number = gnncDataNumber.__safeClear(VALUE_SAFE_.text); //valor do lançamento
+				var vf:Number = gnncDataNumber.__safeClear(VALUE_FINE_.text);
+				var vc:Number = gnncDataNumber.__safeClear(VALUE_CALC_.text);
+				var ad:Number = gnncDataNumber.__safeClear(VALUE_ADD_.text);
+				var vd:Number = gnncDataNumber.__safeClear(VALUE_DISCOUT_.text);
+				var ff:Number = gnncDataNumber.__safeClear(VALUE_FINAL_.text);
+				//fine
+				var fv:Number = gnncDataNumber.__safeClear(FINE_VALUE_.text,3);
+				var fc:Number = gnncDataNumber.__safeClear(FINE_VALUE_PERCENT_.text,3);
+				var fp:Number = gnncDataNumber.__safeClear(FINE_PERCENT_.text,3);
+				var ft:Number = gnncDataNumber.__safeClear(_tableFinancial.FINE_PERCENT_TIME);//FINE_PERCENT_TIME_.text
+				//discount
+				//var dp:Number = gnncDataNumber.__safeClear(_tableFinancial.DISCOUNT_PERCENT);
+				//var dv:Number = gnncDataNumber.__safeClear(_tableFinancial.DISCOUNT_VALUE);
+				var dp:Number = gnncDataNumber.__safeClear(DISCOUNT_PUNCTUALITY_.text);
+				
+				//----------------------------------------------------------
+				//set fine
+				//var set_fv:Number = gnncDataNumber.__safeClear(SET_FINE_VALUE_.text);
+				//var set_fp:Number = gnncDataNumber.__safeClear(SET_FINE_PERCENT_.text);
+				//set discount
+				//var set_dv:Number = gnncDataNumber.__safeClear(SET_DISCOUNT_VALUE_.text);
+				//var set_dp:Number = gnncDataNumber.__safeClear(SET_DISCOUNT_PERCENT_.text);
+				//----------------------------------------------------------
+				
+				var de:Date = gnncDate.__string2Date(_tableFinancial.DATE_END,false);
+				var df:Date = DATE_FINAL_.selectedDate;
+				var dc:Number = 0; //date calc
+				
+				//Zera as horas
+				de.hours 		= 0;
+				de.minutes 		= 0;
+				de.seconds 		= 0;
+				de.milliseconds = 0;
+				//Zera as horas
+				df.hours 		= 0;
+				df.minutes 		= 0;
+				df.seconds 		= 0;
+				df.milliseconds = 0;
+
+				/*
+				gnncGlobalLog.__add(
+					',va:'+va+
+					',vs:'+vs+
+					',vf:'+vf+
+					',vd:'+vd+
+					',vc:'+vc+
+					',ff:'+ff+
+					',dc:'+dc+
+					',ft:'+ft+
+					',fp:'+fp+
+					',fv:'+fv+
+					',ft:'+ft+
+					"\n"+
+					',fvINPUT:'+gnncDataNumber.__safeClear(FINE_VALUE_.text)+
+					',ftINPUT:'+gnncDataNumber.__safeClear(_tableFinancial.FINE_PERCENT_TIME)+
+					',dp:'+dp+
+					',dv:'+dv+
+					',c:'+c+
+					'',
+					'111111111111111111'
+				);*/
+
+				df = df.getTime()<de.getTime()?de:df; //Se o pagamento for antes não altera o valor
+				dc = DateUtils.dateDiff(DateUtils.DAY_OF_MONTH,de,df); //verifca a distancia em dias dos pagamentos, antecipado é igual a 1
+				fv = dc<1?0:fv; //se for 0 ou negativo, pago no dia ou antes = juros/multa é zero
+				ft = ft>0?ft:1; //diario 1, quinzenal 15, mensal 30
+				dp = dc<1?dp:0; //se zero ou menor aplicar o desconto pontualidade
+				
+				DATE_DIFF_.text = DATE_SAMPLE.text = dc > 700 ? '(+2anos)' : ' (' + dc + ' dias)' ;
+				
+				var j:Number = (vs*(dc)/ft*fp/100) + (dc<1?0:fc); //juros				
+				var c:Number = gnncDataNumber.__safeClear((vs+j+fv)*1);
+				
+				//calc
+				valueCalc = c;
+				//final
+				valueFinalPay = gnncDataNumber.__safeClear(VALUE_.text);
+
+				//-------------------------------------------------------------------------------------------------------
+				//-------------------------------------------------------------------------------------------------------
+				//update inputs
+				//-------------------------------------------------------------------------------------------------------
+				//-------------------------------------------------------------------------------------------------------
+				
+				FINE_PERCENT_CALC_.text = gnncDataNumber.__safeReal( ( dc<1 ? (0) : (j-fc) ) ,2);
+
+				VALUE_FINE_.text    		= gnncDataNumber.__safeReal( ( dc<1 ? (0) : (j+fv) ),2,''); //juro + multa | aplicar 0 de juro+multa se a baixa for antes ou igual ao vencimento 
+				VALUE_PUNC_.text  			= gnncDataNumber.__safeReal( ( dc<1 ? (dp) : (0) ),2,'');
+				VALUE_CALC_.text    		= gnncDataNumber.__safeReal( ( dc<1 ? (0) : (valueCalc) ),2,'');
+				VALUE_ADD_.text     		= gnncDataNumber.__safeReal( ( valueFinalPay-valueCalc < 0 ? 0 : valueFinalPay-valueCalc ) ,2,'');
+				VALUE_DISCOUT_.text 		= gnncDataNumber.__safeReal(valueCalc-valueFinalPay < 0 ? 0 : valueFinalPay-valueCalc ,2,''); // se negativo é porque nao tem desconto 				
+				VALUE_FINAL_.text   		= gnncDataNumber.__safeReal(valueFinalPay,2,'');
+								
+				//modo nao avancado de baixa / parte da frente
+				valueSimple_.text   = gnncDataNumber.__safeReal(valueCalc-dp);
+
+				if(setInputEdit){
+					VALUE_.text = gnncDataNumber.__safeReal(valueCalc-dp,2,'');
+					VALUE_.setStyle('valueSafeFinal',valueCalc-dp);
+					VALUE_.setFocus();
+				}
+				
+				/*
+				var discountV:Number    = 0;
+				var isDiscount:Boolean  = vs > va ? true : false ;
+				
+				callLater(setChangeValues);
+				
+				function setChangeValues():void
+				{				
+					//DISCOUNT_PERCENT_.text 	= '0';
+					discountV    			= c-va;
+					//DISCOUNT_VALUE_.text    = isDiscount  ? gnncDataNumber.__safeReal((discountV*-1),2,'',',','.','','') : '0,00';
+					//FINE_VALUE_.text        = !isDiscount ? gnncDataNumber.__safeReal((discountV*-1),2,'',',','.','','') : '0,00';
+
+					gnncGlobalLog.__add(
+						',discV:'+discountV+
+						',c:'+c+
+						',(discountV*-1):'+(discountV*-1)
+					);
+				}*/
+				btnSave_.setStyle('skinClass',GNNC.skin.button.skin_button);				
+			}
+
+			private function allowFineAndDiscount(e:MouseEvent=null):void
+			{
+				if(allowDiscount_.selected && allowFine_.selected && e.hasOwnProperty('currentTarget')){
+					allowDiscount_.selected = allowFine_.selected = false;
+					e.currentTarget.selected = true;
+				}
+				
+				if(allowDiscount_.selected || allowFine_.selected){
+					VALUE_.enabled = false;
+				}else{
+					VALUE_.enabled = true;
+				}
+
+				if(!allowDiscount_.selected){
+					SET_DISCOUNT_VALUE_.text   = '0,00';
+					SET_DISCOUNT_PERCENT_.text = '0,00';
+				}
+				if(!allowFine_.selected){
+					SET_FINE_VALUE_.text   = '0,00';
+					SET_FINE_PERCENT_.text = '0,00';
+				}
+
+				SET_DISCOUNT_VALUE_.enabled   = allowDiscount_.selected;
+				SET_DISCOUNT_PERCENT_.enabled = allowDiscount_.selected;
+				SET_FINE_VALUE_.enabled       = allowFine_.selected;
+				SET_FINE_PERCENT_.enabled     = allowFine_.selected;
+
+				updateValuesSafe(true);
+			}
+			
+			private function updateFineAndDiscount():void
+			{
+				//updateFineAndDiscount();
+				
+				//----------------------------------------------------------
+				//set fine
+				var set_fv:Number = gnncDataNumber.__safeClear(SET_FINE_VALUE_.text);
+				var set_fp:Number = gnncDataNumber.__safeClear(SET_FINE_PERCENT_.text);
+				//set discount
+				var set_dv:Number = gnncDataNumber.__safeClear(SET_DISCOUNT_VALUE_.text);
+				var set_dp:Number = gnncDataNumber.__safeClear(SET_DISCOUNT_PERCENT_.text);
+				//----------------------------------------------------------
+				
+				var v:Number = 0;
+				
+				if(allowDiscount_.selected || allowFine_.selected){
+					v = VALUE_.getStyle('valueSafeFinal');
+					VALUE_.text = gnncDataNumber.__safeReal(v,2,'');
+					updateValuesSafe();
+				}
+			
+				set_dp = (Number(set_dp)/100) * v;
+				set_fp = (Number(set_fp)/100) * v;
+
+				if(set_dp + set_dv > v ){
+					set_dp = 0;
+					set_dv = v;
+				}
+				if(set_fp + set_fv > v ){
+					set_fp = 0;
+					set_fv = v;
+				}
+
+				//VALUE_ADD_.text     = gnncDataNumber.__safeReal( ( set_fp + set_fv ) ,2,'');
+				//VALUE_DISCOUT_.text = gnncDataNumber.__safeReal( ( set_dp + set_dv ) ,2,''); // se negativo é porque nao tem desconto 
+
+				valueFinalPay       = v + ( set_fp + set_fv ) - ( set_dp + set_dv );
+				VALUE_DISCOUT_.text = gnncDataNumber.__safeReal(valueCalc-valueFinalPay < 0 ? 0 : valueFinalPay-valueCalc ,2,''); // se negativo é porque nao tem desconto 
+				VALUE_.text         = gnncDataNumber.__safeReal( valueFinalPay , 2, '' );
+				VALUE_FINAL_.text   = gnncDataNumber.__safeReal( valueFinalPay , 2, '' );
+			}
+
+
+			
+
+						
+		]]>
+	</fx:Script>
+	
+	<elements:elementStageBox/>
+	
+	<elements:elementLabelFont id="titlePopUp_" text="BAIXAR / FATURAR LANÇAMENTO FINANCEIRO" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+
+	<!-- s:HGroup gap="2" verticalAlign="middle" height="40" top="10" left="15">
+		<s:Image source="{gnncEmbedBlackWhite.check_32_green_ok}" /> 
+		<elements:elementLabelFont text="BAIXAR/FATURAR" fontSize="15" fontWeight="normal" height="32" paddingLeft="10" />
+	</s:HGroup-->
+	
+	<mx:ViewStack id="panelCenter_" left="20" top="35" right="20" bottom="35" change="{changeViewStack()}" >
+		<s:NavigatorContent width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1" />
+			</s:layout>
+
+			<elements:elementLabelBackgroudColor id="valueSimple_" width="100%" height="40" 
+											   _fontWeight="normal" _fontSize="18" horizontalAlign="center"
+											   _paddingLeftText="15" _paddingRightText="15"
+											   _colorBackground="0xcccccc" _color="0xffffff" verticalAlign="middle"
+											   />
+			
+			<s:Rect height="12"/>
+			
+			<s:HGroup width="100%" gap="5">
+
+				<s:VGroup width="90" fontWeight="bold" gap="5">
+					
+					<s:Label text="Conta" height="25" verticalAlign="middle" />
+					<s:Label text="Doc. Tipo" height="25" verticalAlign="middle" />
+					<s:Label text="Doc. Núm." height="25" verticalAlign="middle" />
+					<s:Label text="Forma de Pag." height="25" verticalAlign="middle" />
+					<s:Label text="Bandeira" height="25" verticalAlign="middle" visible="{payTypeFlagCard2_.visible}" />
+
+					<s:Label text="Acrescentar" height="25" verticalAlign="middle" />
+
+				</s:VGroup>
+				<s:VGroup width="150" gap="5">
+					
+					<s:DropDownList id="FINANCIAL_ACCOUNT2_" labelField="NAME" dataProvider="{_gnncGlobal._FINANCIAL_ACCOUNT.DATA_ARR}" width="100%" height="25" prompt="Selecione..." itemRenderer="GNNC.modules.financial.itemRender.itemRender_financialAccount_forList" labelFunction="gnncData.labelFunctionFirstLetter"
+									change="{cloneData(0,true)}"/>
+					<s:DropDownList id="DOCUMENT_TYPE2_" dataProvider="{gnncGlobalArrays._FINANCIAL_DOCUMENT_TYPE}" width="100%" height="25" prompt="Selecione..." 
+									change="{cloneData(1,true)}" close="{payTypeCheck()}" />
+					<s:TextInput id="DOCUMENT_NUMBER2_" text="" height="25" width="100%" maxChars="100"
+								 change="{cloneData(2,true)}"/>
+					<s:DropDownList id="PAY_TYPE2_" dataProvider="{gnncGlobalArrays._FINANCIAL_PAY_TYPE}" selectedIndex="0" width="100%" height="25" prompt="Selecione..." itemRenderer="GNNC.modules.financial.itemRender.itemRender_financialPayType_forList"
+									change="{cloneData(3,true)}" close="{payTypeCheck()}" />
+					<s:DropDownList id="payTypeFlagCard2_" width="100%" labelField="label" dataProvider="{gnncGlobalArrays._financialBankFlagSimple}" height="25" prompt="Selecione..."  itemRenderer="GNNC.modules.financial.itemRender.itemRender_financialPayFlagCard_forList"
+									change="{cloneData(4,true)}" />
+					
+					<s:CheckBox id="addTax2_" height="25" label="Taxa adicional (novo)" selected="false" fontWeight="normal" 
+								toolTip="Abrirá uma nova janela para cadastro da taxa adicional, relacionada a este lançamento."
+								change="{cloneData(5,true)}"
+								/> 
+				</s:VGroup>
+
+			</s:HGroup>
+			
+			<s:Rect height="5"/>
+			
+			<s:Button id="btnAdvanced2_" label="Avançado" width="100%" height="30" fontWeight="bold" 
+					  icon="{gnncEmbedBlackWhite.bw_financial_16_type_money}" click="{advanced()}" />
+
+		</s:NavigatorContent>
+		<s:NavigatorContent width="100%" height="100%" creationPolicy="all">
+
+			<s:HGroup width="100%" height="100%" paddingLeft="7" >
+				<s:VGroup width="90" height="100%" fontWeight="bold" gap="5">
+					<!-- s:Label text="Valor (R$)"  height="20" verticalAlign="middle" />
+					<s:Label text="Conta"       height="20" verticalAlign="middle" />
+					<s:Rect height="5"/ -->
+					<s:Label text="Datas"        height="20" verticalAlign="middle" color="0xAAAAAA" />
+					<s:Label text="Vencimento"   height="20" verticalAlign="middle" />
+					<s:Label text="Data de Hoje" height="20" verticalAlign="middle" />
+					<s:Label text="Diferença"    height="20" verticalAlign="middle" />
+					<s:Rect height="5"/>
+					
+					<s:Label text="Juro/Multa"   height="20" verticalAlign="middle" color="0xAAAAAA" />
+					<s:Label text="Juro Pago"         height="20" verticalAlign="middle" />
+					<s:Label text="Multa Fixa "  height="20" verticalAlign="middle" />
+					<s:Label text="Multa Perc."  height="20" verticalAlign="middle" toolTip="Multa sobre o valor do lançamento, porém fixada, independente do dia faturado. Aplicada após o vencimento." />
+					<s:Label text="Desc. Pont."   height="20" verticalAlign="middle" toolTip="Desconto por pontualidade até o vencimento." />
+
+				</s:VGroup>
+				<s:VGroup  width="120" height="100%" gap="5">
+					<!-- s:Label id="VALUE_"                  text="" height="20" verticalAlign="middle" fontWeight="bold" fontSize="14" width="100%" showTruncationTip="true" maxDisplayedLines="1"/>
+					<s:Label id="FINANCIAL_ACCOUNT_NAME_" text="" height="20" verticalAlign="middle" fontWeight="bold" fontSize="14" width="100%" showTruncationTip="true" maxDisplayedLines="1" />
+					<s:Rect height="5" / -->
+					<s:Rect height="20"/>
+					<s:Label id="DATE_END_"               text="" height="20" verticalAlign="middle" width="100%" showTruncationTip="true" />
+					<s:Label id="DATE_TODAY_"             text="" height="20" verticalAlign="middle" />
+					<s:Label id="DATE_DIFF_"              text="" height="20" verticalAlign="middle" />
+					<s:Rect height="5"/>
+
+					<s:HGroup gap="2" height="20" color="0xAAAAAA">
+						<s:Label id="FINE_PERCENT_"       text="0" height="20" verticalAlign="middle" />
+						<s:Label                          text="%" height="20" verticalAlign="middle" />
+						<s:Label id="FINE_PERCENT_TIME_"  text=""  height="20" verticalAlign="middle" paddingLeft="5" />
+					</s:HGroup>
+
+					<s:HGroup gap="2" height="20" >
+						<s:Label id="FINE_PERCENT_CALC_"      text="0" height="20" verticalAlign="middle" />
+						<s:Label id="DATE_SAMPLE"             text=""  height="20" fontWeight="normal" toolTip="Dias de atraso calculado pelo Vencimento" verticalAlign="middle" color="0xAAAAAA" />
+					</s:HGroup>
+
+					<s:Label id="FINE_VALUE_"             text="0" height="20" verticalAlign="middle" />
+
+					<s:HGroup gap="2" height="20">
+						<s:Label id="FINE_VALUE_PERCENT_"           text="0" height="20" verticalAlign="middle" />
+						<s:Label id="FINE_VALUE_PERCENT_IN_PERCENT" text="0" height="20" verticalAlign="middle" color="0xAAAAAA"/>
+					</s:HGroup>
+					
+					<s:HGroup gap="2" height="20" >
+						<s:Label id="DISCOUNT_PUNCTUALITY_"   text="0" height="20" verticalAlign="middle" />
+					</s:HGroup>
+
+				</s:VGroup>
+				<elements:elementVLine width="20"/>
+				<s:VGroup width="90" fontWeight="bold" gap="5">
+
+					<s:Label text="Lançamento" height="20" verticalAlign="middle" color="0xAAAAAA" fontWeight="bold" />
+
+					<s:Label text="Pago em" height="25" verticalAlign="middle" />
+					<s:Label text="Valor (R$)" height="30" verticalAlign="middle" toolTip="Valor Lançado"/>
+					<s:Label text="Conta" height="25" verticalAlign="middle" />
+					<s:Label text="Doc. Tipo" height="25" verticalAlign="middle" />
+					<s:Label text="Doc. Núm." height="25" verticalAlign="middle" />
+					<s:Label text="Forma de Pag." height="25" verticalAlign="middle" />
+					<s:Label text="Bandeira" height="25" verticalAlign="middle" visible="{payTypeFlagCard_.visible}" />
+
+				</s:VGroup>
+				<s:VGroup width="150" gap="5">
+
+					<s:Rect height="20"/>
+					
+					<s:Group height="25" width="100%">
+						<s:Button id="dateFinalButtun_" label="" width="100%" height="25" icon="{gnncEmbedBlackWhite.bw_calendar_16}" click="{SHOW_CALENDAR_.displayPopUp=!SHOW_CALENDAR_.displayPopUp}" fontWeight="normal" />
+						<s:PopUpAnchor id="SHOW_CALENDAR_" popUpPosition="below" displayPopUp="false" top="25">
+							<mx:DateChooser id="DATE_FINAL_" width="180" height="180" fontSize="11" selectedDate="{new Date()}" showToday="true" borderColor="0xCCCCCC"  
+											change="{__refreshDate();/*__financialList(FINANCIAL_CALENDAR_.selectedDate);*/ SHOW_CALENDAR_.displayPopUp = false;}" rollOut="{SHOW_CALENDAR_.displayPopUp = false}" 
+											borderVisible="true" firstDayOfWeek="0" yearNavigationEnabled="true" />
+						</s:PopUpAnchor>
+					</s:Group>
+
+					<s:TextInput id="VALUE_" text="0,00" width="100%" height="30" 
+								 alpha=".8" color="0xFFFFFF" fontSize="15" fontWeight="normal" 
+								 restrict="[0-9]" paddingLeft="7" maxChars="11"
+								 borderColor="{gnncDataNumber.__safeClear(VALUE_.text)==0?0x444444:_safeIn?0x009900:0xcc0000}"
+								 contentBackgroundColor="{gnncDataNumber.__safeClear(VALUE_.text)==0?0x444444:_safeIn?0x009900:0xcc0000}"
+
+								 keyUp   ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{updateValuesSafe()})}" 
+								 keyDown ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{updateValuesSafe()})}"
+								 focusIn ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{updateValuesSafe()})}"
+								 focusOut="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{updateValuesSafe()})}"
+								 />
+					<s:DropDownList id="FINANCIAL_ACCOUNT_" labelField="NAME" dataProvider="{_gnncGlobal._FINANCIAL_ACCOUNT.DATA_ARR}" width="100%" height="25" prompt="Selecione..." itemRenderer="GNNC.modules.financial.itemRender.itemRender_financialAccount_forList" labelFunction="gnncData.labelFunctionFirstLetter"
+									change="{cloneData(0,false)}"
+									/>
+					<s:DropDownList id="DOCUMENT_TYPE_" dataProvider="{gnncGlobalArrays._FINANCIAL_DOCUMENT_TYPE}" width="100%" height="25" prompt="Selecione..." 
+									change="{cloneData(1,false)}" close="{payTypeCheck()}"
+									/>
+					<s:TextInput id="DOCUMENT_NUMBER_" text="" height="25" width="100%" maxChars="100"
+								 change="{cloneData(2,false)}"/>
+					<s:DropDownList id="PAY_TYPE_" dataProvider="{gnncGlobalArrays._FINANCIAL_PAY_TYPE}" selectedIndex="0" width="100%" height="25" prompt="Selecione..." itemRenderer="GNNC.modules.financial.itemRender.itemRender_financialPayType_forList"
+									change="{cloneData(3,false)}" close="{payTypeCheck()}"/>
+					<s:DropDownList id="payTypeFlagCard_" width="100%" labelField="label" dataProvider="{gnncGlobalArrays._financialBankFlagSimple}" height="25" prompt="Selecione..."  itemRenderer="GNNC.modules.financial.itemRender.itemRender_financialPayFlagCard_forList"
+									change="{cloneData(4,false)}"/>
+					<!-- s:HGroup gap="5" width="100%" verticalAlign="middle">
+						<gnncDateField4:gnncDateField4 id="DATE_FINAL_" width="80" height="25" selectedDate="{new Date()}" formatString="DD/MM/YYYY" editable="false" keyUp="{__changeValues()}" change="{__changeValues()}" focusOut="{__changeValues()}" yearNavigationEnabled="true" focusAlpha="0" firstDayOfWeek="0" />
+					</s:HGroup -->
+				</s:VGroup>
+				<elements:elementVLine width="20"/>
+				<s:VGroup width="220" height="100%" gap="5" >
+					<!-- s:HGroup width="100%" >
+						<s:VGroup width="80" fontWeight="bold" gap="5" >
+						</s:VGroup>
+						<s:VGroup width="100%" gap="5">
+						</s:VGroup>
+					</s:HGroup -->
+					
+					<s:Label text="Desconto / Bônus"       height="20" verticalAlign="middle" color="0xAAAAAA" fontWeight="bold" />
+					<s:HGroup width="100%" gap="5" verticalAlign="middle">
+						
+						<s:CheckBox id="allowDiscount_" label="" selected="false" click="{allowFineAndDiscount(event)}" toolTip="Abilitar desconto manual" /> 
+
+						
+						<s:HGroup gap="-1" height="30" width="100%" verticalAlign="middle" >
+							<s:Group width="30" height="30">
+								<s:Rect width="30" height="30" radiusX="3" radiusY="3">
+									<s:fill>
+										<s:SolidColor color="0xcccccc"/>
+									</s:fill>
+								</s:Rect>
+								<s:Label text="R$" fontWeight="normal" verticalAlign="middle" textAlign="center" width="30" height="30" paddingTop="1"/>
+							</s:Group>
+							<s:TextInput id="SET_DISCOUNT_VALUE_" text="0,00" maxChars="7" width="100%" height="30" restrict="[0-9]" enabled="false" fontSize="15"
+
+										 contentBackgroundColor="{SET_DISCOUNT_VALUE_.text!=='0,00'?0x444444:0xffffff}"
+										 color="{SET_DISCOUNT_VALUE_.text!=='0,00'?0xffffff:0x444444}"
+
+										 keyUp   ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{updateFineAndDiscount()})}" 
+										 keyDown ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{})}"
+										 focusOut="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{})}"
+										 
+										 />
+						</s:HGroup>
+
+						<s:HGroup gap="-1" height="30" width="100%" verticalAlign="middle" >
+							<s:Group width="30" height="30">
+								<s:Rect width="30" height="30" radiusX="3" radiusY="3">
+									<s:fill>
+										<s:SolidColor color="0xcccccc"/>
+									</s:fill>
+								</s:Rect>
+								<s:Label text="%" fontWeight="normal" verticalAlign="middle" textAlign="center" width="30" height="30" paddingTop="1"/>
+							</s:Group>
+							<s:TextInput id="SET_DISCOUNT_PERCENT_" text="0,00" maxChars="5" width="100%" height="30" restrict="[0-9]" enabled="false" fontSize="15"
+										 
+										 contentBackgroundColor="{SET_DISCOUNT_PERCENT_.text!=='0,00'?0x444444:0xffffff}"
+										 color="{SET_DISCOUNT_PERCENT_.text!=='0,00'?0xffffff:0x444444}"
+										 
+										 keyUp   ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{updateFineAndDiscount()})}" 
+										 keyDown ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{})}"
+										 focusOut="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{})}"
+										 
+										 />
+						</s:HGroup>
+					</s:HGroup>
+
+					<s:Label text="Juros / Multa / Adicional"       height="20" verticalAlign="middle" color="0xAAAAAA" fontWeight="bold" />
+					<s:HGroup width="100%" gap="5" verticalAlign="middle">
+
+						<s:CheckBox id="allowFine_" label="" selected="false" click="{allowFineAndDiscount(event)}" toolTip="Abilitar juro/multa manual" /> 
+
+						<s:HGroup gap="-1" height="30" width="100%" verticalAlign="middle" >
+							<s:Group width="30" height="30">
+								<s:Rect width="30" height="30" radiusX="3" radiusY="3">
+									<s:fill>
+										<s:SolidColor color="0xcccccc"/>
+									</s:fill>
+								</s:Rect>
+								<s:Label text="R$" fontWeight="normal" verticalAlign="middle" textAlign="center" width="30" height="30" paddingTop="1"/>
+							</s:Group>
+							<s:TextInput id="SET_FINE_VALUE_" text="0,00" maxChars="7" width="100%" height="30" restrict="[0-9]" enabled="false" fontSize="15"
+										 
+										 contentBackgroundColor="{SET_FINE_VALUE_.text!=='0,00'?0x444444:0xffffff}"
+										 color="{SET_FINE_VALUE_.text!=='0,00'?0xffffff:0x444444}"
+										 
+										 keyUp   ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{updateFineAndDiscount()})}" 
+										 keyDown ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{})}"
+										 focusOut="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{})}"
+										 
+										 />
+						</s:HGroup>
+
+						<s:HGroup gap="-1" height="30" width="100%" verticalAlign="middle" >
+							<s:Group width="30" height="30">
+								<s:Rect width="30" height="30" radiusX="3" radiusY="3">
+									<s:fill>
+										<s:SolidColor color="0xcccccc"/>
+									</s:fill>
+								</s:Rect>
+								<s:Label text="%" fontWeight="normal" verticalAlign="middle" textAlign="center" width="30" height="30" paddingTop="1"/>
+							</s:Group>
+							<s:TextInput id="SET_FINE_PERCENT_" text="0,00" maxChars="5" width="100%" height="30" restrict="[0-9]" enabled="false" fontSize="15"
+										 
+										 contentBackgroundColor="{SET_FINE_PERCENT_.text!=='0,00'?0x444444:0xffffff}"
+										 color="{SET_FINE_PERCENT_.text!=='0,00'?0xffffff:0x444444}"
+										 
+										 keyUp   ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{updateFineAndDiscount()})}" 
+										 keyDown ="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{})}"
+										 focusOut="{gnncDataNumber.__safeKeyEvent(event,true,function cv():void{})}"
+										 
+										 />
+						</s:HGroup>
+
+					</s:HGroup>
+					
+					<s:Label text="Novo lançamento" height="25" verticalAlign="middle" color="0xAAAAAA" fontWeight="bold" />
+					<s:CheckBox id="addTax_" label="Taxa adicional" selected="false" fontWeight="bold"
+								toolTip="Abrirá uma nova janela para cadastro da taxa adicional, relacionada a este lançamento."
+								change="{cloneData(5,false)}"
+								/> 
+
+
+					<!-- s:Button label="Registrar desconto no valor" width="100%" height="25"/>
+					<s:Button label="Descartar desconto no valor" width="100%" height="25"/>
+					<s:Button label="Registrar diferença (taxa)" width="100%" height="25"/>
+					<s:Button label="Descartar desconto (taxa)" width="100%" height="25"/ -->
+				</s:VGroup>
+			</s:HGroup>
+			
+		</s:NavigatorContent>
+	</mx:ViewStack>
+		
+	<s:Group width="100%" height="44" bottom="34" visible="{panelCenter_.selectedIndex==0?false:true}">
+		<elements:elementBarStatus height="44" left="1" right="1" colorStart="0xffffff" colorEnd="0xffffff" />
+
+		<s:VGroup width="100%" height="44" verticalAlign="top" gap="1">
+			<s:HGroup width="100%" gap="1" verticalAlign="middle" paddingLeft="25" paddingRight="15" paddingTop="9" >
+
+				<s:Label width="90" text="Valor"      fontSize="10" fontWeight="bold" toolTip="Valor do lançamento" />
+				<s:Label width="90" text="Pontualidade" fontSize="10" fontWeight="bold" toolTip="Valor de pagamento pontual até o vencimento" />
+				<s:Label width="90" text="Juro/Multa" fontSize="10" fontWeight="bold" toolTip="Valor do juro" />
+				<s:Label width="90" text="Calculado"  fontSize="10" fontWeight="bold" toolTip="Valor calculado (automaticamento): valor + juro + desconto" />
+				<s:Label width="90" text="Adicional"  fontSize="10" fontWeight="bold" toolTip="Valor do juro" />
+				<s:Label width="90" text="Desconto"   fontSize="10" fontWeight="bold" toolTip="Valor do desconto" />
+				<s:Label width="90" text="Final (a faturar)"     fontSize="10" fontWeight="bold" toolTip="Valor final" />
+
+			</s:HGroup>
+			<s:HGroup width="100%" gap="1" verticalAlign="middle" paddingLeft="25" paddingRight="15" >
+				
+				<s:Label width="90" id="VALUE_SAFE_"    text="0,00" fontSize="14" fontWeight="bold" paddingLeft="0" toolTip="" maxDisplayedLines="1" showTruncationTip="true" color="0x000000" />
+				<s:Label width="90" id="VALUE_PUNC_"    text="0,00" fontSize="14" fontWeight="bold" paddingLeft="0" toolTip="" maxDisplayedLines="1" showTruncationTip="true" />
+				<s:Label width="90" id="VALUE_FINE_"    text="0,00" fontSize="14" fontWeight="bold" paddingLeft="0" toolTip="" maxDisplayedLines="1" showTruncationTip="true" />
+				<s:Label width="90" id="VALUE_CALC_"    text="0,00" fontSize="14" fontWeight="bold" paddingLeft="0" toolTip="" maxDisplayedLines="1" showTruncationTip="true" color="0x999999" />
+				<s:Label width="90" id="VALUE_ADD_"     text="0,00" fontSize="14" fontWeight="bold" paddingLeft="0" toolTip="" maxDisplayedLines="1" showTruncationTip="true" />
+				<s:Label width="90" id="VALUE_DISCOUT_" text="0,00" fontSize="14" fontWeight="bold" paddingLeft="0" toolTip="" maxDisplayedLines="1" showTruncationTip="true" />
+				<s:Label width="90" id="VALUE_FINAL_"   text="0,00" fontSize="14" fontWeight="bold" paddingLeft="0" toolTip="" maxDisplayedLines="1" showTruncationTip="true" color="#0066ff" />
+				
+			</s:HGroup>
+		</s:VGroup>
+	</s:Group>
+	<s:Group width="100%" height="34" bottom="0">
+		<elements:elementBarStatus height="34" />
+		<s:HGroup width="100%" height="34" gap="1" verticalAlign="middle" paddingLeft="5" paddingRight="5" >
+			<s:Button id="btnView_" label="Visualizar" icon="{gnncEmbedBlackWhite.bw_view_16}" click="{__financialView()}" fontWeight="normal" focusEnabled="false" height="25" width="25"/>
+			<!-- s:Button id="btnAdvanced_" label="Voltar" fontWeight="bold" focusEnabled="false" height="25" click="{advanced()}" visible="false"/ -->
+			
+			<s:Rect width="100%" minWidth="1"/>
+			
+			<!-- s:Button label="A Compensar" icon="{gnncEmbedBlackWhite.check_16_bw_ok}" click="{__financialView()}" fontWeight="bold" focusEnabled="false" height="25" enabled="false" / -->
+			<s:Button id="btnSave_" icon="{gnncEmbedBlackWhite.check_16_green_ok}" label="Baixar" click="{__save()}" fontWeight="bold" height="25" >
+				<s:keyUp>
+					<![CDATA[
+					if( gnncKeyboard.__ENTER(event) && !gnncKeyboard.__CONTROL_ENTER(event) ) 
+					__save()
+					]]>
+				</s:keyUp>
+			</s:Button>
+			<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" height="25" skinClass="GNNC.skin.button.skin_buttonLink" />
+		</s:HGroup>
+	</s:Group>
+	
+	<elements:elementHLine bottom="78" height="1" visible="{panelCenter_.selectedIndex==0?false:true}"/>
+
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+
+</s:Module>

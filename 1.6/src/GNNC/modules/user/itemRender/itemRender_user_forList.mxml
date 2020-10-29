@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				
+				width="100%" height="30"
+				rightMouseDown="{__menuRight(event)}" 
+				
+				autoDrawBackground="false" 
+				xmlns:stage="GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			private function __menuRight(e:MouseEvent):void
+			{
+				var itemUser:ContextMenuItem  		= new ContextMenuItem(data.USER,false,false);
+				itemUser.addEventListener			(Event.SELECT,function(e:Event):void{  });
+				
+				// Create custom context menu. 
+				var cm:ContextMenu 	= new ContextMenu();
+				cm.hideBuiltInItems	();
+				cm.customItems 		= [itemUser];
+				
+				this.contextMenu 	= cm;
+			}
+
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="hovered"/>
+		<s:State name="selected"/>
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Rect includeIn="hoveredAndShowsCaret,hovered" left="0" right="1" top="0" bottom="0"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect includeIn="selected,selectedAndShowsCaret" left="0" right="1" top="0" bottom="0"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:HGroup left="1" top="1" right="1" bottom="2" gap="1" verticalAlign="middle" paddingLeft="6" paddingRight="6" 
+			  color="{Number(data.ACTIVE)==0?0xbbbbbb:0x333333}"
+			  color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF">
+		
+		<s:Image source="{gnncEmbedBlackWhite.bw_user_16}" toolTip="{'Usuário, Id: '+data.ID}"
+				 alpha="{Number(data.ACTIVE)==0?.5:1}"
+				 />
+		<s:Rect width="3"/>
+		<s:Label text="{data.USER}" fontSize="11" fontWeight="bold" width="90" maxDisplayedLines="1" showTruncationTip="true"
+				 paddingLeft="3"
+				 />
+
+		<s:Image source="{gnncEmbedBlackWhite.bw_client_16}" toolTip="{'Cliente, Id: '+data.ID_CLIENT}"/>
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME_CLIENT)}" fontWeight="normal" width="60" maxDisplayedLines="1" showTruncationTip="true" paddingTop="1"
+				 paddingLeft="3"
+				 />
+
+		<s:Image source="{gnncEmbedBlackWhite.bw_permission_16}" toolTip="{'Permissão em grupo, Id: '+data.ID_PERMISSION_GROUP}"/>
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME_GROUP)}" width="100%" paddingLeft="3" maxDisplayedLines="1" showTruncationTip="true" paddingTop="1" />
+
+		<s:Rect width="10"/>
+
+		
+		<s:Rect width="10"/>
+
+		<s:Image source="{ gnncEmbedBlackWhite.bw_email_16 }"  toolTip="E-mail" width="12" height="12" smooth="true" />
+		<s:Label text="{ data.USER_EMAIL ? String(data.USER_EMAIL).toLowerCase() : '' }" fontSize="11" fontWeight="normal" textDecoration="none" color="0x3785e2" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" buttonMode="true" width="80" maxDisplayedLines="1" showTruncationTip="true" paddingRight="5" paddingLeft="5" paddingTop="0" />
+		
+		<s:Label text="Cliente" fontWeight="normal" width="40" maxDisplayedLines="1" showTruncationTip="true" paddingTop="1"
+				 paddingLeft="3" textAlign="left" alpha="{Number(data.IS_CLIENT)==1?1:.2}" />
+		<s:Label text="Admin" fontWeight="normal" width="40" maxDisplayedLines="1" showTruncationTip="true" paddingTop="1"
+				 paddingLeft="3" textAlign="left" alpha="{Number(data.IS_ADMIN)==1?1:.2}"/>
+
+		<s:Image source="{data.ACTIVE==0?gnncEmbedImage.STATUS_RED_16:data.ACTIVE==1?gnncEmbedImage.STATUS_GREEN_16:data.ACTIVE==2?gnncEmbedImage.STATUS_YELLOW_16:gnncEmbedImage.STATUS_GREY_16}" toolTip="Status" width="16" height="16" />
+	</s:HGroup>
+	
+	<elements:elementHLine bottom="0" left="0" right="0" alpha=".5"/>
+	
+</s:ItemRenderer>

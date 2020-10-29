@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" 
+		  xmlns:stage="GNNC.elements.stage.*"
+		  creationComplete="{__start()}" 
+		  xmlns:gnncDateField4="GNNC.UI.gnncDateField4.*" 
+		  xmlns:select="GNNC.elements.component.select.*" 
+		  xmlns:elements="GNNC.UI.elements.*"
+		  >
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.elements.elementHLine;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.file.gnncFilesRemote;
+			import GNNC.gnncEmbedExtension;
+			
+			import mx.graphics.SolidColor;
+			
+			import spark.components.Image;
+			import spark.components.Label;
+						
+			private var connAttach:gnncAMFPhp = new gnncAMFPhp();
+			private var connExec:gnncAMFPhp = new gnncAMFPhp();
+
+			private function __start():void
+			{
+				__config();
+			}
+
+			private function __config():void
+			{
+				/*addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						//if(gnncKeyboard.__CONTROL(event)) BTN_FINAL_.setFocus();
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+					},false,0
+				)*/
+			}
+			
+			private function __list():void
+			{
+				var sql:String = "" + //" select COUNT(*) as ROWS, SUM(SIZE) as SIZE, EXTENSION, GROUP_CONCAT(EXTENSION) as EXTENSIONS from dbd_attach where ID > 0 ";
+					" select COUNT(*) as ROWS, SUM(a.SIZE) SIZE, a.EXTENSION  from dbd_attach a where a.SIZE > 0 group by a.EXTENSION order by SIZE desc ";
+
+				//public var EXTENSION:String		= ''; //jpg pdf doc... 
+				//public var SIZE:uint			= 0;  //bytes
+
+				this.enabled = false;
+				connAttach = new gnncAMFPhp();
+				connAttach.__sql(sql,'','',fResult,fFault);
+				
+				function fResult(event:*):void{
+
+					enabled = true;
+
+					if(connAttach.DATA_ROWS < 1)
+						return;
+					
+					//https://whatsabyte.com/P1/byteconverter.htm
+					// 1gb = 1073741824 bytes
+					// 2gb = 2147483648
+					// 3gb = 3221225472
+					// 4gb = 4294967296
+					// 5gb = 5368709120
+					// 6gb = 6442450944
+					// 7gb = 7516192768
+					// 8gb = 8589934592
+					// 9gb = 9663676416
+					// 10gb = 10737418240
+					
+					var gb1:Number = 1073741824;
+					var i:uint = 0;
+					var r:uint = 0;
+					var s:Number = 0;
+					var e:Array = new Array();
+					var o:Object = new Object();
+
+					stageAttach_.removeAllElements();
+
+					for(i=0; i<connAttach.DATA_ROWS; i++ ){
+						o = connAttach.DATA_ARR.getItemAt(i);
+						r += Number(o.ROWS);
+						s += Number(o.SIZE);
+						e.push(o.EXTENSION);
+						addEx(o);
+					}
+					
+					attachBar_.percentWidth = (Number(s) / gb1 ) * 100 ;
+					attachPercent_.text     = Number( (Number(s) / gb1 ) * 100).toFixed(2) + ' %';
+					files_.text             = gnncDataNumber.__setThousand(uint(r)) + ' arquivo(s)';
+
+					size_.text = gnncFilesRemote.__bytes2Legend(s,'0');
+					min_.text  = gnncFilesRemote.__bytes2Legend(gb1 - s,'0') + ' de espaço livre';
+
+				}
+
+				function fFault(event:*):void{ 
+					enabled = true;
+				}
+
+			}
+
+			private function addEx(o:Object):void
+			{ 
+				var img:Image = new Image();
+				img.width = img.height = 16;
+				img.source = gnncEmbedExtension.__fileExtension(o.EXTENSION,16);//data.EXTENSION,16)
+				
+				var hg:HGroup = new HGroup();
+				hg.percentWidth = 100;
+				hg.gap = 7;
+				hg.verticalAlign = "middle";
+				hg.padding = 3;
+				hg.paddingLeft = 4;
+				hg.paddingRight = 4;
+				
+				var r:Rect = new Rect();
+				r.fill = new SolidColor(0xffffff);
+				r.percentWidth = 100;
+				r.height = 25;
+				r.radiusX = 3;
+				r.radiusX = 3;
+				r.alpha = .2
+
+				var g:Group = new Group();
+				g.percentWidth = 100;
+				
+				var line:elementHLine = new elementHLine();
+				line.height = 1;
+				line.alpha = .4;
+				line.bottom = 0;
+
+				var l:Label = new Label();
+				l.text = String(o.EXTENSION).toLowerCase();
+				l.percentWidth = 100;
+				l.setStyle('font-weight','bold');
+				l.setStyle('fontWeight','bold');
+				
+				var s:Label = new Label();
+				s.text = gnncFilesRemote.__bytes2Legend(o.SIZE);
+				s.width = 60;
+				s.setStyle('text-align','right');
+				s.setStyle('textAlign','right');
+
+				hg.addElement(img);
+				hg.addElement(l);
+				hg.addElement(s);
+				g.addElement(r);
+				g.addElement(hg);
+				g.addElement(line);
+				
+				stageAttach_.addElement(g);
+			}
+			
+			
+		]]>
+	</fx:Script>
+
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal"/>
+	</s:states>
+
+	<!-- elements:elementBarStatus width="100%" height="100%" alpha=".5"/ -->
+	<elements:elementBarStatus width="200" height="100%" alpha=".5"/>
+	
+	<s:HGroup width="100%" height="100%" gap="0">
+		
+		<s:Scroller width="200" height="100%" horizontalScrollPolicy="off">			
+			<s:VGroup width="200" height="100%" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10" gap="1" id="panelLeft_">
+
+				<s:Button width="100%" height="30" label="Espaço Utilizado" click="{__list()}" />
+				<s:Rect height="10"/>
+				
+				<s:VGroup id="stageAttach_" gap="1" fontSize="11" width="100%">
+					
+				</s:VGroup>
+				
+			</s:VGroup>
+		</s:Scroller>
+		
+		<elements:elementVLine height="100%" width="1" />
+		
+		<s:VGroup width="100%" height="100%" gap="0" paddingLeft="20" paddingBottom="20" paddingRight="20" paddingTop="20" >
+			<s:Group width="100%" height="100%">
+				
+				<s:VGroup width="100%" verticalCenter="0" verticalAlign="middle" padding="50" gap="5">
+					
+					<elements:elementLabelFont id="size_" text="0 GB" fontSize="50" width="100%" textAlign="center" verticalAlign="middle" />
+					<elements:elementLabelFont id="files_" text="0 arquivos" fontSize="15" fontWeight="bold" width="100%" textAlign="center" verticalAlign="middle" paddingBottom="10" />
+
+					<s:HGroup width="100%" verticalAlign="middle" paddingLeft="50" paddingRight="50">
+						<!-- s:Image source="{gnncEmbedBlackWhite.bw_attach_32}" toolTip="Arquivos"/ -->
+						<s:Group width="100%">
+							<elements:elementBarStatus alpha="1" fill="{new SolidColor(0xaaaaaa)}" radiusX="4" radiusY="4"/>
+							<elements:elementBarStatus id="attachBar_" width="0" alpha="1" fill="{new SolidColor(0x2170cf)}" radiusX="4" radiusY="4"/>
+							<elements:elementLabelFont id="attachPercent_" text="0 %" left="9" height="30" fontSize="15" fontWeight="bold" verticalAlign="middle" color="0xffffff"/>
+							<!-- elements:elementLabelFont id="balanceAllInValue"  right="7" height="30" color="0xFFFFFF" fontSize="11" fontWeight="normal" verticalAlign="middle"/ -->
+						</s:Group>
+					</s:HGroup>
+
+					<s:HGroup width="100%" verticalAlign="middle" paddingLeft="50" paddingRight="50">
+						<elements:elementLabelFont id="min_" text="0 bytes" fontSize="12" width="100%" textAlign="left" verticalAlign="middle" />
+						<elements:elementLabelFont id="max_" text="1GB" fontSize="12" width="100%" textAlign="right" verticalAlign="middle" />
+					</s:HGroup>
+
+				</s:VGroup>
+				
+			</s:Group>
+		</s:VGroup>
+		
+		
+	</s:HGroup>
+	
+	
+</s:Module>

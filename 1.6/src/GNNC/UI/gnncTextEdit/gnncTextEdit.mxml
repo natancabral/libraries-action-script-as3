@@ -1,0 +1,1204 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module name="Customeditor_"
+		 xmlns:fx="http://ns.adobe.com/mxml/2009"
+		 xmlns:s="library://ns.adobe.com/flex/spark"
+		 xmlns:mx="library://ns.adobe.com/flex/mx"
+		 width="100%" height="100%" creationComplete="{__start()}"
+		 >
+	<s:layout>
+		<s:VerticalLayout gap="1" />
+	</s:layout>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.data.data.gnncClipBoard;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataHtml;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.globals.gnncGlobalLog;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.keyboard.gnncKeyboardPaste;
+			
+			import flash.text.engine.FontPosture;
+			import flash.text.engine.FontWeight;
+			
+			import flashx.textLayout.conversion.ConversionType;
+			import flashx.textLayout.conversion.TextConverter;
+			import flashx.textLayout.edit.EditManager;
+			import flashx.textLayout.edit.IEditManager;
+			import flashx.textLayout.edit.SelectionState;
+			import flashx.textLayout.elements.FlowElement;
+			import flashx.textLayout.elements.FlowGroupElement;
+			import flashx.textLayout.elements.InlineGraphicElement;
+			import flashx.textLayout.elements.LinkElement;
+			import flashx.textLayout.elements.ListElement;
+			import flashx.textLayout.elements.ListItemElement;
+			import flashx.textLayout.elements.ParagraphElement;
+			import flashx.textLayout.elements.SpanElement;
+			import flashx.textLayout.elements.TextFlow;
+			import flashx.textLayout.events.FlowElementMouseEvent;
+			import flashx.textLayout.events.StatusChangeEvent;
+			import flashx.textLayout.formats.ListMarkerFormat;
+			import flashx.textLayout.formats.ListStylePosition;
+			import flashx.textLayout.formats.ListStyleType;
+			import flashx.textLayout.formats.TextAlign;
+			import flashx.textLayout.formats.TextDecoration;
+			import flashx.textLayout.formats.TextLayoutFormat;
+			
+			import mx.controls.Alert;
+			import mx.events.CloseEvent;
+			import mx.events.ColorPickerEvent;
+			import mx.events.FlexEvent;
+			
+			import spark.events.IndexChangeEvent;
+			import spark.utils.TextFlowUtil;
+			
+			[Embed(source='images/insert-image-16.png')] 	static public const INSERT_IMAGE_16:Class;
+			[Embed(source='images/text-code-16.png')] 		static public const TEXT_CODE_16:Class;
+			[Embed(source='images/text-align-c-16.png')] 	static public const TEXT_ALIGN_C_16:Class;
+			[Embed(source='images/text-align-l-16.png')] 	static public const TEXT_ALIGN_L_16:Class;
+			[Embed(source='images/text-align-r-16.png')] 	static public const TEXT_ALIGN_R_16:Class;
+			[Embed(source='images/text-align-j-16.png')] 	static public const TEXT_ALIGN_J_16:Class;
+
+			
+			[Embed(source='images/uppercase.png')] 			static public const uppercase:Class;
+			[Embed(source='images/lowercase.png')] 			static public const lowercase:Class;
+
+			private var _workingText:String;
+			private var _codeTLF:TextLayoutFormat;
+			private var _defaultTLF:TextLayoutFormat;
+			private var _blockChange:Boolean = false;
+			private var _focusInEditorHtml:Boolean = false;
+			
+			public function set __removeMoreOptions(value_:Boolean):void 
+			{
+				currentState = (value_) ? 'noMoreOptions' : 'normal';
+			}
+
+			public function set __removeAlignText(value_:Boolean):void 
+			{
+				//txtAlignBB.visible = (value_) ? false : true;
+			}
+
+			public function get text():String 
+			{
+				return editor_.text;
+			}
+
+			public function set text(value_:String):void 
+			{
+				editor_.text = value_;
+			}
+
+			public function get textFlow():TextFlow 
+			{
+				return editor_.textFlow;
+			}
+			
+			public function set textFlow(value_:TextFlow):void 
+			{
+				editorCode_.text 	 = gnncDataHtml.__textFlow2FlashHtml(value_);
+				editor_.textFlow 	 = value_;
+			}
+			
+			public function get textHtml():String 
+			{
+				return editorCode_.text;
+			}
+			
+			public function set textHtml(value_:String):void 
+			{
+				editor_.textFlow 	 = gnncDataHtml.__html2TextFlow(value_);
+				editorCode_.text 	 = value_;
+			}
+
+			protected function __start():void 
+			{
+				//editor_.textFlow.addEventListener(StatusChangeEvent.INLINE_GRAPHIC_STATUS_CHANGE, function(e:*):void{boldBtn.label=new Date().time+'..'});
+				editor_.addEventListener(KeyboardEvent.KEY_DOWN,
+					function(event:KeyboardEvent):void
+					{
+						if ((event.charCode == Keyboard.B || event.charCode == 98) && event.ctrlKey == true) 	boldBtn_clickHandler(null);
+						if ((event.charCode == Keyboard.I || event.charCode == 105) && event.ctrlKey == true) 	italBtn_clickHandler(null);
+						if ((event.charCode == Keyboard.U || event.charCode == 117) && event.ctrlKey == true) 	underBtn_clickHandler(null);
+					}
+				);
+
+				//try
+				//editor_.textFlow.addEventListener(StatusChangeEvent.INLINE_GRAPHIC_STATUS_CHANGE,__picLoaded);
+				//editor_.textFlow.addEventListener("inlineGraphicStatusChanged",__picLoaded);
+				//editor_.textFlow.addEventListener(SelectionEvent.SELECTION_CHANGE,__picLoaded);
+				
+				__change(false);
+				__highlightHTMLcode();
+				__change(true);
+			}
+			
+			private function __picLoaded(e:StatusChangeEvent):void
+			{
+				//var image:InlineGraphicElement = e.element as InlineGraphicElement;
+				//image.source;
+				
+				//var le:LinkElement = e.element as LinkElement;
+				//le.href = 'http://www.gnial.com.br';
+				
+				//var z:String = le.getFirstLeaf().text;
+				
+				//Alert.show(image.source+" - "+le.href);
+
+			}
+
+			
+			private function __highlightColor():void 
+			{
+				// define the TextLayoutFormat for code
+				_codeTLF 							= new TextLayoutFormat();
+				_codeTLF.color 						= 0x3366ff;
+				_codeTLF.fontWeight 				= 'normal';
+				
+				// define the TextLayoutFormat for default text
+				_defaultTLF 						= new TextLayoutFormat();
+				_defaultTLF.color 					= 0x000000;
+				_defaultTLF.fontWeight 				= 'normal';
+			}
+			
+			private function __highlightHTMLcode():void 
+			{
+				return;
+				
+				// Turn the change listener off while we are working on htmlInput field.
+				_blockChange = true;
+
+				__highlightColor();
+
+				// Set all of the text format to default.
+				editorCode_.setFormatOfRange		( _defaultTLF, 0, editorCode_.text.length );
+				
+				var currentIndex:int 				= 0;
+				var s:String 						= editorCode_.text;
+				
+				// Highlight the code sections between the <> characters.
+				while( s.indexOf( '<', currentIndex ) != -1 ) 
+				{
+					var startIndex:int 				= s.indexOf( '<', currentIndex );
+					var endIndex:int 				= s.indexOf( '>', startIndex );
+					currentIndex 					= endIndex;
+					editorCode_.setFormatOfRange	( _codeTLF, startIndex, endIndex + 1 );
+				}
+				
+				// Turn the change listener back on.
+				_blockChange = false;
+				
+				//editor_.updateCompletePendingFlag = true;
+				editor_.validateNow();
+				//editor_.validateDisplayList();
+			}
+			
+			protected function editor__selectionChangeHandler(evt:FlexEvent):void 
+			{
+				var txtLayFmt:TextLayoutFormat 		= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				//fontDDL.selectedItem 				= txtLayFmt.fontFamily;
+				//sizeDDL.selectedItem 				= txtLayFmt.fontSize;
+				boldBtn.selected 					= (txtLayFmt.fontWeight == FontWeight.BOLD);
+				italBtn.selected 					= (txtLayFmt.fontStyle == FontPosture.ITALIC);
+				underBtn.selected 					= (txtLayFmt.textDecoration == TextDecoration.UNDERLINE);
+				//colorCP.selectedColor 				= txtLayFmt.color;
+				lineBtn.selected 					= txtLayFmt.lineThrough;
+
+				//var txtLink:LinkElement 			= editor_.textFlow.getParagraph();
+				//__getWhileElements(editor_.textFlow.getPreviousSibling());
+
+				switch (txtLayFmt.textAlign) 
+				{
+					case TextAlign.LEFT: 			txtAlignBB.selectedIndex = 0;
+						break;
+					case TextAlign.CENTER: 			txtAlignBB.selectedIndex = 1;
+						break;
+					case TextAlign.RIGHT: 			txtAlignBB.selectedIndex = 2;
+						break;
+					case TextAlign.JUSTIFY: 		txtAlignBB.selectedIndex = 3;
+						break;
+					default: 						txtAlignBB.selectedIndex = -1;
+						break;
+				}
+			}
+			
+			protected function __removeDDL(e:*=null):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+
+				var txtLayFmt:TextLayoutFormat = editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+
+				txtLayFmt.fontFamily 				= 'Arial';
+				//txtLayFmt.fontSize 					= 12;
+				txtLayFmt.fontWeight 				= FontWeight.NORMAL;
+				txtLayFmt.fontStyle 				= FontPosture.NORMAL;
+				txtLayFmt.textDecoration 			= TextDecoration.NONE;
+				txtLayFmt.color 					= 0x333333;
+				txtLayFmt.lineThrough 				= false;
+				txtLayFmt.listAutoPadding			= null;
+				txtLayFmt.listMarkerFormat			= null;
+				txtLayFmt.listStylePosition			= ListStylePosition.OUTSIDE;
+				txtLayFmt.listStyleType				= ListStyleType.BOX;
+				txtLayFmt.clearFloats				= null; 
+				
+				
+				editor_.setFormatOfRange			(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				//editor_.setFocus();
+			}
+
+			public function __doSetImage(url_:String='',htmlTitle_:String='',htmlAlign_:String='',htmlCssStyle_:String=''):void
+			{
+				/*
+				var _page:SELECT_ATTACH = new SELECT_ATTACH();
+				_page._MIX				= 'WEB';
+				
+				new gnncPopUp().__creation(_page,true,false,_fRemove);
+				*/
+
+				if(!gnncData.__trimText(url_) || gnncData.__trimText(url_).length < 8)
+					return;
+
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition != editor_.selectionAnchorPosition)
+				{
+					new gnncAlert().__alert('Para inserir uma imagem selecione o local desejado, não faça seleção de texto.');
+					return;
+				}
+				
+				if(panelCenter_.selectedIndex != 0)
+					return;
+				
+				var _ifImage:Boolean = false;
+				
+				if(url_.indexOf('.jpeg') > -1)
+					_ifImage = true;
+
+				if(url_.indexOf('.jpg') > -1)
+					_ifImage = true;
+
+				if(url_.indexOf('.png') > -1)
+					_ifImage = true;
+
+				if(url_.indexOf('.gif') > -1)
+					_ifImage = true;
+
+				var key:String = gnncDataRand.__key(10);
+
+				editor_.insertText('[['+key+']]');
+				
+				__change(false);
+
+				var _txt:String = editorCode_.text.replace('[['+key+']]','<IMG src="'+url_+'" align="'+htmlAlign_+'" style="'+htmlCssStyle_+'" title="'+htmlTitle_+'" alt="'+htmlTitle_+'" />');
+				editorCode_.text = _txt.toString();
+				
+				__change(true);
+	
+				////editor_.setFocus();
+			}
+			
+			public function __insertText(text_:String=''):void
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition != editor_.selectionAnchorPosition)
+				{
+					new gnncAlert().__alert('Selecione o local desejado para a inserção. Não faça seleção de texto.');
+					return;
+				}
+
+				if(panelCenter_.selectedIndex != 0)
+					return;
+				
+				var key:String = gnncDataRand.__key(10);
+				
+				editor_.insertText('[['+key+']]');
+				
+				__change(false);
+				
+				var _txt:String = editorCode_.text.replace('[['+key+']]',text_);
+				editorCode_.text = _txt.toString();
+				
+				__change(true);
+				
+				////editor_.setFocus();
+			}
+			
+			protected function doSetList():void
+			{
+				return;
+				
+				var parag:ParagraphElement = new ParagraphElement();
+				
+				var list:ListElement = new ListElement()
+				//list.tabStops=TabStopFormat.defaultFormat;//"e20 s24";     
+				list.listStyleType=ListStyleType.CHECK
+				list.listStylePosition=ListStylePosition.INSIDE;
+				
+				var lm:ListMarkerFormat=new ListMarkerFormat();
+				list.listMarkerFormat=lm;
+				
+				var flowE:SpanElement = new SpanElement();
+				flowE.text = 'acd';
+				
+				for(var j:int=0;j<10;j++)
+				{
+						var item:ListItemElement = new ListItemElement();
+						item.addChild(flowE);
+						list.addChild(item);
+				}
+				
+				parag.addChild(list);
+				
+				editor_.textFlow.addChildAt(0,list);
+				
+				//interactionManager.applyContainerFormat(lm)
+				//messageTA.textFlow.interactionManager.setFocus();
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+
+			}
+			
+			
+			
+			protected function fontDDL_changeHandler(evt:IndexChangeEvent):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+
+				var txtLayFmt:TextLayoutFormat 		= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				//txtLayFmt.fontFamily 				= fontDDL.selectedItem;
+				editor_.setFormatOfRange			(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+			}
+			
+			protected function sizeDDL_changeHandler(evt:IndexChangeEvent):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+
+				var txtLayFmt:TextLayoutFormat 		= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				//txtLayFmt.fontSize 					= sizeDDL.selectedItem;
+				editor_.setFormatOfRange			(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+			}
+			
+			protected function boldBtn_clickHandler(evt:MouseEvent):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+
+				var txtLayFmt:TextLayoutFormat 		= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				txtLayFmt.fontWeight 				= (txtLayFmt.fontWeight == FontWeight.BOLD) ? FontWeight.NORMAL : FontWeight.BOLD;
+				editor_.setFormatOfRange				(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+
+			}
+			
+			protected function italBtn_clickHandler(evt:MouseEvent):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+
+				var txtLayFmt:TextLayoutFormat 		= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				txtLayFmt.fontStyle 				= (txtLayFmt.fontStyle == FontPosture.ITALIC) ? FontPosture.NORMAL : FontPosture.ITALIC;
+				editor_.setFormatOfRange			(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+			}
+			
+			protected function underBtn_clickHandler(evt:MouseEvent):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+
+				var txtLayFmt:TextLayoutFormat 		= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				txtLayFmt.textDecoration 			= (txtLayFmt.textDecoration == TextDecoration.UNDERLINE) ? TextDecoration.NONE : TextDecoration.UNDERLINE;
+				editor_.setFormatOfRange			(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+			}
+			
+			protected function colorCP_changeHandler(evt:ColorPickerEvent):void 
+			{
+				var txtLayFmt:TextLayoutFormat 		= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				//txtLayFmt.color 					= colorCP.selectedColor;
+				editor_.setFormatOfRange			(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+
+			}
+			
+			protected function txtAlignBB_changeHandler(evt:IndexChangeEvent):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0) //no shore
+					return;
+
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+				
+				if (txtAlignBB.selectedItem) 
+				{
+					var txtLayFmt:TextLayoutFormat 	= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+					txtLayFmt.textAlign 			= txtAlignBB.selectedItem.value;
+					editor_.setFormatOfRange		(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+					//editor_.setFocus();
+				}				
+			}
+			
+			protected function lineBtn_clickHandler(evt:MouseEvent):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+
+				var txtLayFmt:TextLayoutFormat 		= editor_.getFormatOfRange(null, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				txtLayFmt.lineThrough 				= lineBtn.selected;
+				editor_.setFormatOfRange			(txtLayFmt, editor_.selectionAnchorPosition, editor_.selectionActivePosition);
+				
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+			}
+
+			protected function dontAllowPaste(e:KeyboardEvent):void 
+			{
+				if(gnncKeyboard.__controlV(e))
+				{
+					//__paste(new Event(Event.PASTE));
+					e.stopImmediatePropagation();
+					e.stopPropagation();
+					e.preventDefault();
+				}
+			}
+			
+			protected function __paste(e:*=null):void 
+			{
+				if(e!=null){
+					e.stopImmediatePropagation();
+					e.stopPropagation();
+					e.preventDefault();
+				}
+
+				_blockChange = true;
+
+				var ac:uint = 0;
+				var an:uint = 0;
+				
+				if(editor_.selectionActivePosition < editor_.selectionAnchorPosition){
+					ac = editor_.selectionActivePosition;
+					an = editor_.selectionAnchorPosition;
+				}else{
+					ac = editor_.selectionAnchorPosition;
+					an = editor_.selectionActivePosition;
+				}
+
+				var em:IEditManager = IEditManager(editor_.textFlow.interactionManager);  
+				em.selectRange(an,ac);
+				
+				if(gnncClipBoard.__formatData(gnncClipBoard.RICH_TEXT_FORMAT)==true){
+					em.textFlow = gnncDataHtml.__html2TextFlow(gnncClipBoard.__paste(gnncClipBoard.RICH_TEXT_FORMAT));
+					gnncGlobalLog.__add('[RICH_TEXT_FORMAT]');
+					gnncGlobalLog.__add(gnncClipBoard.__paste(gnncClipBoard.RICH_TEXT_FORMAT));
+				}else if(gnncClipBoard.__formatData(gnncClipBoard.HTML_FORMAT)==true){
+					em.textFlow = gnncDataHtml.__html2TextFlow(gnncClipBoard.__paste(gnncClipBoard.HTML_FORMAT));
+					gnncGlobalLog.__add('[HTML_FORMAT]');
+					gnncGlobalLog.__add(gnncClipBoard.__paste(gnncClipBoard.HTML_FORMAT));
+				}else if(gnncClipBoard.__formatData(gnncClipBoard.TEXT_FORMAT)==true){
+					em.insertText(gnncClipBoard.__paste(gnncClipBoard.TEXT_FORMAT) + '',em.getSelectionState());
+					gnncGlobalLog.__add('[TEXT_FORMAT]');
+					gnncGlobalLog.__add(gnncClipBoard.__paste(gnncClipBoard.TEXT_FORMAT));
+				}
+				
+				em.deselect();
+				em.clearSelection();
+				em.updateAllControllers();
+				em = null;
+
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				editor_.selectRange(0,0);
+				//editor_.setFocus();
+				
+				callLater(function():void{
+					callLater(function():void{
+						_blockChange = false;
+						__change(false);
+						//editorCode_.setFocus();
+						callLater(function():void{
+							__change(true);
+						});
+					});
+				});
+			}
+			
+			/*protected function btnPaste(e:MouseEvent):void 
+			{
+				//e.stopImmediatePropagation();
+				//e.stopPropagation();
+				//e.preventDefault();
+				
+				_blockChange = true;
+				
+				if(gnncClipBoard.__formatData(gnncClipBoard.HTML_FORMAT)==false && gnncClipBoard.__formatData(gnncClipBoard.TEXT_FORMAT)==false && gnncClipBoard.__formatData(gnncClipBoard.RICH_TEXT_FORMAT)==false )
+					return;
+
+				var ac:uint = 0;
+				var an:uint = 0;
+				
+				if(editor_.selectionActivePosition < editor_.selectionAnchorPosition){
+					ac = editor_.selectionActivePosition;
+					an = editor_.selectionAnchorPosition;
+				}else{
+					ac = editor_.selectionAnchorPosition;
+					an = editor_.selectionActivePosition;
+				}
+				
+				var em:IEditManager = IEditManager(editor_.textFlow.interactionManager);  
+				em.selectRange(an,ac);
+				
+				if(gnncClipBoard.__formatData(gnncClipBoard.RICH_TEXT_FORMAT)==true){
+					em.textFlow = gnncDataHtml.__html2TextFlow(gnncClipBoard.__paste(gnncClipBoard.RICH_TEXT_FORMAT));
+					gnncGlobalLog.__add('[RICH_TEXT_FORMAT]');
+					gnncGlobalLog.__add(gnncClipBoard.__paste(gnncClipBoard.RICH_TEXT_FORMAT));
+				}else if(gnncClipBoard.__formatData(gnncClipBoard.HTML_FORMAT)==true){
+					em.textFlow = gnncDataHtml.__html2TextFlow(gnncClipBoard.__paste(gnncClipBoard.HTML_FORMAT));
+					gnncGlobalLog.__add('[HTML_FORMAT]');
+					gnncGlobalLog.__add(gnncClipBoard.__paste(gnncClipBoard.HTML_FORMAT));
+				}else if(gnncClipBoard.__formatData(gnncClipBoard.TEXT_FORMAT)==true){
+					em.insertText(gnncClipBoard.__paste(gnncClipBoard.TEXT_FORMAT) + '',em.getSelectionState());
+					gnncGlobalLog.__add('[TEXT_FORMAT]');
+					gnncGlobalLog.__add(gnncClipBoard.__paste(gnncClipBoard.TEXT_FORMAT));
+				}
+				
+				em.deselect();
+				em.clearSelection();
+				em.updateAllControllers();
+				em = null;
+				
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				editor_.selectRange(0,0);
+				//editor_.setFocus();
+				
+				callLater(function():void{
+					callLater(function():void{
+						_blockChange = false;
+						__change(false);
+						callLater(function():void{
+							__change(true);
+						});
+					});
+				});
+				
+				//html = html.split("\n").join("<br>");
+				
+				//editor_.textFlow = gnncTextFlowUtils.fromHtmlText(html) + gnncDataHtml.__textFlow2FlashHtml(html);
+				//editorCode_.text = html;
+				
+				//textFlow = gnncTextFlowUtils.fromHtmlText(html);
+				//textHtml = html;
+				//_blockChange = false;
+			}*/
+
+			protected function btnCopyHtml(e:Event):void 
+			{
+				gnncClipBoard.__copyObject(gnncTextFlowUtils.toHtmlText(editor_.textFlow,true) + gnncDataHtml.__textFlow2FlashHtml(editor_.textFlow));
+			}
+
+			private function __onLink(event:MouseEvent,url_:String='',nameFile_:String=''):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition && !url_ && !nameFile_)
+					return;
+				
+				var keyStart:String = gnncDataRand.__key(10);
+				var keyEnd:String 	= gnncDataRand.__key(10);
+				var _target:String = '';
+
+				var selectedText:String = editor_.text.substring( editor_.selectionAnchorPosition, editor_.selectionActivePosition );
+
+				if(url_ && nameFile_)
+				{
+					Object(event.currentTarget).text 		= url_;
+					selectedText 	= nameFile_;
+					_target			= ' target="_blank" ';
+				}
+
+				editor_.insertText( '[['+keyStart+']]' + selectedText + '[['+keyEnd+']]' );
+
+				__change(false);
+
+				editorCode_.text = editorCode_.text.replace('[['+keyStart+']]','<a href="'+Object(event.currentTarget).text+'" '+_target+' >');
+				editorCode_.text = editorCode_.text.replace('[['+keyEnd+']]','</a>');
+				
+				__change(true);
+				
+				Object(event.currentTarget).text = '';
+			}
+
+
+			protected function codeBtn_clickHandler(evt:MouseEvent):void 
+			{
+				panelCenter_.selectedIndex = codeBtn.selected ? 1 : 0;
+			}
+			
+			public function set paddingBottom(value_:uint):void
+			{
+				//editor_.setStyle		('paddingBottom',value_);
+				//editor_.setStyle		('padding-bottom',value_);
+			}
+
+			public function set paddingLeft(value_:uint):void
+			{
+				//editor_.setStyle		('paddingLeft',value_);
+				//editor_.setStyle		('padding-left',value_);
+			}
+
+			public function set paddingRight(value_:uint):void
+			{
+				//editor_.setStyle		('paddingRight',value_);
+				//editor_.setStyle		('padding-right',value_);
+			}
+
+			public function set paddingTop(value_:uint):void
+			{
+				//editor_.setStyle		('paddingTop',value_);
+				//editor_.setStyle		('padding-top',value_);
+			}
+
+			public function __change(code_:Boolean):void
+			{
+				if(_blockChange == true)
+					return;
+
+				if(code_)
+					editor_.textFlow 	= gnncDataHtml.__html2TextFlow(editorCode_.text);
+				else
+					editorCode_.text 	= gnncDataHtml.__textFlow2FlashHtml(editor_.textFlow);
+				
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+			}
+			
+			public function __setTable():void
+			{
+				//table
+				//https://cdn2.iconfinder.com/data/icons/freecns-cumulus/16/519904-098_Spreadsheet-24.png
+				//https://cdn1.iconfinder.com/data/icons/iconsweets2/40/layout.png
+				EditManager(editor_.textFlow.interactionManager).insertInlineGraphic(INSERT_IMAGE_16,25,25);    
+			}
+			
+			public function __setGallery():void
+			{
+				//gallery
+				//https://cdn1.iconfinder.com/data/icons/jigsoar-icons/24/_gallery.png
+				EditManager(editor_.textFlow.interactionManager).insertInlineGraphic(INSERT_IMAGE_16,25,25);    
+			}
+			
+			
+			
+			
+			
+			
+			//example 1
+			protected function __appLink():void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+								
+				var p:ParagraphElement 	= new ParagraphElement();
+				
+				var span:SpanElement 	= new SpanElement();
+				span.text 				= "Test Message Link";
+
+				var linkSpan:SpanElement = new SpanElement();
+				linkSpan.text 			= "dynamicLink";
+
+				var link:LinkElement 	= new LinkElement();
+				link.href				= 'http://www.gnnc.com.br/';
+				link.addEventListener	( FlowElementMouseEvent.CLICK, __linkSelect );
+
+				link.addChild			( linkSpan );				
+				p.addChild				( link );
+				p.addChild				( span );
+				textFlow.addChild		( p );
+				
+			}
+
+			/*
+			Parameters
+			href:String — The uri referenced by the link.
+			targetString:String (default =  null) — The target browser window of the link.
+			extendToLinkBoundary:Boolean (default =  false) — Specifies whether to consolidate selection  with any overlapping existing links, and then apply the change.
+			operationState:SelectionState (default = null) — Specifies the text to which this  operation applies; if null, the operation applies to the current  selection.
+			Returns
+			
+			LinkElement — The LinkElement that was created.
+			*/
+			protected function __addLink(event:MouseEvent,href_:String,target_:String=null):void 
+			{
+				__removeLink();
+				
+				var em:IEditManager 	= IEditManager(editor_.textFlow.interactionManager);  
+				em.selectRange			(editor_.selectionActivePosition, editor_.selectionAnchorPosition)  
+				em.applyLink			(href_, target_, true, null);
+				
+				//set addEvent
+				__findLinkElements();
+				Object(event.currentTarget).text = '';
+				
+				em.deselect();
+				em = null;
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+			}
+
+			protected function __removeLink():void 
+			{
+				var em:IEditManager 	= IEditManager(editor_.textFlow.interactionManager);  
+				em.selectRange			(editor_.selectionActivePosition, editor_.selectionAnchorPosition)  
+				em.applyLink			("", null, true, null);
+				
+				em.deselect();
+				em = null;
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+
+			}
+
+			//example 4
+			private var linksArray:Array 	= [];
+			private var imgArray:Array 		= [];
+			
+			/**
+			 * Finds the first LinkElement recursively and returns it.
+			 */
+			private function __getWhileElements(group:FlowGroupElement,type_:String	):void
+			{
+				var childGroups:Array = [];
+				
+				// First check all the child elements of the current group,
+				// Also save any children that are FlowGroupElement
+				for (var i:int = 0; i < group.numChildren; i++) 
+				{
+					var element:FlowElement = group.getChildAt(i);
+					
+					switch(type_)
+					{
+						case 'link':
+						case 'a':
+							
+							if (element is LinkElement) {
+								linksArray.push(element as LinkElement);
+							} else if (element is FlowGroupElement) {
+								childGroups.push(element);
+							}
+							
+							break;
+						
+						case 'img':
+						case 'image':
+						case 'graphic':
+							if (element is InlineGraphicElement) {
+								imgArray.push(element as InlineGraphicElement);
+							} else if (element is FlowGroupElement) {
+								childGroups.push(element);
+							}
+
+							break;
+
+					}
+					
+				}
+				
+				// Recursively check the child FlowGroupElements now
+				for (i = 0; i < childGroups.length; i++)
+				{
+					var childGroup:FlowGroupElement = childGroups[i];
+					__getWhileElements(childGroup,type_);
+				}
+				
+			}
+
+			public function __findLinkElements():void
+			{
+				linksArray = [];
+				__getWhileElements(textFlow,'link');
+				
+				var iter:int = 0;
+				var leng:int = linksArray.length;
+				
+				for (iter = 0; iter < leng; iter++){
+					//linksArray[iter].href = 'http://www.google.com.br';
+					linksArray[iter].addEventListener(FlowElementMouseEvent.CLICK, __linkSelect, false, 0, true);
+				}
+				
+				//new gnncAlert().__alert('@'+linksArray.toString(),'---');
+			}
+			
+			private function __linkSelect(e:FlowElementMouseEvent=null):void
+			{
+				e.stopImmediatePropagation();
+				e.stopPropagation(); //maybe
+				e.preventDefault();
+				
+				var le:LinkElement = e.flowElement as LinkElement;
+				le.href = 'http://www.gnial.com.br';
+				
+				var z:String = le.getFirstLeaf().text;
+				
+				Alert.buttonWidth	= 100;
+				Alert.yesLabel 		= 'Acessar URL';
+				Alert.noLabel 		= 'Mudar Link';
+				Alert.cancelLabel 	= 'Cancelar';
+
+				Alert.show("O link: \""+z+"\", o que você deseja fazer?","Link",(Alert.YES|Alert.NO|Alert.CANCEL), null, __alertListener, null, Alert.CANCEL);
+				
+				function __alertListener(e:CloseEvent):void 
+				{
+					if (e.detail == Alert.YES)
+						navigateToURL(new URLRequest(le.href), '_self');
+
+					else if (e.detail == Alert.NO)
+						Alert.show('Mudar Link');
+
+					Alert.buttonWidth 	= 65;
+					Alert.yesLabel 		= 'Sim';
+					Alert.noLabel 		= 'Não';
+					Alert.cancelLabel 	= 'Cancelar';
+
+				}
+
+			}
+			
+			
+			
+			
+			
+			
+			
+			
+			
+			//GRAPHICH EXAMPLE 1
+			
+			public function __insertGraphic( source:Object, width:Object, height:Object, float:String, selection:SelectionState=null ):void
+			{
+				if(selection==null)
+					selection = new SelectionState( editor_.textFlow,editor_.selectionAnchorPosition,editor_.selectionActivePosition);
+				
+				var editManager:IEditManager 		= IEditManager(selection.textFlow.interactionManager);
+				
+				editManager.beginCompositeOperation	();
+				editManager.deleteText				( selection );
+
+				var changedSelection:SelectionState = new SelectionState( selection.textFlow, selection.anchorPosition, selection.anchorPosition );
+
+				editManager.splitParagraph			( changedSelection );
+
+				changedSelection 					= new SelectionState( changedSelection.textFlow, changedSelection.anchorPosition + 1, changedSelection.anchorPosition + 1);
+
+				editManager.insertInlineGraphic		( source, width, height, float, changedSelection );
+
+				changedSelection 					= new SelectionState( changedSelection.textFlow, changedSelection.anchorPosition + 1, changedSelection.anchorPosition + 1);
+
+				editManager.splitParagraph			( changedSelection );
+				editManager.endCompositeOperation();
+				
+				editor_.textFlow.flowComposer.updateAllControllers();
+
+				editManager.deselect();
+				editManager = null;
+				editor_.textFlow.flowComposer.updateAllControllers();
+				editor_.validateNow();
+				//editor_.setFocus();
+			}
+			
+			
+			public function __findGraphicElements():void
+			{
+				imgArray = [];
+				__getWhileElements(textFlow,'img');
+
+				var iter:int = 0;
+				var leng:int = imgArray.length;
+				var arrText:Array = [];
+				
+				for (iter = 0; iter < leng; iter++)
+				{
+					arrText.push(gnncDataHtml.__textFlow2String(InlineGraphicElement(imgArray[0]).getTextFlow()));
+					//linksArray[iter].href = 'http://www.google.com.br';
+					//imgArray[iter].addEventListener(FlowElementMouseEvent.CLICK, __linkSelect, false, 0, true);
+				}
+				
+				TextConverter.export(editor_.textFlow,TextConverter.TEXT_LAYOUT_FORMAT, ConversionType.STRING_TYPE);
+				
+				if(imgArray.length>0)
+				new gnncAlert().__alert('Imagens: '+imgArray.toString()+'/'+arrText.join('|'));
+			}
+
+			protected function setFormatText(evt:MouseEvent,type:String):void 
+			{
+				if(editor_.selectionActivePosition < 0 || editor_.selectionAnchorPosition < 0)
+					return;
+				if(editor_.selectionActivePosition == editor_.selectionAnchorPosition)
+					return;
+				
+				var ac:uint = 0;
+				var an:uint = 0;
+				
+				if(editor_.selectionActivePosition < editor_.selectionAnchorPosition){
+					ac = editor_.selectionActivePosition;
+					an = editor_.selectionAnchorPosition;
+				}else{
+					ac = editor_.selectionAnchorPosition;
+					an = editor_.selectionActivePosition;
+				}
+				
+				var em:IEditManager = IEditManager(editor_.textFlow.interactionManager);  
+				em.selectRange(an,ac);
+				var s:String = editor_.textFlow.getText(ac,an);
+				//em.insertText(s.toUpperCase(),em.getSelectionState());
+				
+				switch(type){
+					case 'uppercase':
+						em.insertText(s.toUpperCase(),em.getSelectionState());
+						break;
+					case 'lowercase':
+						em.insertText(s.toLowerCase(),em.getSelectionState());
+						break;
+					case 'name':
+						em.insertText(gnncData.__firstLetterUpperCase(s),em.getSelectionState());
+						break;
+					case 'paragraph':
+						em.insertText(s.substr(0,1).toUpperCase()+s.substr(1).toLowerCase(),em.getSelectionState());
+						break;
+					case 'noBreak':
+						em.insertText(s.split("\n\n").join(' ').split("\n").join(' '),em.getSelectionState());
+						break;
+				}
+				
+				em.selectRange(an,ac);
+				//em.deselect();
+				//em = null;
+				editor_.setFocus();
+			}
+			
+			private function upCaseFirstLetter(str:String):String{
+				return str.replace(/\b./g,function(m:String):String{return String(m).toUpperCase()});
+			}
+			
+				
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="noMoreOptions" />
+	</s:states>
+
+	<!-- LINK -->
+	<!---linkNormalFormat color="0x763524" textDecoration="underline"-->
+	
+	<!-- PARAGRAPH -->
+	<!---p textIndent="35" -->
+	
+	<mx:ViewStack id="panelCenter_" width="100%" height="100%">
+		<s:NavigatorContent width="100%" height="100%" creationPolicy="all">
+			<s:TextArea id="editor_" focusEnabled="false" width="100%" height="100%" borderAlpha=".2" fontSize="13"
+						selectionChange="editor__selectionChangeHandler(event)"
+						focusOut	="{__change(false)}" 
+						keyDown     ="{dontAllowPaste(event)}"
+						paste		="{__paste(event)}" 
+						paddingBottom="15" paddingLeft="15" paddingRight="15" paddingTop="15"
+						>
+				<!-- s:textFlow>
+					< s:TextFlow >
+						< ! - - paragraphSpaceBefore="15" paddingTop="15" paddingLeft="15" paddingRight="15" paddingBottom="15" - - >
+						< ! - - s:linkNormalFormat color="0x763524" textDecoration="underline"/ - - >
+						< ! - - s:p>Escreva aqui seu texto.</s:p - - >
+					< / s:TextFlow>
+				< / s:textFlow -->
+			</s:TextArea>
+		</s:NavigatorContent>
+		<s:NavigatorContent width="100%" height="100%" creationPolicy="all">
+			<s:TextArea id="editorCode_" width="100%" height="100%" change="{__change(true)}" keyUp="{__change(true)}" focusOut="{__change(true)}" 
+						borderAlpha=".2"
+						paddingBottom="15" paddingLeft="15" paddingRight="15" paddingTop="15">
+				
+			</s:TextArea>
+		</s:NavigatorContent>
+	</mx:ViewStack>
+
+	<s:Group width="100%" height="25">
+
+		<s:Rect width="100%" height="25" radiusX="3" alpha=".7">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0xDDDDDD"/>
+					<s:GradientEntry color="0xCCCCCC"/>
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+
+		<mx:ViewStack id="panel_" width="100%" height="25" enabled="{!codeBtn.selected}">
+			<s:NavigatorContent label="PARÁGRAFO" width="100%" height="100%" creationPolicy="all" fontSize="11">
+				<s:layout>
+					<s:HorizontalLayout gap="-1"/>
+				</s:layout>
+				
+				<s:ToggleButton id="boldBtn" 	label="B" fontWeight="bold" 			width="30" height="25" click="boldBtn_clickHandler(event);" 	toolTip="Negrito" />
+				<s:ToggleButton id="italBtn" 	label="I" fontStyle="italic" 			width="30" height="25" click="italBtn_clickHandler(event);" 	toolTip="Itálico" />
+				<s:ToggleButton id="underBtn" 	label="U" textDecoration="underline" 	width="30" height="25" click="underBtn_clickHandler(event);" 	toolTip="Sublinhado" />
+				<s:ToggleButton id="lineBtn" 	label="S" lineThrough="true" 			width="30" height="25" click="lineBtn_clickHandler(event);" 	toolTip="Riscado" />
+				
+				<s:Rect width="3"/>
+				
+				<s:Button 	toolTip="Maiúsculo" click="{setFormatText(event,'uppercase')}" width="30" icon="{uppercase}" />
+				<s:Button 	toolTip="Minúsculo" click="{setFormatText(event,'lowercase')}" width="30" icon="{lowercase}" />
+				<s:Rect width="3"/>
+				<s:Button 	label="¶" 	click="{setFormatText(event,'paragraph')}" width="30" fontWeight="bold" toolTip="Parágrafo" />
+				<s:Button 	label="Ab" 	click="{setFormatText(event,'name')}" fontSize="9" width="32" toolTip="Nome Próprio" />
+				<s:Button 	icon="{gnncEmbedImage.TEXT_ENTER_16}" toolTip="Remover quebra de linha" 	click="{setFormatText(event,'noBreak')}" fontSize="9" width="32"  />
+
+				<s:Rect width="3"/>
+				
+				<s:ButtonBar id="txtAlignBB" arrowKeysWrapFocus="true" labelField="label" width="115" height="25" change="txtAlignBB_changeHandler(event);">
+					<s:dataProvider>
+						<s:ArrayList>
+							<fx:Object label="Esquerdo" 	value="{TextAlign.LEFT}"		icon="{TEXT_ALIGN_L_16}" />
+							<fx:Object label="Centro" 		value="{TextAlign.CENTER}"		icon="{TEXT_ALIGN_C_16}" />
+							<fx:Object label="Direito" 		value="{TextAlign.RIGHT}"		icon="{TEXT_ALIGN_R_16}" />
+							<fx:Object label="Justificado" 	value="{TextAlign.JUSTIFY}"		icon="{TEXT_ALIGN_J_16}" />
+						</s:ArrayList>
+					</s:dataProvider>
+				</s:ButtonBar>
+
+			</s:NavigatorContent>
+			<!-- s:NavigatorContent label="FONTE" width="100%" height="100%" creationPolicy="all">
+				<s:layout>
+					<s:HorizontalLayout gap="1"/>
+				</s:layout>
+				
+				<mx:ColorPicker id="colorCP" change="colorCP_changeHandler(event);" />
+				
+				<s:Rect width="3"/>
+
+				<s:DropDownList id="sizeDDL" width="55" change="sizeDDL_changeHandler(event);" fontSize="11" >
+					<s:dataProvider>
+						<s:ArrayList source="[8,10,12,14,16,24,36,72]" />
+					</s:dataProvider>
+				</s:DropDownList>
+				
+				<s:DropDownList id="fontDDL" width="100" change="fontDDL_changeHandler(event);" enabled="false" fontSize="11">
+					<s:dataProvider>
+						<s:ArrayList source="[Arial,Verdana,Times New Roman,Trebuchet MS]" />
+					</s:dataProvider>
+				</s:DropDownList>
+				
+			</s:NavigatorContent -->
+									
+			<!-- s:NavigatorContent label="WEB" width="100%" height="100%" creationPolicy="all">
+				<s:layout>
+					<s:HorizontalLayout gap="-1"/>
+				</s:layout>
+				
+				<s:TextInput id="linkUrl_" width="150" height="25" contentBackgroundAlpha="1" contentBackgroundColor="0xffffff" 
+							 text="" prompt="http://" fontSize="12"
+							 />
+				<s:Button label="Criar Link" click="{__addLink(linkUrl_.text,null)}" / -->
+				<!-- s:Button label="findLInk" click="{__findLinkElements()}" /-->
+				<!-- s:Button label="Link" fontWeight="bold" click="{__onLink()}"/-->
+				
+				<!-- s:Button label="Imagem" click="{__insertGraphic('http://www.gnnc.com.br/image/logo-gnnc-natan-cabral-gnial.jpg',100,200,'left')}" />
+				<s:Button label="Listar" click="{__findGraphicElements()}" / -->
+				
+			<!-- /s:NavigatorContent -->
+
+			<s:NavigatorContent label="LIMPAR" width="100%" height="100%" creationPolicy="all">
+				<s:layout>
+					<s:HorizontalLayout gap="1"/>
+				</s:layout>
+				
+				<s:Button 	label="Formatação" 	click="{__removeDDL(event)}" />
+				<s:Button 	label="Links" 		click="{__removeLink()}" />
+				
+			</s:NavigatorContent>
+
+		</mx:ViewStack>
+		
+	</s:Group>
+
+	<s:Group width="100%" height="20" excludeFrom="noMoreOptions" >
+		
+		<s:Rect width="100%" height="20" radiusX="3" alpha=".5">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0xDDDDDD"/>
+					<s:GradientEntry color="0xCCCCCC"/>
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+
+		<s:TabBar dataProvider="{panel_}" height="20" selectedIndex="0" fontSize="11" />
+
+		<s:HGroup top="0" right="1" gap="1">
+			<!-- s:Button width="20" height="20" click="btnCopyHtml(event)" icon="{gnncEmbedBlackWhite.bw_clipboard_16_copy}" toolTip="Copiar HTML" / -->
+			<!-- s:Button width="20" height="20" click="__paste(event)" icon="{gnncEmbedBlackWhite.bw_clipboard_16_paste}" toolTip="Colar Texto" / -->
+			<s:ToggleButton id="codeBtn" lineThrough="true" width="20" height="20" click="codeBtn_clickHandler(event);" icon="{TEXT_CODE_16}" toolTip="Código HTML" />
+		</s:HGroup>
+
+	</s:Group>
+	
+</s:Module>

@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" width="100" height="100"
+		 creationComplete="{start()}" preinitialize="{pre()}"
+		 >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncClipBoard;
+			import GNNC.data.file.gnncFilesNative;
+			import GNNC.data.file.gnncFilesRemote;
+			import GNNC.data.globals.gnncGlobalLog;
+			import GNNC.data.globals.gnncGlobalStatic;
+			
+			import flash.filesystem.File;
+			
+			private var file:gnncFilesNative = new gnncFilesNative();
+			private var allowDownloadSet:Boolean = true;
+			[Bindable]
+			private var dataObject:Object = null;
+			private var propertySet:String = 'ATTACH_IMAGE';
+			
+			public var thumbnailCrop:Boolean = true;
+			public var allowLoadExtensions:Array = ['jpg','jpeg','gif','png','pdf','ai','psd'];
+			
+			/*
+			Para inserir em itemRender, basta colocar o data e configurar a variável "property" e "thumbnailCrop"
+			*/
+			public function set data(s:Object):void { dataObject = s }
+			public function get data():Object { return dataObject }
+			
+			/*
+			Para imagens embeded do sistema, neste recurso não há download 
+			*/
+			public function set source(s:Object):void { Object(getElementAt(0)).source = s }
+			public function get source():Object { return Object(getElementAt(0)).source; }
+			
+			public function set allowDownload(s:Boolean):void { allowDownloadSet = s }
+			public function get allowDownload():Boolean { return allowDownloadSet }
+						
+			/**
+			 * for get name imagem owner, data[property]
+			 * data.ID
+			 * data.IMAGE
+			 * data.ATTACH_IMAGE
+			 * data.NAME
+			 * **/
+			public function set property(s:String):void { propertySet = s }
+			public function get property():String { return propertySet }
+			
+			private function pre():void
+			{
+			}
+			
+			private function start():void
+			{
+			}
+
+			private function thumbnailCropPath(extension:String,crop:Boolean):String
+			{
+				return thumbnailCrop == true ? 'thumbnailCrop' : 'thumbnail' ;
+			}
+
+			private function getAttachFile(data_:Object,event:*=null):Object
+			{
+				if(data_==null)
+					return null;
+				
+				if(allowDownload==false)
+					return null;
+				
+				if(!data_.hasOwnProperty(propertySet))
+					return null;
+				
+				if(String(data_[propertySet]).length<7)
+					return null;
+				
+				var ex:String = gnncFilesRemote.__getExtension(data_[propertySet]);
+				var fu:String = String(data_[propertySet]); //full name and extension
+				var na:String = String(data_[propertySet]).replace('.'+ex,'');
+
+				if( allowLoadExtensions.indexOf(ex) < 0 ){
+					return null;
+				}
+				
+				switch(ex){
+					case 'pdf':
+					case 'psd':
+					case 'ai':
+						thumbnailCrop = false;
+						fu = fu.replace(ex,'png');
+						ex = 'png';
+						break;
+				}
+				
+				var url:String = gnncGlobalStatic._httpHost+'/ATTACH/'+String(gnncGlobalStatic._dataBase).toUpperCase()+'/'+thumbnailCropPath(ex,thumbnailCrop)+'/'+fu;
+				
+				var path:File = File.documentsDirectory;
+				var getf:File = File.documentsDirectory.resolvePath(path.nativePath+'\\GNNC\\Attach\\'+gnncGlobalStatic._dataBase+'\\'+na+'.'+ex);
+				//var getu:File = File.documentsDirectory.resolvePath(path.url+'/GNNC/attach/'+gnncGlobalStatic._dataBase+'/'+na+'.'+ex);
+				//var alll:File = file.__selectedLocationToSaveFile(na,ex,'/GNNC/attach/'+gnncGlobalStatic._dataBase+'/',gnncFilesNative._documentDirectory,false,true,false);
+				
+				//gnncGlobalLog.__add('urlCache1:'+path.url+'|'+path.nativePath+'|');
+				//gnncGlobalLog.__add('urlCache2:'+getf.url+'|'+getf.nativePath+'|');
+				//gnncGlobalLog.__add('urlCache3:'+getu.url+'|'+getu.nativePath+'|');
+				//gnncGlobalLog.__add('urlCache4:'+getf.url+'|');
+				
+				//toolTip=url;
+				
+				if(getf.exists){
+					//gnncGlobalLog.__add('cacheImage:entrou:'+na);
+					if(event!=null){
+						Object(event.currentTarget).source = getf.url;
+					}
+					return getf.url;
+				}
+				
+				//file._percent;
+				file._allowGlobalLoading = false;
+				file._allowGlobalError = false;
+				//save
+				file.__loadUrlAndWriteFile(url,na,ex,'/GNNC/Attach/'+gnncGlobalStatic._dataBase+'/',true,false,gnncFilesNative._documentDirectory,fSuccess,fError);//,null,fError);
+
+				function fSuccess(e:*=null):void{
+					Object(getElementAt(0)).source = url;
+					//gnncGlobalLog.__add('thumbnailSuccess[0]');
+				}
+				
+				function fError(e:*=null):void{
+					Object(getElementAt(0)).source = null;
+					//toolTip = 'Miniatura não encontrada.';
+					//gnncGlobalLog.__add('thumbnailError[0]');
+				}
+
+				return null;
+			}
+			
+			protected function imageHttpStatusHandler(event:HTTPStatusEvent):void
+			{
+				switch (event.status) {
+					case 200:
+						// ok! Valid image, do nothing.
+						break;
+					case 404:
+						// Invalid image, PANIC!
+						Object(event.currentTarget).source = null;
+						//gnncGlobalLog.__add('thumbnailError[2]');
+						break;
+					default:
+						//Object(getElementAt(0)).source = null;
+						break;
+				}
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:Image source="{getAttachFile(dataObject)}" width="{width}" height="{height}" scaleMode="zoom" 
+			 cacheAsBitmap="true"
+			 cachePolicy="on"
+			 smooth="true"
+			 httpStatus="imageHttpStatusHandler(event)"
+			 />
+
+</s:Group>

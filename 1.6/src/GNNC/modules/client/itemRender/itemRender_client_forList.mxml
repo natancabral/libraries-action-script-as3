@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				width="100%" height="30" 
+				
+				creationComplete="{__start()}" 
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				doubleClickEnabled="true" 
+				
+				cacheAsBitmap		= "true"
+				xmlns:stage			= "GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*"
+
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.gnncDate;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			import spark.core.ContentCache;
+			
+			static public const valueCache:ContentCache = new ContentCache();
+			
+			private function __start():void
+			{
+			}
+			
+			private function __selectIndex():void
+			{
+				if(Object(owner).selectedItems.length > 1)
+					return;
+				
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __star():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._star,data));
+			}
+			
+			private function __startRating(object_:Object,number_:uint):Object
+			{
+				return data.STAR_RATING == 0 ? gnncEmbedBlackWhite.bw_star_16_unselected : 
+					data.STAR_RATING >= number_ ? 
+					gnncEmbedBlackWhite.bw_star_16 : 
+					gnncEmbedBlackWhite.bw_star_16_unselected;
+			}
+
+			private function __selectComplete():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._complete));
+			}
+
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<elements:elementHLine left="4" right="4" bottom="0" alpha="1" color="0xeeeeee"/>
+	
+	<s:Rect includeIn="hoveredAndShowsCaret,hovered" left="0" right="1" top="0" bottom="0"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+	
+	<!-- elements:elementBarGray left="0" top="0" right="0" bottom="0" alpha=".2" / -->
+	
+	<s:Rect includeIn="selected,selectedAndShowsCaret" right="1" left="0" top="0" bottom="0"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+
+	<!--- CLIENT -->
+	
+	<s:HGroup left="5" top="0" right="0" bottom="0" gap="1" verticalAlign="middle" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" >
+		
+		<s:Image source="{ data.COMPANY == 1 ? gnncEmbedBlackWhite.bw_client_16_company_v2 : gnncEmbedBlackWhite.bw_client_16_v2 }" width="16" height="16" toolTip="{'Cliente, Id: '+data.ID+(data.NAME_USER!=''?'\nCadastrado por :'+data.NAME_USER:'')+(data.DATE?'\nCadastrado em: '+gnncDate.__date2Legend(data.DATE):'')}"/>
+
+		<s:Rect width="1"/>
+		<s:Image source="{data.STAR>0?gnncEmbedBlackWhite.bw_favorite_16:gnncEmbedBlackWhite.bw_favorite_16_unselected}" click="{__star()}" toolTip="{data.STAR==1?'Favoritos (Remover)':'Favoritos (Adicionar)'}" buttonMode="true" width="12" height="12" smooth="true" />
+
+		<s:Rect width="1"/>
+		<s:Image source="{ gnncEmbedImage.PLAYBACK_16_SHOT }" width="12" height="12" toolTip="Foto" alpha="{String(data.ATTACH_CLIENT).length > 10 ? 1 : .15}" smooth="true" smoothingQuality="high"/>
+		
+		<s:Rect width="1"/>
+		<s:Image source="{data.ACTIVE==0?gnncEmbedImage.STATUS_RED_16:data.ACTIVE==1?gnncEmbedImage.STATUS_GREEN_16:data.ACTIVE==2?gnncEmbedImage.STATUS_YELLOW_16:gnncEmbedImage.STATUS_GREY_16}" width="12" height="12" smooth="true" />
+		<s:Label text="{ gnncData.__firstLetterUpperCase(data.NICK_NAME ? data.NICK_NAME : data.NAME) }" fontSize="11" fontWeight="bold" width="100%" maxDisplayedLines="1" showTruncationTip="true" paddingRight="5" paddingLeft="5" paddingTop="0" />
+
+		<s:HGroup gap="-1" height="8">
+			<s:Image source="{ __startRating(data,1) }" width="8" height="8" toolTip="1 estrela"  smooth="true" />
+			<s:Image source="{ __startRating(data,2) }" width="8" height="8" toolTip="2 estrelas" smooth="true" />
+			<s:Image source="{ __startRating(data,3) }" width="8" height="8" toolTip="3 estrelas" smooth="true" />
+			<s:Image source="{ __startRating(data,4) }" width="8" height="8" toolTip="4 estrelas" smooth="true" />
+			<s:Image source="{ __startRating(data,5) }" width="8" height="8" toolTip="5 estrelas" smooth="true" />
+		</s:HGroup>
+		
+		<s:Rect width="4"/>
+		
+		<s:Image source="{ gnncEmbedBlackWhite.bw_series_group_16 }" width="16" height="16" toolTip="{ 'Grupo, Id: '+data.ID_GROUP }" />
+		<s:Label text="{ gnncData.__firstLetterUpperCase(data.NAME_GROUP) }" fontSize="11" fontWeight="normal" width="80" maxDisplayedLines="1" showTruncationTip="true" paddingRight="5" paddingLeft="5" paddingTop="0" />
+		
+		<s:Image source="{ gnncEmbedBlackWhite.bw_email_16 }"  toolTip="E-mail" width="12" height="12" smooth="true" />
+		<s:Label text="{ data.EMAIL ? String(data.EMAIL).toLowerCase() : '' }" fontSize="11" fontWeight="normal" textDecoration="none" color="0x3785e2" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" buttonMode="true" width="80" maxDisplayedLines="1" showTruncationTip="true" paddingRight="5" paddingLeft="5" paddingTop="0" />
+		
+		<s:Image source="{ gnncEmbedBlackWhite.bw_birthday_16 }" width="12" height="12" visible="{ data.COMPANY == 0? true : false }" toolTip="Aniversário" />
+		<s:Label text="{ gnncDate.__date2Legend(data.DATE_BIRTH,null,false,false,'',true) }" fontSize="11" fontWeight="normal" width="50" maxDisplayedLines="1" showTruncationTip="true" paddingRight="5" paddingLeft="5" paddingTop="0" visible="{data.COMPANY==0}" />
+	
+	</s:HGroup>
+		
+</s:ItemRenderer>

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" width="100%" height="100%" xmlns:gnncPaint="GNNC.UI.gnncPaint.*" 
+		  >
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.file.gnncFilesNative;
+			
+			private function file():void
+			{
+				var f:gnncFilesNative = new gnncFilesNative();
+				//f.__uploadComponentFlex();
+				//f.__save2Upload();
+				f.__savePng(canvas,'rascunho');
+			}
+			
+			private function drawingModeChange():void
+			{
+				switch (controlPanel.currentState)
+				{
+					case "lineMode":
+						canvas.drawingMode = DrawingCanvasElement.LINE;
+						break;
+					case "rectMode":
+						canvas.drawingMode = DrawingCanvasElement.RECT;
+						break;
+					case "ellipseMode":
+						canvas.drawingMode = DrawingCanvasElement.ELLIPSE;
+						break;
+					case "pathMode":
+						canvas.drawingMode = DrawingCanvasElement.PATH;
+						break;
+				}
+			}
+			private function drawingStateChange(event:*):void
+			{
+				canvas.stroke = event.stroke;
+				canvas.fill = event.fill;
+			}
+		]]>
+	</fx:Script>
+	
+	<gnncPaint:ControlPanel id="controlPanel" width="52" height="100%" 
+							  currentStateChange="drawingModeChange()"
+							  drawingStateChange="drawingStateChange(event)"/>
+	<gnncPaint:DrawingCanvasElement id="canvas" left="52" right="0" top="0" bottom="0"/>
+	
+</s:Module>

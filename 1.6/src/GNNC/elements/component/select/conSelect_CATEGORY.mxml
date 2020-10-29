@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 creationComplete="{__start()}" 
+		 width="100%" height="25" 
+		 >
+	<s:layout>
+		<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+	</s:layout>
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.data.gnncDataObject;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.category.formNew.newCategory;
+			import GNNC.sqlTables.table_category;
+			import GNNC.time.gnncFunctions;
+			
+			import mx.collections.ArrayCollection;
+			import mx.core.IVisualElement;
+			import mx.events.IndexChangedEvent;
+			import mx.events.PropertyChangeEvent;
+			
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable] private var _gnncGlobal:gnncGlobalStatic	= new gnncGlobalStatic(true);
+			
+			public var _myMix:String 						= 'CATEGORY';
+			
+			public const _component:String 					= 'CATEGORY';
+			public const _name:String 						= 'Categoria';
+			public const _iconComponent:Object 				= gnncEmbedBlackWhite.bw_series_category_16;
+			public const _iconClear:Object 					= gnncEmbedBlackWhite.bw_clear_14_selection;
+			public const _iconNew:Object 					= gnncEmbedBlackWhite.bw_series_category_16_new;
+			public const _iconEdit:Object 					= gnncEmbedBlackWhite.bw_series_category_16_edit;
+			public const _iconRemove:Object 				= gnncEmbedBlackWhite.bw_series_category_16_delete;
+			
+			public var _ICON:Boolean 						= true;
+			public var _ADD:Boolean 						= true;
+			public var _EDIT:Boolean 						= false;
+			public var _DELETE:Boolean 						= false;
+
+			public var setWidthFix:Boolean = false;
+
+			public function set _MIX(value_:String)			:void{ _myMix = value_; __refresh() };
+			public function get _MIX()						:String{ return _myMix };
+
+			public function set prompt(value_:String)		:void{ LIST_.prompt = value_ };
+			public function get prompt()					:String{ return LIST_.prompt };
+
+			public function set selectedIndex(value_:int)	:void{ LIST_.selectedIndex = value_ };
+			public function get selectedIndex()				:int{ return LIST_.selectedIndex };
+			
+			public function set value(value_:uint)			:void{ __selectedId(value_) };
+			public function get value()						:uint{ return LIST_.selectedIndex>-1?LIST_.selectedItem.ID:0 };
+			
+			public var _CHANGE_EVENT:Function = function(e:IndexChangeEvent):void{};
+			
+			private function __start():void
+			{
+				if(this.height!=25)
+				{
+					var h:Number = this.height;
+					LIST_.height        = h;
+					buttonClear.height  = buttonClear.width  = h;
+					buttonNew.height    = buttonNew.width    = h;
+					buttonEdit.height   = buttonEdit.width   = h;
+					buttonDelete.height = buttonDelete.width = h;
+				}
+
+				if(!_MIX)
+				{
+					new gnncAlert().__error(_name+'.Administrador, selecione um MIX.');
+					this.enabled = false;
+				}
+				
+				if(!_ICON) 		removeElement(icon);
+				if(!_ICON) 		removeElement(margin);
+				
+				if(!_ADD) 		removeElement(buttonNew);
+				if(!_EDIT) 		removeElement(buttonEdit);
+				if(!_DELETE) 	removeElement(buttonDelete);
+				
+				callLater(resizeDropDownList);
+			}
+
+			private function setOnItem():void
+			{
+				callLater(function():void{
+					if(LIST_.dataProvider.length==1)
+						LIST_.selectedIndex = 0;
+				});
+			}
+			
+			private function resizeDropDownList():void
+			{
+				var fi:String = gnncDataObject.__getClassName(IVisualElement(Object(owner)));
+				
+				setWidthFix = fi === 'FormItem' ? true : false ;
+				
+				if(setWidthFix)
+					gnncFunctions.delayedCall(function():void{
+						var w:Number = Number(LIST_.width);
+						LIST_.width = w;
+						LIST_.maxWidth = w;
+					},100);
+				new gnncDataBindable().__monitoring(_gnncGlobal._CATEGORY,'DATA_ARR',__refresh);
+				__refresh();
+			}
+
+			private function __refresh(e:*=null):void
+			{
+				if(_gnncGlobal._CATEGORY.DATA_ROWS)
+					LIST_.dataProvider = new gnncDataArrayCollection().__hierarchy(new gnncDataArrayCollection().__filter(_gnncGlobal._CATEGORY.DATA_ARR,'MIX',_MIX));
+				callLater(setOnItem);
+			}
+
+			private function __selectedId(value_:uint):void
+			{
+				if(LIST_.dataProvider.length)
+					LIST_.selectedIndex = new gnncDataArrayCollection().__getIndex(LIST_.dataProvider as ArrayCollection,'ID',value_);
+				callLater(setOnItem);
+			}
+			
+			private function __NEW():void
+			{
+				var _page:newCategory		= new newCategory();
+				_page._MIX 					= _MIX;
+				new gnncPopUp().__creation	(_page);
+			}
+			
+			private function __EDIT():void
+			{
+				if(LIST_.selectedIndex<0)
+					return;
+				
+				var _obj:Object				= LIST_.selectedItem;
+				var _page:newCategory 		= new newCategory();
+				_page._MIX 					= _MIX;
+				_page._TABLE_CATEGORY 		= new table_category(_obj.ID);
+				new gnncPopUp().__creation	(_page);
+			}
+			
+			private function __DELETE():void
+			{
+				new gnncAlert().__error('Não suportando abrir a janela. v1.5');
+				//new DAYBYDAY_MODULES(parentApplication).__DEPARTAMENT(_MIX);
+			}
+			
+			public function __CLEAR():void
+			{
+				value = 0;
+				LIST_.selectedIndex = -1;
+				_CHANGE_EVENT(null);
+			}
+			
+			private function __labelFuncton(item:Object):String
+			{
+				return gnncData.__firstLetterUpperCase(item.NAME);
+			}
+			
+			public function __changeEvent(e:IndexChangeEvent):void
+			{
+				icon.toolTip = _name+', ID: '+value;
+				selectedIndex = selectedIndex;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:Image id="icon" source="{_iconComponent}" toolTip="{_name+', ID: 0'}" />
+	<s:Rect id="margin" width="3" />
+	
+	<s:DropDownList id="LIST_" width="100%" minWidth="100" height="25" prompt="Selecione..."  
+					dataProvider="{new ArrayCollection()}"
+					labelField="NAME" change="{__changeEvent(event); _CHANGE_EVENT(event)}" 
+					labelFunction="__labelFuncton" enabled="{LIST_.dataProvider.length>0?true:false}"
+					itemRenderer="GNNC.skin.dropDownList.itemRender.itemRender_hierarchyWithTitle_forList"
+					/>
+	
+	<s:Button id="buttonClear"		icon="{_iconClear}	"		width="25" toolTip="Limpar seleção" 	click="{__CLEAR()}" skinClass="GNNC.skin.button.skin_buttonLink" focusEnabled="false" tabEnabled="false" />
+	<s:Button id="buttonNew" 		icon="{_iconNew}"			width="25" toolTip="Novo" 				click="{__NEW()}" focusEnabled="false" tabEnabled="false" />
+	<s:Button id="buttonEdit" 		icon="{_iconEdit}"			width="25" toolTip="Editar" 			click="{__EDIT()}" focusEnabled="false" tabEnabled="false" />
+	<s:Button id="buttonDelete" 	icon="{_iconRemove}" 		width="25" toolTip="Excluir" 			click="{__DELETE()}" focusEnabled="false" tabEnabled="false" />
+	
+</s:Group>

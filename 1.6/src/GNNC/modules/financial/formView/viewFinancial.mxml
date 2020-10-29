@@ -1,0 +1,462 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="750" height="510" 
+		  creationComplete="{__start()}" 
+		  xmlns:stage="GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:list="GNNC.elements.component.list.*" 
+		  >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBank;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.client.formView.viewClient;
+			import GNNC.sqlTables.table_client;
+			import GNNC.sqlTables.table_financial;
+
+			private var _connFinancial:gnncAMFPhp 		= new gnncAMFPhp();
+			private var _connAttach:gnncAMFPhp 			= new gnncAMFPhp();
+			private var _connExec:gnncAMFPhp 			= new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp 			= new gnncPopUp();
+			
+			public var _tableFinancial:table_financial;
+			public var _change:Boolean 					= false;
+			
+			private function __start():void
+			{
+				attach_.addEventListener(gnncEventGeneral._refresh,__attachRefresh);
+				attach_.setFocus();
+				
+				__check();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __check():void
+			{
+				if(_tableFinancial != null)
+				{
+					if(_tableFinancial.ID)
+					{
+						_gnncPopUp.__close(); 
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var COLUMNS:Array = new Array
+							([
+								'*',
+								'(SELECT NAME from dbd_client 				where dbd_client.ID 			= dbd_financial.ID_CLIENT) 				as NAME_CLIENT',
+								'(SELECT NAME from dbd_departament 			where dbd_departament.ID 		= dbd_financial.ID_DEPARTAMENT) 		as NAME_DEPARTAMENT',
+								'(SELECT NAME from dbd_group 				where dbd_group.ID 				= dbd_financial.ID_GROUP) 				as NAME_GROUP',
+								'(SELECT NAME from dbd_category 			where dbd_category.ID 			= dbd_financial.ID_CATEGORY) 			as NAME_CATEGORY',
+								'(SELECT NAME from dbd_financial_account 	where dbd_financial_account.ID 	= dbd_financial.ID_FINANCIAL_ACCOUNT) 	as NAME_FINANCIAL_ACCOUNT'
+							]);
+						var _sql:String = new gnncSql().__SELECT(new table_financial(_tableFinancial.ID),false,COLUMNS);
+						_connFinancial.__sql(_sql,'','',__fResultCheck,__fFaultCheck);
+						
+						__attachRefresh();
+					}
+					else
+					{
+						new gnncAlert().__error('Sem IDentificador.');
+						__close();
+					}
+				} 
+				else 
+				{
+					_tableFinancial = new table_financial();
+					new gnncAlert().__error('É preciso entrar com o IDentificador do Lançamento.');
+					__close();
+				}
+			}
+			
+			protected function __fFaultCheck(e:*):void
+			{
+				_gnncPopUp.__close();
+				new gnncAlert().__error('O Lançamento não foi encontrado. Verifique se o mesmo não foi Cancelado ou Excluído.');
+				__close();
+			}
+			
+			protected function __fResultCheck(e:*):void
+			{
+				_gnncPopUp.__close();
+				
+				if(!_connFinancial.DATA_ROWS)
+				{
+					new gnncAlert().__error('Lançamento financeiro não encontrada.');
+					__close();
+					return;
+				}
+				
+				_tableFinancial.ID					= _tableFinancial.ID;
+				
+				var obj:Object = _connFinancial.DATA_ARR.getItemAt(0);
+				
+				IDS_REFERENCE_.text                 = obj.IDS_REFERENCE;
+				ID_PAY_PART_.text                   = Number(obj.ID_PAY_PART)>0?obj.ID_PAY_PART:'';
+				
+				CLIENT_.text	 					= gnncData.__firstLetterUpperCase(obj.NAME_CLIENT);
+				_tableFinancial.ID_PROJECT			= obj.ID_PROJECT;
+				_tableFinancial.ID_CONTRACT 		= obj.ID_CONTRACT;
+				FINANCIAL_ACCOUNT_.text 			= gnncData.__firstLetterUpperCase(obj.NAME_FINANCIAL_ACCOUNT);
+				_tableFinancial.MIX 				= obj.MIX;
+
+				if(Number(obj.NUMBER_FINAL_PAY)==0)
+					NUMBER_FINAL_PAY_.text 				= '';
+				else
+					NUMBER_FINAL_PAY_.text 				= (obj.IS_TRANS==1?'T':obj.VALUE_IN>0?'R':obj.VALUE_IN_PAY>0?'D':'') + ' ' + obj.NUMBER_FINAL_PAY;
+
+				NUMBER_.text 						= obj.NUMBER_LETTER+' '+obj.NUMBER;
+				
+				DOCUMENT_TYPE_.text 				= (obj.DOCUMENT_TYPE!=''?new gnncDataArrayCollection().__filterNumeric(gnncGlobalArrays._FINANCIAL_DOCUMENT_TYPE,'data',obj.DOCUMENT_TYPE).getItemAt(0).label:'') + ' ' + (obj.DOCUMENT_BANK==''?'':obj.DOCUMENT_BANK=='OUTRO'?'':' ('+obj.DOCUMENT_BANK+')');
+				DOCUMENT_NUMBER_.text 				= obj.DOCUMENT_NUMBER!=''?obj.DOCUMENT_NUMBER:'';
+
+				var value:Number  = obj.VALUE_IN    >0?obj.VALUE_IN:obj.VALUE_OUT;
+				var valPay:Number = obj.VALUE_IN_PAY>0?obj.VALUE_IN_PAY:obj.VALUE_OUT_PAY;
+				
+				VALUE_.text							= ( obj.IS_PAY_PART==1 ? '+' : '' )+( gnncDataNumber.__safeReal(value) );
+				VALUE_PAY_.text						= valPay > 0 ? ( obj.IS_PAY_PART==1 ? '+' : '' )+( gnncDataNumber.__safeReal(valPay) ) : '' ; 
+				
+				DISCOUNT_PUNCTUALITY_.text          = gnncDataNumber.__safeReal(obj.DISCOUNT_PUNCTUALITY);
+				
+				FINE_VALUE_.text 					= gnncDataNumber.__safeReal(obj.FINE_VALUE);
+				FINE_VALUE_PERCENT_.text 			= gnncDataNumber.__safeReal((Number(obj.FINE_VALUE_PERCENT)/100)*value) + ' ('+obj.FINE_VALUE_PERCENT+'%)';
+				FINE_PERCENT_.text 					= obj.FINE_PERCENT_TIME>0?obj.FINE_PERCENT+'% '+String(new gnncDataArrayCollection().__filterNumeric(gnncGlobalArrays._FINANCIAL_FINE_PERCENT,'data',obj.FINE_PERCENT_TIME).getItemAt(0).label):'0%';
+				
+				FINE_PAY_.text                     = gnncDataNumber.__safeReal(obj.FINE_PAY); 
+				DISCOUNT_PAY_.text                 = gnncDataNumber.__safeReal(obj.DISCOUNT_PAY); 
+
+				PAY_TYPE_.text						= (obj.PAY_TYPE?new gnncDataArrayCollection().__search(gnncGlobalArrays._FINANCIAL_PAY_TYPE,'data',obj.PAY_TYPE,'label').toString():'')+(obj.FLAG_CARD!=''?' ('+obj.FLAG_CARD+')':'');
+
+				//_TABLE.PAY_TYPE 					= _tableFinancial.PAY_TYPE;
+				DESCRIPTION_.text 					= gnncData.__firstLetterUpperCase(obj.DESCRIPTION);
+				
+				DATE_START_.text					= gnncDate.__date2Legend(String(obj.DATE_START));
+				DATE_END_.text						= gnncDate.__date2Legend(String(obj.DATE_END));
+				DATE_.text						    = gnncDate.__date2Legend(String(obj.DATE));
+				
+				FINAL_.text							= gnncDate.__isValid(obj.DATE_CANCELED)?'Cancelado em '+gnncDate.__date2Legend(String(obj.DATE_CANCELED)):gnncDate.__isValid(obj.DATE_FINAL)?'Baixado em '+gnncDate.__date2Legend(String(obj.DATE_FINAL)):'Nenhum pagamento';
+				finalImage_.source					= gnncDate.__isValid(obj.DATE_CANCELED)?gnncEmbedBlackWhite.check_16_bw_ok:gnncDate.__isValid(obj.DATE_FINAL)?gnncEmbedBlackWhite.check_16_green_ok:gnncEmbedBlackWhite.check_16_bw;
+				
+				DEPARTAMENT_.text					= obj.NAME_DEPARTAMENT;
+				GROUP_.text							= obj.NAME_GROUP;
+				CATEGORY_.text						= obj.NAME_CATEGORY;
+				
+				_tableFinancial.ID_PRODUCT 			= obj.ID_PRODUCT;
+				
+				_tableFinancial.ACTIVE 				= obj.ACTIVE;
+				_tableFinancial.VISIBLE 			= obj.VISIBLE;
+				_tableFinancial.CONTROL 			= obj.CONTROL;
+				
+				//OTHERS
+				
+				VALUE_.setStyle						('color',obj.VALUE_IN>0?0x009900:obj.VALUE_OUT>0?0xcc0000:0x444444);
+				CLIENT_NAME_.text					= obj.VALUE_IN>0?'Cliente (Receber)':obj.VALUE_OUT>0?'Cliente (Pagar)':'Cliente';
+				labelPayValue_.text					= obj.VALUE_IN>0?'Valor recebido (R$)':obj.VALUE_OUT>0?'Valor pago (R$)':'Valor (R$)';
+
+				IS_TAX_.text                = obj.IS_TAX==1 ? 'Sim' : '-';
+				IS_TRANS_.text              = obj.IS_TRANS==1 ? 'Sim' : '-';
+				IS_PAY_PART_.text           = obj.IS_PAY_PART==1 ? 'Sim' : '-'; //se o pagamento foi separado em mais pedaços
+				IS_REVERSAL_.text           = obj.IS_REVERSAL==1 ? 'Sim' : '-'; //estorno
+				
+				cf_.text = obj.IS_FIXED_COST == 1 ? 'Sim' : '-' ;
+				cv_.text = obj.IS_FIXED_COST == 2 ? 'Sim' : '-' ;
+
+				pt_.source = obj.PAY_TYPE=='DINHEI'?gnncEmbedBlackWhite.bw_financial_16_type_money:
+					obj.PAY_TYPE=='CCREDT'?gnncEmbedBlackWhite.bw_financial_16_type_creditcard:
+					obj.PAY_TYPE=='CDEBIT'?gnncEmbedBlackWhite.bw_financial_16_type_creditcard:
+					obj.PAY_TYPE=='CHEQUE'?gnncEmbedBlackWhite.bw_financial_16_type_overdraft:
+					obj.PAY_TYPE=='CREDTP'?gnncEmbedBlackWhite.bw_financial_16_type_book:
+					obj.PAY_TYPE=='DEPOCC'?gnncEmbedBlackWhite.bw_financial_16_safe:
+					obj.PAY_TYPE=='DEBTCC'?gnncEmbedBlackWhite.bw_financial_16_safe:
+					obj.PAY_TYPE=='TRANSB'?gnncEmbedBlackWhite.bw_financial_16_safe:
+					obj.PAY_TYPE=='BOLETO'?gnncEmbedBlackWhite.bw_financial_16_type_boleto:
+					gnncEmbedBlackWhite.bw_financial_16_safe;
+				
+				accountImage_.source = __getBank(obj);
+				
+				__attachRefresh();
+			}
+
+			private function __getBank(obj:Object):Object
+			{
+				var x:int = new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._financialBankSimple,'data',obj.DOCUMENT_BANK);
+				return x < 0 ? gnncEmbedBlackWhite.bw_financial_16_account : gnncEmbedBank[gnncGlobalArrays._financialBankSimple.getItemAt(x).image+'_16'];
+			}
+
+			private function __clientView():void
+			{
+				var _OBJ:Object				= _connFinancial.DATA_ARR.getItemAt(0);
+				var _page:viewClient 		= new viewClient();
+				_page._tableClient 		= new table_client(_OBJ.ID_CLIENT);
+				new gnncPopUp().__creation	(_page);
+			}
+			
+			private function __attachRefresh(e:gnncEventGeneral=null):void
+			{
+				/*
+				var _TABLE:table_attach 				= new table_attach();
+				_TABLE.ID_MIX 							= obj.ID;
+				_TABLE.MIX								= 'FINANCIAL';
+				
+				var _sql:String 						= new gnncSql().__SELECT(_TABLE,false,null,null,null,null,null,['NAME'],false);
+				_connAttach.__sql						(_sql,'','',__fResult,__fFault);
+				*/
+				
+				attach_._connList = new gnncAMFPhp();
+				attach_._connList._allowGlobalLoading 	= false;
+				attach_._connList._allowGlobalError		= false;
+				
+				//attach_._sqlShow = true;
+				attach_.__selectWhere(_tableFinancial.ID,['ID_MIX']," MIX = 'FINANCIAL' ",false);
+			}
+
+
+		]]>
+	</fx:Script>
+	
+	<elements:elementStageBoxPopUp />
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panel_}" height="30" />
+	</s:HGroup>
+	
+	<mx:ViewStack id="panel_" left="20" right="20" top="55" bottom="52" >
+		<s:NavigatorContent width="100%" height="100%" label="BÁSICO">
+			<s:layout>
+				<s:VerticalLayout gap="5" paddingBottom="0" paddingLeft="15" paddingRight="15" paddingTop="15"/>
+				<!-- s:HorizontalLayout gap="1" paddingBottom="0" paddingLeft="15" paddingRight="15" paddingTop="15"/ -->
+			</s:layout>
+
+			<s:HGroup width="100%" gap="5">
+				
+			<s:VGroup width="100%" gap="5">
+				<s:HGroup width="100%" gap="5">
+					<s:Label text="Valor (R$)" color="0x999999" width="100%"/>
+					<s:Label text="Valor (R$)" color="0x999999" id="labelPayValue_" width="100%"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5" paddingBottom="4">
+					<s:Label id="VALUE_"     fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" fontSize="15" />
+					<s:Label id="VALUE_PAY_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" color="0x3366ff" fontSize="15" />
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:Label text="Registro Nº" color="0x999999" width="100%"/>
+					<s:Label text="Fatura Nº" color="0x999999" width="100%"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:HGroup width="100%" gap="5" verticalAlign="middle">
+						<s:Image source="{gnncEmbedBlackWhite.bw_financial_16_safe}"/>
+						<s:Label id="NUMBER_" fontWeight="normal" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" fontSize="14" />
+					</s:HGroup>
+					<s:HGroup width="100%" gap="5" verticalAlign="middle">
+						<s:Image id="finalImage_" source="{gnncEmbedBlackWhite.check_16_bw}"/>
+						<s:Label id="NUMBER_FINAL_PAY_" fontWeight="normal" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" fontSize="14" />
+					</s:HGroup>
+				</s:HGroup>
+
+				<s:Label text="Cliente" color="0x999999" id="CLIENT_NAME_" paddingTop="2"/>
+				<s:HGroup width="100%" gap="5" verticalAlign="middle">
+					<s:Image source="{gnncEmbedBlackWhite.bw_client_16}"/>
+					<s:Label id="CLIENT_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true"  buttonMode="true" textDecoration="underline" click="{__clientView()}" color="0x3366ff" paddingTop="1" />
+				</s:HGroup>
+
+				<s:Rect height="4"/>
+				
+				<s:Label text="Tipo de Pagamento" color="0x999999"/>
+				<s:HGroup width="100%" gap="5" verticalAlign="middle">
+					<s:Image id="pt_" source="{null}"/>
+					<s:Label id="PAY_TYPE_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+				
+				<s:Label text="Documento Tipo" color="0x999999" width="100%"/>
+				<s:Label id="DOCUMENT_TYPE_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				<s:Label text="Documento Número" color="0x999999" width="100%"/>
+				<s:Label id="DOCUMENT_NUMBER_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+
+				<s:Rect height="4"/>
+				
+				<s:HGroup width="100%" gap="1">
+					<s:Label text="Vínculos (referências)" color="0x999999" width="60%" maxDisplayedLines="1" showTruncationTip="true"/>
+					<s:Label text="Pagamento" color="0x999999" width="40%" maxDisplayedLines="1" showTruncationTip="true"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="1">
+					<s:HGroup width="60%" gap="5" verticalAlign="middle">
+						<s:Image source="{gnncEmbedBlackWhite.bw_help_16}"
+								 toolTip="{'Este recurso consegue identificar o histórico (origem) referentes a este lançamento.'}"
+								 />
+						<s:Label id="IDS_REFERENCE_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+					</s:HGroup>
+					<s:HGroup width="40%" gap="5" verticalAlign="middle">
+						<s:Image source="{gnncEmbedBlackWhite.bw_help_16}"
+								 toolTip="{
+								 'Este identificador aponta para o lançamento que o representa como pagamento (baixado).\n'+
+								 'Conjunto de dois ou mais lançamentos pagos em um único e novo lançamento (baixado).'}"
+								 />
+						<s:Label id="ID_PAY_PART_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+					</s:HGroup>
+				</s:HGroup>
+
+			
+			</s:VGroup>
+			<elements:elementVLine width="10"/>
+			<s:VGroup width="190" gap="5">
+
+				<s:Label text="Conta" color="0x999999"/>
+				<s:HGroup width="100%" gap="5" verticalAlign="middle" paddingBottom="4">
+					<s:Image id="accountImage_" source="{gnncEmbedBlackWhite.bw_financial_16_account}"/>
+					<s:Label id="FINANCIAL_ACCOUNT_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" fontSize="13" paddingTop="2" paddingLeft="2" />
+				</s:HGroup>
+
+				<s:Label text="Situação (status)" color="0x999999"/>
+				<s:HGroup width="100%" gap="5" verticalAlign="middle">
+					<s:Image source="{gnncEmbedBlackWhite.bw_calendar_16}"/>
+					<s:Label id="FINAL_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true"  />
+				</s:HGroup>
+				<s:HGroup width="100%" gap="1">
+					<s:Label text="Vencimento" color="0x999999" width="100%"/>
+					<s:Label text="Cadastrado" color="0x999999" width="100%"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="1">
+					<s:HGroup width="100%" gap="5" verticalAlign="middle">
+						<s:Image source="{gnncEmbedBlackWhite.bw_calendar_16_hour}"/>
+						<s:Label id="DATE_END_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+					</s:HGroup>
+					<s:HGroup width="100%" gap="5" verticalAlign="middle">
+						<s:Image source="{gnncEmbedBlackWhite.bw_new_16}"/>
+						<s:Label id="DATE_" fontWeight="normal" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" color="0x777777" />
+					</s:HGroup>
+				</s:HGroup>
+				<s:Label text="Programado" color="0x999999"/>
+				<s:HGroup width="100%" gap="5" verticalAlign="middle">
+					<s:Image source="{gnncEmbedBlackWhite.bw_calendar_16_alarm}"/>
+					<s:Label id="DATE_START_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+
+				<s:Rect height="4"/>
+
+				<s:Label text="Centro de Custo" color="0x999999"/>
+				<s:HGroup width="100%" gap="5" verticalAlign="middle">
+					<s:Image source="{gnncEmbedBlackWhite.bw_series_departament_16}"/>
+					<s:Label id="DEPARTAMENT_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+				<s:Label text="Plano de Contas" color="0x999999"/>
+				<s:HGroup width="100%" gap="5" verticalAlign="middle">
+					<s:Image source="{gnncEmbedBlackWhite.bw_series_group_16}"/>
+					<s:Label id="GROUP_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+				<s:Label text="Categoria" color="0x999999"/>
+				<s:HGroup width="100%" gap="5" verticalAlign="middle">
+					<s:Image source="{gnncEmbedBlackWhite.bw_series_category_16}"/>
+					<s:Label id="CATEGORY_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+
+			</s:VGroup>
+			<elements:elementVLine width="10"/>
+			<s:VGroup width="190" gap="5">
+
+				<s:Label text="Acréscimo pago (R$)" color="0x999999"/>
+				<s:Label id="FINE_PAY_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" color="0x3366ff" fontSize="12" />
+				<s:Label text="Desconto pago (R$)" color="0x999999"/>
+				<s:Label id="DISCOUNT_PAY_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" color="0x3366ff" fontSize="12" />
+				<s:Label text="Desconto pontualidade (R$)" color="0x999999" />
+				<s:Label id="DISCOUNT_PUNCTUALITY_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true"  />
+				
+				<s:Rect height="2"/>
+
+				<s:HGroup width="100%" gap="5">
+					<s:Label text="Multa Fixa (R$)" color="0x999999" width="100%" maxDisplayedLines="1" showTruncationTip="true"/>
+					<s:Label text="Multa Perc. (%)" color="0x999999" width="100%" maxDisplayedLines="1" showTruncationTip="true"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:Label id="FINE_VALUE_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+					<s:Label id="FINE_VALUE_PERCENT_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+				
+				<s:HGroup width="100%" gap="5">
+					<s:Label text="Juro (%)" color="0x999999" width="100%" maxDisplayedLines="1" showTruncationTip="true"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:Label id="FINE_PERCENT_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+
+				<s:Rect height="4"/>
+
+				<s:HGroup width="100%" gap="5">
+					<s:Label text="Taxa" color="0x999999" width="100%"/>
+					<s:Label text="Transferência" color="0x999999" width="100%"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:Label id="IS_TAX_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+					<s:Label id="IS_TRANS_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:Label text="Estorno" color="0x999999" width="100%"/>
+					<s:Label text="Pagamento parcial" color="0x999999" width="100%"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:Label id="IS_REVERSAL_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+					<s:Label id="IS_PAY_PART_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:Label text="Custo fixo" color="0x999999" width="100%"/>
+					<s:Label text="Custo variável" color="0x999999" width="100%"/>
+				</s:HGroup>
+				<s:HGroup width="100%" gap="5">
+					<s:Label id="cf_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+					<s:Label id="cv_" fontWeight="bold" text="" width="100%" maxDisplayedLines="1" showTruncationTip="true" />
+				</s:HGroup>
+
+				<!--
+				public var IS_TAX:uint					= 0;
+				public var IS_TRANS:uint				= 0;
+				public var IS_PAY_PART:uint				= 0; //se o pagamento foi separado em mais pedaços
+				public var IS_REVERSAL:uint				= 0; //estorno
+				FLAG_CARD
+-->
+			</s:VGroup>
+
+			</s:HGroup>
+
+			<s:HGroup width="100%" height="30" gap="1">
+				<!-- elements:elementBarStatus width="100%" height="25" radiusX="4" radiusY="4"/ -->
+				<s:Label text="Descrição:" fontWeight="bold" height="30" verticalAlign="middle" paddingRight="5"/>
+				<s:Label id="DESCRIPTION_" fontWeight="normal" text="" width="100%" 
+						 maxDisplayedLines="1" showTruncationTip="true"
+						 paddingLeft="0" paddingRight="0"
+						 height="30" verticalAlign="middle"
+						 />
+			</s:HGroup>
+			
+			<elements:elementHLine height="3"/>
+
+			<elements:elementLabelDropShadow text="ARQUIVOS ANEXADOS" fontSize="13" height="25"  fontWeight="normal"/>
+			<list:conList_attach id="attach_" width="100%" height="100%" bottom="0" _backgroundAlpha="0" _borderVisible="false" />
+			
+		</s:NavigatorContent>
+	</mx:ViewStack>
+		
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Rect width="100%"/>
+		<!-- s:Button icon="{gnncEmbedBlackWhite.bw_refresh_16}" label="Atualizar" click="{__start()}" / -->
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" />
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+
+</s:Group>

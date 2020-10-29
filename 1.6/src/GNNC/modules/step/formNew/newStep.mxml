@@ -1,0 +1,617 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	 
+	width="700" height="520" 
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*" 
+	xmlns:select="GNNC.elements.component.select.*"
+	
+	>
+	<fx:Declarations>
+		<mx:Fade id="FAD" duration="500"/>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataXml;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.file.gnncFilesNative;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.others.gnncScrollPosition;
+			import GNNC.sqlTables.table_step;
+			
+			import mx.collections.ArrayCollection;
+			
+			private var _connStep:gnncAMFPhp 				= new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp				= new gnncPopUp(this);
+			private var _gnncFilesNative:gnncFilesNative	= new gnncFilesNative();
+			
+			[Bindable] public var _tableStep:table_step = new table_step();
+			
+			public const _MIX:String = 'STEP';
+			
+			public var _change:Boolean = false;
+			private var _changeNew:Boolean = false;
+			public var idsDelete:Array = new Array();
+			
+			private function __start():void
+			{
+				//currentState='advanced';
+				stepLabelName_.inputText.setFocus();
+				__check();
+			}
+			
+			private function __check():void
+			{
+				if(_tableStep != null)
+				{
+					if(Number(_tableStep.ID_CLIENT) > 0 && Number(_tableStep.ID_PROJECT) > 0)
+					{
+						_gnncPopUp.__loading('Recolhendo dados...');
+						
+						var _columns:Array = [
+							"*",
+							"coalesce((select COUNT(ID) from dbd_job 	where dbd_job.ID_STEP 		like dbd_step.ID)				,'') ROWS_JOB"
+						];
+						
+						var _sql:String = new gnncSql().__SELECT(_tableStep,false,_columns,null,null,null,null,['ORDER_ITEM','ID','NAME']);
+						_connStep.__sql(_sql,'','',__fResultCheck,__fFaultCheck);
+						
+					}
+					else
+					{
+						__noClientOrProject();
+					}
+				} 
+				else 
+				{
+					_tableStep = new table_step();
+					__noClientOrProject();
+				}
+			}
+
+			protected function __fFaultCheck(e:*):void
+			{
+				_gnncPopUp.__close();
+				__close();
+			}
+			
+			protected function __fResultCheck(e:*):void
+			{
+				_gnncPopUp.__close();
+				//__ORDER(); //<-- INSERT data._TABLE
+				if(_connStep.DATA_ROWS > 0)
+					MESSAGE_.visible = false;
+				
+				STEP_.dataProvider = _connStep.DATA_ARR;
+			}
+			
+			private function __noClientOrProject():void
+			{
+				new gnncAlert().__alert('Impossível localizar o Cliente e/ou o Projeto para inicializar as Etapas.');
+				callLater(__close);
+			}
+			
+			private function __close():void
+			{
+				//if(!_changeNew)
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __stepNameEdit():void
+			{
+				this.STEP_.enabled = !this.STEP_.enabled;
+				
+				
+				if(!STEP_.enabled)
+				{
+					this.stepLabelName_.inputText.text = STEP_.selectedItem.NAME;
+					stepLabelName_.inputText.setFocus();
+					BTN_NEW.label = 'Salvar';
+					BTN_REMOVE.enabled = false;
+					BTN_EDIT.enabled = false;
+					btnSave_.enabled = false;
+				} else 
+				{
+					this.stepLabelName_.inputText.text = '';
+					BTN_NEW.label = 'Adicionar';
+					BTN_REMOVE.enabled = true;
+					BTN_EDIT.enabled = true;
+					btnSave_.enabled = true;
+				}
+			}
+			
+			private function __save():void
+			{
+				setOrder();
+				callLater(__saveAll);
+			}
+			
+			private function __saveAll():void
+			{
+				var itemInsert:Vector.<Object> = new Vector.<Object>;
+				var itemUpdate:Vector.<Object> = new Vector.<Object>;
+				
+				var SQL_INSERT:String = '';
+				var SQL_UPDATE:String = '';
+				var SQL_DELETE:String = '';
+				
+				var o:Object = new Object();
+				var i:uint 	 = 0;
+				var len:uint = STEP_.dataProvider.length;
+
+				for(i=0; i<len; i++){
+					o = STEP_.dataProvider.getItemAt(i);
+					SQL_INSERT += new gnncSql().__INSERT(o,false,true,false) + gnncGlobalStatic._breakSql;
+				}
+				
+				_gnncPopUp.__loading();
+				
+				if(idsDelete.length){
+					SQL_DELETE = new gnncSql().__DELETE(new table_step(),idsDelete,true);
+				}
+				
+				var sql:String = SQL_INSERT + SQL_UPDATE + SQL_DELETE; 
+				_connStep.__sql(sql,'','',fResult,fFault);
+				
+				function fResult(e:*):void
+				{
+					_change = true;
+					_gnncPopUp.__close();
+					__close();
+				}
+				
+				function fFault(e:*):void
+				{
+					_gnncPopUp.__close();
+				}
+
+				return
+				/*
+				for(i=0; i<len; i++)
+				{
+					o = STEP_.dataProvider.getItemAt(i);
+					
+					if(o.hasOwnProperty('ID'))
+						itemUpdate.push(o);
+					else
+						itemInsert.push(o);
+				}
+				
+				// INSERT 
+				len = itemInsert.length;
+				for(i=0; i<len; i++)
+					SQL_INSERT += new gnncSql().__INSERT(itemInsert[i],false,false,false) + gnncGlobalStatic._breakSql;
+				
+				// UPDATE
+				len = itemUpdate.length;
+				for(i=0; i<len; i++)
+					SQL_UPDATE += new gnncSql().__UPDATE(itemUpdate[i],null,true,null) + gnncGlobalStatic._breakSql;
+				
+				_gnncPopUp.__loading();
+				
+				if(idsDelete.length){
+					SQL_DELETE = new gnncSql().__DELETE(new table_step(),idsDelete,true);
+				}
+				
+				var _sql:String = SQL_INSERT + SQL_UPDATE + SQL_DELETE; 
+
+				_connStep.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{
+					_change = true;
+					_gnncPopUp.__close();
+					__close();
+				}
+				
+				function __fFault(e:*):void
+				{
+					_gnncPopUp.__close();
+				}*/
+				
+			}
+			
+			private function __stepAdd():void
+			{
+				var OBJ:Object = new Object();
+				_changeNew	= true;
+				
+				if(!STEP_.enabled)
+				{
+					OBJ = STEP_.dataProvider.getItemAt(STEP_.selectedIndex); 
+					OBJ.NAME = stepLabelName_.inputText.text;
+					STEP_.dataProvider.setItemAt(OBJ,STEP_.selectedIndex);
+					__stepNameEdit();
+				}
+				
+				if(stepLabelName_.inputText.text && STEP_.enabled)
+				{
+					gnncData.__scapeText(null,[stepLabelName_.inputText]);
+					
+					OBJ = {
+						//DATE_START:	DAYBYDAY_DATE.__DATE2STRING(new Date()),
+						//DATE_END:	DAYBYDAY_DATE.__DATE2STRING(new Date()),
+						_TABLE:'STEP',
+						ID_CLIENT: 	_tableStep.ID_CLIENT,
+						ID_PROJECT: _tableStep.ID_PROJECT,
+						NAME: 		stepLabelName_._TEXT.toUpperCase()
+					};
+					STEP_.dataProvider.addItem				(OBJ);
+					STEP_.selectedIndex						= STEP_.dataProvider.length-1
+					stepLabelName_._TEXT 						= '';
+					stepLabelName_.inputText.setFocus			();
+					MESSAGE_.visible 						= false;
+					
+					gnncScrollPosition.__setEnd(STEP_);
+				}
+			}
+			
+			private function __steRemove():void
+			{
+				var objDat:Object         = STEP_.selectedItem;
+				var idxDat:int            = STEP_.selectedIndex;
+				//var idxArr:int            = connListStep.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = STEP_.selectedItems;
+				var itensCount:uint       = itens.length;
+
+				if(idxDat < 0)
+					return;
+				
+				if(itensCount > 1){
+					new gnncNotification().__show('Múltipla seleção','Selecione apenas um item');
+					return;
+				}
+				
+				if(Number(objDat.ROWS_JOB)>0){
+					new gnncAlert().__alert('Não é possível remover etapas contendo <b>Jobs</b> (tarefas) dentro dela, é preciso excluír ou mover os Jobs antes da exclusão.');
+					return;
+				}
+				
+				if(Number(objDat.ID)>0)
+					idsDelete.push(objDat.ID);
+				
+				STEP_.dataProvider.removeItemAt(idxDat);
+				STEP_.selectedIndex = idxDat-1;
+				
+				if( STEP_.selectedIndex < 0 && STEP_.dataProvider.length >0 )
+					STEP_.selectedIndex = 0;
+				
+			}
+			
+			private function setOrder():void
+			{
+				var o:Object;
+				var i:uint = 1;
+				var len:uint = STEP_.dataProvider.length;
+				
+				if(len==0)
+					return;
+				for(i=0; i<len; i++)
+				{
+					o = STEP_.dataProvider.getItemAt(i);
+					o.ORDER_ITEM = i+1;
+					o._TABLE 	 = 'STEP';
+					
+					o.ID_CLIENT  = _tableStep.ID_CLIENT;
+					o.ID_PROJECT = _tableStep.ID_PROJECT;
+					
+					delete o.ROWS_JOB;
+					delete o.NC;
+					delete o.SDS;
+					delete o.SDE;
+					
+					STEP_.dataProvider.setItemAt(o,i);
+				}
+			}
+			
+			private function __DATE_CHANGE_SEQUENCY():void
+			{
+				if(STEP_.selectedIndex>-1)
+				{
+					var index_:int = STEP_.selectedIndex;
+					var OBJ:Object;
+					var t:int = STEP_.dataProvider.length-1;
+					
+					if(t>-1)
+						while(index_++ < t)
+						{
+							OBJ 							= STEP_.dataProvider.getItemAt(index_);
+							OBJ.DATE_END 					= STEP_.dataProvider.getItemAt(index_-1).DATE_END;
+							OBJ.DATE_START 					= STEP_.dataProvider.getItemAt(index_-1).DATE_START;
+							STEP_.dataProvider.setItemAt	(OBJ,index_);
+						}
+				}
+			}
+			
+			private function __REMOVE_DATE_LINE():void
+			{
+				var OBJ:Object;
+				if(STEP_.selectedIndex>-1)
+				{
+					OBJ								= STEP_.dataProvider.getItemAt(STEP_.selectedIndex);
+					OBJ.DATE_START					= '';
+					OBJ.DATE_END					= '';
+					OBJ.SDS							= 0;
+					OBJ.SDE							= 0;
+					STEP_.dataProvider.setItemAt	(OBJ,STEP_.selectedIndex);
+					
+					if(CHANGE_LINE_.selected)
+					{
+						STEP_.selectedIndex 			= STEP_.selectedIndex+1;
+						STEP_.layout.verticalScrollPosition += 22; 
+					}
+				}
+			}
+			
+			private function __selectStep():void
+			{
+				if(STEP_.selectedIndex>-1)
+				{
+					__D								(true);
+					var OBJ:Object 					= STEP_.dataProvider.getItemAt(STEP_.selectedIndex);
+					OBJ.NC 							= 0;
+					STEP_.dataProvider.setItemAt	(OBJ,STEP_.selectedIndex);
+					
+					//GROUP_._ID_GROUP				= STEP_.dataProvider.getItemAt(STEP_.selectedIndex).ID_GROUP;
+					//CATEGORY_._ID_CATEGORY			= STEP_.dataProvider.getItemAt(STEP_.selectedIndex).ID_CATEGORY;
+					
+				}
+			}
+			
+			private function __CHANGE_DATE():void
+			{
+				if(STEP_.selectedIndex>-1)
+				{
+					var OBJ:Object 					= STEP_.dataProvider.getItemAt(STEP_.selectedIndex);
+					var DTE:String					= STEP_.dataProvider.getItemAt(STEP_.selectedIndex).DATE_END;
+					
+					if(DS_.selected)
+					{
+						OBJ.DATE_START 				= gnncDate.__date2String(CALENDAR_START_.selectedDate,false);
+						OBJ.SDS						= 1;
+						
+						/*if(DS_.selected)
+						if(!DTE || DTE=='0000-00-00')
+						OBJ.DATE_END			= DAYBYDAY_DATE.__DATE2STRING(CALENDAR_START_.selectedDate,false);*/
+						
+					}
+					else if(DE_.selected)
+					{
+						OBJ.DATE_END 				= gnncDate.__date2String(CALENDAR_START_.selectedDate,false);
+						OBJ.SDE						= 1;
+					}
+					
+					STEP_.dataProvider.setItemAt(OBJ,STEP_.selectedIndex);
+					
+					if(CHANGE_LINE_.selected)
+						if((DE_.selected || !CHANGE_SE_.selected) && STEP_.selectedIndex < STEP_.dataProvider.length )
+						{
+							STEP_.selectedIndex 	= STEP_.selectedIndex+1;
+							STEP_.layout.verticalScrollPosition += 22; 
+						}
+					
+					if(CHANGE_ALL_DATES_.selected)	__DATE_CHANGE_SEQUENCY();
+					if(CHANGE_SE_.selected)			__D(!DS_.selected);
+				}
+			}
+			
+			private function __D(START_:Boolean):void
+			{
+				DS_.selected = START_;
+				DE_.selected = !START_;
+			}
+			
+			private function __import():void
+			{
+				
+				_gnncFilesNative.__selectWithBrowserNative(__fComplete,__fError);
+
+				function __fError(e:*):void
+				{
+					new gnncAlert().__alert("Não foi possível carregar o arquivo.");
+				}
+				
+				function __fComplete(e:*):void
+				{
+					if(!gnncDataXml.__isValidXML(_gnncFilesNative._DATA_UTF))
+					{
+						new gnncAlert().__alert("Arquivo XML com problema. Tente novamente ou outro arquivo.");
+						return;
+					}
+					
+					STEP_NAME_.dataProvider 	= new ArrayCollection();
+					var i:int 					= -1;
+					var _XML:XML 				= new XML(_gnncFilesNative._DATA_UTF);
+					var max:int					= _XML.child('STEP_NAME').length()-1;
+					
+					while(i++ < max)
+					{
+						var OBJ:Object = {
+							_TABLE:'STEP',
+							ID_CLIENT: 	_tableStep.ID_CLIENT,
+								ID_PROJECT: _tableStep.ID_PROJECT,
+								NAME:		_XML.child('STEP_NAME')[i]
+						};
+						STEP_NAME_.dataProvider.addItem(OBJ);
+					}
+					
+					if(max>0)
+						MESSAGE_.visible = false;
+					
+					if(max<0)
+						new gnncAlert(this).__alert('Nenhuma Etapa foi encontrada para Importação.');
+				};
+				
+				
+			}
+			
+			private function __export():void
+			{
+				if(STEP_.dataProvider.length)
+				{
+					var i:int 			= -1;
+					var max:int			= STEP_.dataProvider.length-1;
+					var CONTENT:String 	= '';
+					
+					while(i++ < max)
+						CONTENT = CONTENT + '<STEP_NAME table="STEP" description="'+STEP_.dataProvider.getItemAt(i).DESCRIPTION+'">'+STEP_.dataProvider.getItemAt(i).NAME + "</STEP_NAME>\n";
+					
+					//DBD_FILE.__WRITE_UTF('Exportar Etapas - '+DAYBYDAY_DATE.__DATE2LEGEND('',new Date()),'xml','','<DBD>'+CONTENT+'</DBD>',true,'DSK');
+					_gnncFilesNative.__saveWithBrowserNative('daybyday.arquivo.etapas_'+gnncDate.__date2Legend('',new Date()),'xml','<dbd>\n'+CONTENT+'</dbd>',gnncFilesNative._documentDirectory);
+				}
+				else
+				{
+					new gnncAlert(this).__alert('Nenhuma Etapa foi encontrada para Exportação. É preciso conter pelo menos 1(uma) etapa na listagem ao lado.');
+				}
+			}
+			
+			private function __selectAll():void
+			{
+				var i:int 			= 1;
+				var max:int			= STEP_NAME_.dataProvider.length;
+				
+				var ALL:Vector.<int> = new Vector.<int>();
+				//ALL.(1, 3);
+				
+				for(i=0; i<max; i++)
+					ALL.push(i);
+				
+				STEP_NAME_.selectedIndices = ALL; 
+				
+				//STEP_.selectedIndices = new <int>[i, max];
+			}
+			
+			protected function __max():void
+			{
+				if(width == 700 && height == 520){
+					this.width = parentApplication.parent.width - 20;
+					this.height = parentApplication.parent.height - 20;
+				}else{
+					this.width = 700;
+					this.height = 520;
+				}
+				new gnncPopUp().__center(this);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="advanced"/>
+	</s:states>
+	
+	<elements:elementStageBoxPopUp />
+	<elements:elementLabelFont id="titlePopUp_" text="ETAPAS" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="1" paddingLeft="1">
+		<!--s:TabBar dataProvider="{panel_}" height="30" /-->
+		<s:Rect width="100%"/>
+		<s:TabBar dataProvider="{panelRight_}" height="30" includeIn="advanced" itemCreationPolicy="immediate"/>
+		<!--s:HGroup height="25" verticalAlign="middle" gap="-1" width="180" fontWeight="bold" includeIn="advanced" itemCreationPolicy="immediate" >
+			<s:ToggleButton id="BTN_DATES_" label="Datas" 	icon="{gnncEmbedBlackWhite.bw_calendar_16}" 	width="100%" height="25" click="{__M(false)}" />
+			<s:ToggleButton id="BTN_MODEL_" label="Modelo" 	icon="{gnncEmbedBlackWhite.bw_project_step_16}" width="100%" height="25" click="{__M(true)}" includeIn="advanced" itemCreationPolicy="immediate" />
+		</s:HGroup-->
+	</s:HGroup>
+	
+	<s:VGroup left="20" right="20" top="55" bottom="52" gap="5" >
+		
+		<s:HGroup width="100%" height="100%" gap="4">
+			<s:VGroup width="100%" height="100%" gap="1">
+				<s:Group width="100%" height="100%">
+					<s:Label id="MESSAGE_" width="300" textAlign="center" lineHeight="16" maxDisplayedLines="5" text="Acrescente uma nova Etapa escrevendo abaixo e teclando Enter ou em Modelo (Opções Avançadas) importe um arquivo de Etapas." fontWeight="bold" fontSize="11" horizontalCenter="0" verticalCenter="0"/>
+					<s:List id="STEP_" left="1" top="1" right="1" bottom="1" dropEnabled="true" dragEnabled="true" dragMoveEnabled="true" 
+							itemRenderer="GNNC.modules.step.itemRender.itemRender_stepList_withDate_forList" borderVisible="false" contentBackgroundAlpha="0" focusAlpha="0" horizontalScrollPolicy="off" allowMultipleSelection="true" 
+							click="{__selectStep()}" keyUp="{__selectStep()}" doubleClickEnabled="true" doubleClick="{__stepNameEdit()}" >
+						<s:layout>
+							<s:VerticalLayout gap="0" rowHeight="25"/>
+						</s:layout>
+					</s:List>
+				</s:Group>
+				<s:Group width="100%" height="40">
+					<elements:elementBarGray width="100%" height="40" radiusX="3" alpha=".5"/>
+					<s:HGroup width="100%" gap="1" height="40" verticalAlign="middle" paddingLeft="6" paddingRight="4">
+						<s:Label text="Nome" fontSize="11" fontWeight="bold" paddingRight="8"/>
+						<!--s:BitmapImage source="{gnncEmbedImage.STEP_16_NEW}"/-->
+						<elements:elementInput id="stepLabelName_" width="100%" height="25" _BOLD="true" _SIZE="11" keyUp="{if(new gnncKeyboard()._ENTER(event)) __stepAdd()}" _COLOR="0x000000" _MAXCHARS="60"  />
+						<s:Rect width="5"/>
+						<s:Button id="BTN_NEW" 		label="Adicionar" 		height="30" icon="{gnncEmbedBlackWhite.bw_new_16}"		click="{__stepAdd()}"			enabled="{(stepLabelName_.inputText.text=='')?false:true}" toolTip="Basta teclar Enter. Escreva o nome da Etapa e tecle Enter." />
+						<s:Button id="BTN_REMOVE" 	label="Remover" 		height="30" icon="{gnncEmbedBlackWhite.bw_delete_16}" 	click="{__steRemove()}" 		enabled="{STEP_.selectedIndex>-1}" toolTip="Remove a Etapa da listagem."/>
+						<s:Button id="BTN_EDIT"		label="Editar" 			height="30" icon="{gnncEmbedBlackWhite.bw_edit_16}" 	click="{__stepNameEdit()}" 		enabled="{STEP_.selectedIndex>-1}" toolTip="Editar o Nome da listagem."/>
+					</s:HGroup>
+				</s:Group>
+			</s:VGroup>
+			<elements:elementVLine height="100%" width="5" includeIn="advanced" _COLOR="0xDDDDDD"/>
+			<mx:ViewStack id="panelRight_" width="200" height="100%" includeIn="advanced" contentBackgroundAlpha="0">
+				<s:NavigatorContent label="CALENDÁRIO" creationPolicy="all">
+					<s:layout>
+						<s:VerticalLayout gap="2"/>
+					</s:layout>
+					
+					<s:Group width="200" height="180">
+						<mx:DateChooser id="CALENDAR_START_" enabled="{STEP_.selectedIndex>-1}" change="{__CHANGE_DATE()}" width="200" height="180" firstDayOfWeek="0" allowDisjointSelection="false" 
+										yearNavigationEnabled="true" textAlign="center" borderVisible="false" includeIn="advanced" itemCreationPolicy="immediate" showToday="false" />
+						<elements:elementHLine _COLOR="0xFFFFFF" top="30" width="201" horizontalCenter="0"  />
+					</s:Group>
+					
+					<s:HGroup height="25" verticalAlign="middle" gap="2" width="200" fontWeight="bold">
+						<s:ToggleButton id="DS_" icon="{gnncEmbedBlackWhite.bw_calendar_16_time_start}" width="100%" label="Inicial" height="25" click="{__D(true)}" selected="true" itemCreationPolicy="immediate" includeIn="advanced"/>
+						<s:ToggleButton id="DE_" icon="{gnncEmbedBlackWhite.bw_calendar_16_time_end}" 	width="100%" label="Final" height="25" change="{__D(false)}" itemCreationPolicy="immediate" includeIn="advanced"/>
+					</s:HGroup>
+					<s:Button label="Remover datas desta linha" icon="{gnncEmbedBlackWhite.bw_calendar_16_delete}" width="100%" height="25" click="{__REMOVE_DATE_LINE()}"/>
+					<s:VGroup gap="2" paddingTop="5" paddingLeft="10" paddingRight="2">
+						
+						<s:Label text="Opções" fontSize="11" fontWeight="bold" height="25" verticalAlign="middle"/>
+						<s:CheckBox id="CHANGE_SE_" label="Mudança auto. Início > Final " selected="true" height="20" />
+						<s:CheckBox id="CHANGE_LINE_" label="Descer auto. linha" selected="true" height="20"/>
+						<s:CheckBox id="CHANGE_ALL_DATES_" label="Mudar auto. a data abaixo" selected="false" height="20" enabled="false" />
+					</s:VGroup>
+
+				</s:NavigatorContent>
+				<s:NavigatorContent label="MODELO" creationPolicy="all">
+					<s:layout>
+						<s:VerticalLayout gap="3"/>
+					</s:layout>
+					
+					
+					<s:HGroup height="25" verticalAlign="middle" gap="1" width="100%" fontWeight="normal">
+						<s:Button icon="{gnncEmbedImage.EXPORT_16}" width="100%" label="Exportar" click="{__export()}" toolTip="Você pode exportar as etapas, da listagem ao lado, e guardar uma lista padrão."/>
+						<s:Button icon="{gnncEmbedImage.IMPORT_16}" width="100%" label="Importar" click="(__import())" toolTip="Importe um arquivo de etapas"/>
+					</s:HGroup>
+					
+					<s:List id="STEP_NAME_" width="100%" height="100%" dataProvider="{new ArrayCollection()}" labelField="NAME" borderVisible="false" dragEnabled="true" allowMultipleSelection="true" fontWeight="bold" dragComplete="{MESSAGE_.visible=false}" contentBackgroundAlpha="0" />
+
+					<s:Button icon="{gnncEmbedBlackWhite.bw_all_16}" width="100%" label="Selecionar tudo" click="{__selectAll()}" height="25"/>
+
+				</s:NavigatorContent>
+			</mx:ViewStack>
+		</s:HGroup>
+		
+	</s:VGroup>
+
+	<s:HGroup left="1" right="1" bottom="1" height="34" gap="1" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<s:Button label="Expandir" click="{__max()}" height="30"/>
+		<s:ToggleButton id="STATE_" icon="{gnncEmbedBlackWhite.bw_setting_16}" label="Opções Avançadas" height="30" click="{STATE_.selected?currentState='advanced':currentState=''}" selected="false"/>
+		<s:Rect width="100%" />
+		<s:Button id="btnSave_" icon="{gnncEmbedBlackWhite.bw_edit_16}" label="Salvar alterações" click="{__save()}" fontWeight="bold" height="30" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" height="30" />
+	</s:HGroup>
+
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

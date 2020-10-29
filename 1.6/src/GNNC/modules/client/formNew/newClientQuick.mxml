@@ -1,0 +1,783 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="750" height="450"
+		  
+		  creationComplete="__start()" 
+		  
+		  xmlns:select		= "GNNC.elements.component.select.*" 
+		  xmlns:stage		= "GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:validator	= "GNNC.data.validator.*" 
+		  xmlns:gnncTextInputMasked="GNNC.UI.gnncTextInputMasked.*"
+		  >
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.application.gnncAppWindow;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncClipBoard;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.data.json.gnncJSON;
+			import GNNC.data.file.gnncFilesNative;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedOperator;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_client;
+			
+			import mx.collections.ArrayCollection;
+			import mx.formatters.PhoneFormatter;
+			import mx.graphics.SolidColor;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			import mx.utils.StringUtil;
+			
+			public var _tableClient:table_client = new table_client();
+			private var _connClient:gnncAMFPhp 	= new gnncAMFPhp();
+			private var _connExec:gnncAMFPhp 	= new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp 	= new gnncPopUp();
+			
+			public const _MIX:String = 'CLIENT';
+			public var _change:Boolean = false;
+			public var showSelectCompany:Boolean = false;
+			private var _cpfCnpjValid:Boolean = false;
+			
+			[Bindable] private var _peopleDescription:ArrayCollection = new ArrayCollection
+				([
+					{
+						firt_name: 		'Nome Completo *', 	
+						middle_name: 	'Nome do Meio', 	
+						last_name: 		'Sobrenome', 	
+						nick_name: 		'Apelido / Nick', 	
+						cpf_cnpj: 		'CPF', 	
+						rg_register: 	'RG', 					
+						sex: 			'Sexo', 	
+						birth: 			'Aniversário'
+					},
+					{	
+						firt_name: 		'Razão Social *', 	
+						middle_name: 	'', 				
+						last_name: 		'|', 			
+						nick_name: 		'Nome Fantasia', 	
+						cpf_cnpj: 		'CNPJ', 	
+						rg_register: 	'Inscrição Estadual', 	
+						sex: 			'|', 		
+						birth: 			'Fundada em'
+					}
+				]);
+			
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__ENTER(event))
+						{
+							focusManager.getNextFocusManagerComponent().setFocus();
+							focusManager.getNextFocusManagerComponent().drawFocus(true);
+							
+							focusManager.showFocus();
+							focusManager.getFocus();
+							focusManager.activate();
+						}
+					}
+				);
+				
+				__clientId();
+				__config();
+			}
+			
+			public function __config():void 
+			{ 
+				blockSelectCompany_.visible = showSelectCompany;
+				
+				GROUP_.value = _tableClient.ID_GROUP;
+			}
+
+			public function setType(company:Boolean):void 
+			{
+				COMPANY_NO_.selected = !company; 
+				COMPANY_YES_.selected = company; 
+				//select type
+				blockSelectCompany_.visible = false;
+				//box show type
+				boxCompany_.visible = false;
+
+				FIRST_NAME_.setFocus();
+			}
+
+			public function checkType():void
+			{
+				setType( uint(_tableClient.COMPANY)==1 ? true : false );
+			}
+
+			private function __clientId():void
+			{
+				if(_tableClient != null){
+					if(_tableClient.ID){
+						_gnncPopUp.__loading('Recolhendo dados...');
+						var _table:table_client = new table_client(_tableClient.ID);
+						_table.ACTIVE = 0;
+						var _sql:String = new gnncSql().__SELECT(_table);
+						_connClient.__sql(_sql,'','',__fResult,__fFault);
+					}
+				}else{
+					_tableClient = new table_client();
+					boxCompany_.visible = false;
+				}
+				checkType();
+			}
+			
+			protected function __fFault(event:FaultEvent):void
+			{
+				__close();
+				_gnncPopUp.__close();
+			}
+			
+			protected function __fResult(event:ResultEvent):void
+			{
+				_gnncPopUp.__close();
+				
+				if(_connClient.DATA_ROWS==0){
+					new gnncAlert(this).__error('Impossível editar este cliente. Verifique se este está bloqueado.');
+					__close();
+					return;
+				}
+				
+				var _obj:Object 				= _connClient.DATA_ARR.getItemAt(0);
+				
+				_tableClient.ID					= _tableClient.ID;
+				
+				FIRST_NAME_.text 				= _obj.NAME;
+				
+				//_obj.COMPANY==0?CPF_.text 		= _obj.CPF_CNPJ:CNPJ_.text = _obj.CPF_CNPJ;
+				
+				_obj.SEX=='M' ? SEX_M.selected = true : _obj.SEX=='F' ? SEX_F.selected = true : SEX_O.selected = true;
+				
+				
+				(!_obj.COMPANY) ? COMPANY_NO_.selected = true : COMPANY_YES_.selected = true ;
+				
+				//ID_PROFESSIONAL				= _obj.ID_PROFESSIONAL;
+				//PROFESSIONAL_NUMBER_.text		= _obj.PROFESSIONAL_NUMBER;
+				//PROFESSIONAL_STATE_.text		= _obj.PROFESSIONAL_STATE;
+				
+				ADDRESS_.text					= _obj.ADDRESS;
+				ADDRESS_NUMBER_.text			= _obj.ADDRESS_NUMBER;
+				ADDRESS_COMPLEMENT_.text		= _obj.ADDRESS_COMPLEMENT;
+				NEIGHBORHOOD_.text				= _obj.NEIGHBORHOOD;
+				ZIPCODE_.text					= _obj.ZIPCODE;
+				CITY_.text						= _obj.CITY;
+				STATE_.text						= _obj.STATE;
+				//COUNTRY_.selectedIndex			= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._COUNTRY,'ISO',_obj.ISO_COUNTRY);
+				
+				//NATURALITY_.text				= _obj.NATURALITY;
+				//NACIONALITY_.selectedIndex	= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._COUNTRY,'ISO',_obj.ISO_NACIONALITY);
+				
+				//_obj.PHONE 					= gnncDataNumber.__clearPhoneNumber(String(_obj.PHONE));
+				//_obj.PHONE_CEL 				= gnncDataNumber.__clearPhoneNumber(String(_obj.PHONE_CEL));
+				//_obj.PHONE_COMPANY 			= gnncDataNumber.__clearPhoneNumber(String(_obj.PHONE_COMPANY));
+				//_obj.PHONE_FAX 				= gnncDataNumber.__clearPhoneNumber(String(_obj.PHONE_FAX));
+
+				//PHONE_.text					= String(_obj.PHONE).length<8 			? '' : String(_obj.PHONE).length==10 			? phoneFormat10_.format(_obj.PHONE) 			: String(_obj.PHONE).length==11 			? phoneFormat11_.format(_obj.PHONE) 			: phoneFormat10_.format(gnncDataNumber.__setZero(_obj.PHONE,10));
+				//PHONE_CEL_.text				= String(_obj.PHONE_CEL).length<8 		? '' : String(_obj.PHONE_CEL).length==10 		? phoneFormat10_.format(_obj.PHONE_CEL) 		: String(_obj.PHONE_CEL).length==11 		? phoneFormat11_.format(_obj.PHONE_CEL) 		: phoneFormat10_.format(gnncDataNumber.__setZero(_obj.PHONE_CEL,10));
+				//PHONE_COMPANY_.text			= String(_obj.PHONE_COMPANY).length<8 	? '' : String(_obj.PHONE_COMPANY).length==10 	? phoneFormat10_.format(_obj.PHONE_COMPANY) 	: String(_obj.PHONE_COMPANY).length==11 	? phoneFormat11_.format(_obj.PHONE_COMPANY) 	: phoneFormat10_.format(gnncDataNumber.__setZero(_obj.PHONE_COMPANY,10));
+				//PHONE_FAX_.text				= String(_obj.PHONE_FAX).length<8 		? '' : String(_obj.PHONE_FAX).length==10 		? phoneFormat10_.format(_obj.PHONE_FAX) 		: String(_obj.PHONE_FAX).length==11 		? phoneFormat11_.format(_obj.PHONE_FAX) 		: phoneFormat10_.format(gnncDataNumber.__setZero(_obj.PHONE_FAX,10));
+				
+				PHONE_.text						= gnncDataNumber.__clearPhoneNumber(String(_obj.PHONE));
+				PHONE_CEL_.text					= gnncDataNumber.__clearPhoneNumber(String(_obj.PHONE_CEL));
+
+				PHONE_OPERATOR_.selectedIndex	= new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._operatorCelPhone,'data',_obj.PHONE_OPERATOR);
+				PHONE_CEL_OPERATOR_.selectedIndex = new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._operatorCelPhone,'data',_obj.PHONE_CEL_OPERATOR);
+
+				EMAIL_.text						= _obj.EMAIL;
+				GROUP_.value					= _obj.ID_GROUP;
+				
+				_tableClient.VISIBLE			= _obj.VISIBLE;
+				_tableClient.CONTROL			= _obj.CONTROL;
+				
+				_gnncPopUp.__close();
+				
+				//EXTRA CPF
+				_tableClient.CPF_CNPJ			= _obj.CPF_CNPJ;
+				CNPJ_.text                      = String(_obj.CPF_CNPJ);
+				
+				//EXTRA Phone Operator
+				__operatorIconChange(PHONE_OPERATOR_		,icon1);
+				__operatorIconChange(PHONE_CEL_OPERATOR_	,icon2);
+
+				boxCompany_.visible = false;
+			}
+			
+			private function __ENROLLMENT():String
+			{
+				return gnncDataRand.__enrollment(15);
+			}
+			
+			private function __PASSWWEB():String
+			{
+				return gnncDataRand.__passWord(8);
+			}
+			
+			private function __close():void
+			{
+				if(this.isPopUp)
+					new gnncPopUp().__close(this);
+				else
+					new gnncAppWindow().__closeWindow(this);
+			}
+			
+			private function __save():void
+			{	
+				if(FIRST_NAME_.text.length < 5){
+					new gnncNotification().__show('Nome','Insira mais caractéres no campo.');
+					FIRST_NAME_.setFocus();
+					return;
+				}
+				if(GROUP_.value == 0){
+					new gnncNotification().__show('Grupo','Selecione um grupo');
+					GROUP_.LIST_.openDropDown();
+					return;
+				}
+				
+				__saveDatas();
+			}
+			
+			private function __saveDatas():void
+			{	
+				
+				_change 					= true;				
+				_gnncPopUp.__loading		()
+				
+				var _table:table_client 	= new table_client();
+				
+				_table.ID					= _tableClient.ID;
+				
+				_table.NAME					= FIRST_NAME_.text.toUpperCase();
+				_table.MIDDLE_NAME			= '';
+				_table.LAST_NAME			= '';
+				_table.CPF_CNPJ				= !uint(COMPANY_.selectedValue) ? CPF_.text : CNPJ_.text;
+				_table.SEX					= uint(COMPANY_.selectedValue) ? 'O' : String(SEX_.selectedValue);
+				
+				_table.COMPANY				= uint(COMPANY_.selectedValue);
+				
+				_table.ENROLLMENT			= gnncDataRand.__enrollment();
+				_table.ACCESS_WEB			= 0;
+				_table.ACCESS_WEB_PASSW		= gnncDataRand.__passWord(8);
+				
+				_table.ID_PROFESSIONAL		= 0;
+				//_table.PROFESSIONAL_NUMBER	= PROFESSIONAL_NUMBER_.text;
+				//_table.PROFESSIONAL_STATE	= PROFESSIONAL_STATE_.text;
+				
+				_table.ADDRESS				= ADDRESS_.text;
+				_table.ADDRESS_NUMBER		= uint(ADDRESS_NUMBER_.text);
+				_table.ADDRESS_COMPLEMENT	= ADDRESS_COMPLEMENT_.text;
+				_table.NEIGHBORHOOD			= NEIGHBORHOOD_.text;
+				_table.ZIPCODE				= uint(ZIPCODE_.text);
+				_table.CITY					= CITY_.text;
+				_table.STATE				= STATE_.text;
+				//_table.ISO_COUNTRY		= COUNTRY_.selectedIndex>-1?COUNTRY_.selectedItem.ISO:'';
+				
+				_table.NATURALITY			= '';
+				//_table.ISO_NACIONALITY	= NACIONALITY_.selectedIndex>-1?NACIONALITY_.selectedItem.ISO:'';
+				
+				_table.PHONE				= PHONE_.text;
+				_table.PHONE_CEL			= PHONE_CEL_.text;
+				
+				_table.PHONE_OPERATOR		= PHONE_OPERATOR_.selectedIndex>-1		? PHONE_OPERATOR_.selectedItem.data		: 0 ;
+				_table.PHONE_CEL_OPERATOR	= PHONE_CEL_OPERATOR_.selectedIndex>-1	? PHONE_CEL_OPERATOR_.selectedItem.data	: 0 ;
+
+				_table.EMAIL				= String(EMAIL_.text).toLowerCase();
+				_table.FATHER				= '';
+				_table.MOTHER				= '';
+				
+				_table.ID_GROUP				= GROUP_.value;
+				
+				_table.VISIBLE				= _tableClient.VISIBLE;
+				_table.CONTROL				= 0;
+				
+				var _sql:String 			= new gnncSql().__INSERT(_table,false,true,true);
+				
+				_connClient.__sql			(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{
+					_gnncPopUp.__close		();
+					__close					();
+				}
+
+				function __fFault(e:*):void
+				{
+					_gnncPopUp.__close		();
+					FIRST_NAME_.setFocus	();
+				}
+				
+			}	
+			
+			private function __searchCep():void
+			{
+				var s:String = ZIPCODE_.text;
+				if(s.length < 8){
+					new gnncAlert(this).__alert('São necessários 8 dígitos no mínimo. 00000-000 (sem traço).');
+					return;
+				}
+				
+				btnZipCode_.enabled = 
+					ZIPCODE_.enabled = 
+					NEIGHBORHOOD_.enabled = 
+					ADDRESS_.enabled = 
+					CITY_.enabled = 
+					STATE_.enabled = false;
+
+				var f:gnncFilesNative = new gnncFilesNative();
+				var url:String = 'https://gnnc.com.br/librarys/gnnc/gnncGetZipCode.php?func=zipCode&zipcode='+s;
+				
+				var o:Object = new Object();
+				o.func = 'zipCode';
+				o.zipcode = s;
+				
+				f.__loadUrl(url,fComplete,fError,o);
+
+				function fComplete(e:*=null):void
+				{
+					btnZipCode_.enabled = 
+						ZIPCODE_.enabled = 
+						NEIGHBORHOOD_.enabled = 
+						ADDRESS_.enabled = 
+						CITY_.enabled = 
+						STATE_.enabled = true;
+
+					if(gnncJSON.isValid(f._DATA_UTF,false)){
+						//{"address":"Avenida Desembargador Moreira","number":"901 a 2119","neighborhood":"Aldeota","city":"Fortaleza","state":"CE"}
+						var arr:ArrayCollection = gnncJSON.toArrayCollection('['+f._DATA_UTF+']',false);
+						var o:Object = arr.getItemAt(0);
+
+						//gnncAlert.__alert('.'+f._DATA_UTF,'t')
+
+						NEIGHBORHOOD_.text = o['neighborhood'];
+						ADDRESS_.text = o['address'];
+						CITY_.text    = o['city'];
+						STATE_.text   = o['state'];
+					}
+					else{
+						new gnncNotification().__show('Não encontrado','CEP não encontrado.');
+					}
+				}
+				function fError(e:*=null):void
+				{
+					new gnncNotification().__show('Problema','Não foi possível estabelecer a conexão.');
+					
+					btnZipCode_.enabled = 
+						ZIPCODE_.enabled = 
+						NEIGHBORHOOD_.enabled = 
+						ADDRESS_.enabled = 
+						CITY_.enabled = 
+						STATE_.enabled = true;
+
+				}
+			}
+			
+			private function __operatorIconChange(obj_:DropDownList,img_:BitmapImage):void
+			{
+				if(obj_.selectedIndex<0)
+					return;
+				
+				switch(obj_.selectedItem.data)
+				{
+					case 41:
+						img_.source = gnncEmbedOperator.TIM_16;
+						break;
+					case 31:
+						img_.source = gnncEmbedOperator.OI_16;
+						break;
+					case 21:
+						img_.source = gnncEmbedOperator.CLARO_16;
+						break;
+					case 77:
+						img_.source = gnncEmbedOperator.NEXTEL_16;
+						break;
+					case 20:
+						img_.source = gnncEmbedOperator.VIVO_16;
+						break;
+					case 14:
+						img_.source = gnncEmbedOperator.BRASILTELECOM_16;
+						break;
+					default:
+						img_.source = null;
+				}
+			}
+
+			private function __fValidateDate(e:KeyboardEvent):void
+			{
+				//\d{2}/\d{2}/\d{4} for DD/DD/DDDD
+				//\d\d?/\d\d?/\d{4} for D/D/DDDD and DD/DD/DDDD
+				//DB2_.text = dateFormatter.format(DB2_.text);
+				
+				
+				var backSpace:Boolean = gnncKeyboard.__BACKSPACE(e);
+				var o:Object = e.currentTarget;
+				var s:String = o.text;
+				
+				var p1:uint  = o.selectionActivePosition;
+				var p2:uint  = o.selectionAnchorPosition;
+				
+				if(p1==p2){
+					p1 += (s.length==2?1:s.length==5?2:0);
+					p2 += (s.length==2?1:s.length==5?2:0);
+				}
+				
+				s = s.split('/').join('');
+				s = 
+					(s.length<3?s.substr(0):s.substr(0,2))+
+					(backSpace?'':(s.length>1?'/':''))+
+					(s.length<5?s.substr(2):s.substr(2,2))+
+					(backSpace?'':(s.length>3?'/':''))+
+					(s.length<9?s.substr(4):s.substr(4,4))
+					;
+				o.text = s;
+				//o.selectRange(p2,p1);
+				o.selectRange(s.length,s.length);
+				//o.selectRange(s.length,s.length);
+				
+				if(o.text.length>7){
+					dateValidator.enabled = true;
+					dateValidator.source = o;
+					dateValidator.validate();
+				}else{ 
+					dateValidator.enabled = false;
+					dateValidator.source = o;
+					dateValidator.validate();
+				}
+				
+				return;
+				
+				var dt:Array = String(o.text).split('/');
+				dt.reverse();
+			}
+			
+			private function __fValidatePhone(e:KeyboardEvent):void
+			{
+				//\d{2}/\d{2}/\d{4} for DD/DD/DDDD
+				//\d\d?/\d\d?/\d{4} for D/D/DDDD and DD/DD/DDDD
+				//DB2_.text = dateFormatter.format(DB2_.text);
+				
+				var backSpace:Boolean = gnncKeyboard.__BACKSPACE(e);
+				var o:Object = e.currentTarget;
+				var s:String = o.text;
+				var max:uint = 12;
+				var mArr:Array = 
+					[
+						"",
+						"({0}",
+						"({0}{1}",
+						"({0}{1}) {2}",
+						"({0}{1}) {2}{3}",
+						"({0}{1}) {2}{3}{4}",
+						"({0}{1}) {2}{3}{4}{5}",
+						"({0}{1}) {2}{3}{4}{5}{6}",
+						"({0}{1}) {2}{3}{4}{5}{6}-{7}",
+						"({0}{1}) {2}{3}{4}{5}{6}-{7}{8}",
+						"({0}{1}) {2}{3}{4}{5}{6}-{7}{8}{9}",
+						"({0}{1}) {2}{3}{4}{5}{6}-{7}{8}{9}{10}",
+						"({0}{1}) {2}{3}{4}{5}{6}-{7}{8}{9}{10}{11} "
+					]; //(00) 0000-0000 = 14/15
+				var f:String = ''; //final
+				var c:uint = 0;//cont
+
+				s = s.split('(').join('').split(')').join('').split(' ').join('').split('-').join('').split('{').join('').split('}').join('');
+				c = s.length;
+				s = s+'   '; //15 spaces
+				//StringUtil.substitute(m,);
+				
+				f = mArr[c];
+				//
+				//if(!backSpace)
+				for(var i:uint=0;i<c+3;i++){
+					if(i>max)
+						continue;
+					f = f
+						.replace(
+							new RegExp("\\{"+i+"\\}", "g"), 
+							i<=10?
+							s.substr(i,1):''
+						); 
+				}
+				
+				f = StringUtil.trim(f);
+				o.text = f;
+				//o.selectRange(p2,p1);
+				o.selectRange(f.length,f.length);
+				//o.selectRange(s.length,s.length);
+			}
+			
+			private function __copyEnrollment():void
+			{
+				gnncClipBoard.__copyText(ENROLLMENT_.text);
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+				
+		<s:DateTimeFormatter
+			dateStyle="medium"
+			dateTimePattern="dd,mm,yyyy"
+			errorText="null"
+			timeStyle="medium"
+			useUTC="false"
+			id="dateFormatter"			
+			/>
+
+		<s:RadioButtonGroup id	= "COMPANY_" />
+		<s:RadioButtonGroup id	= "SEX_" />
+		<s:RadioButtonGroup id	= "groupPhone_" />
+		
+		<validator:gnncValidatorCpf
+			id					= "V_CPF" 
+			source				= "{CPF_}" 
+			property			= "text" 
+			minValue			= "11"
+			required			= "true" 
+			valid				= "{_cpfCnpjValid = true 	}"
+			invalid				= "{_cpfCnpjValid = false 	}"
+			requiredFieldError	= "*"
+			/>
+		
+		<validator:gnncValidatorCnpj
+			id					= "V_CNPJ"
+			source				= "{CNPJ_}" 
+			property			= "text" 
+			minValue			= "14"
+			required			= "true"
+			valid				= "{_cpfCnpjValid = true 	}"
+			invalid				= "{_cpfCnpjValid = false 	}"
+			requiredFieldError	= "*"
+			/>
+
+		<mx:DateValidator id="dateValidator" inputFormat="DD/MM/YYYY" source="{BIRTH_}" property="text"
+						  requiredFieldError="" required="false" formatError="*" />
+
+		<!-- mx:PhoneFormatter 	id="phoneFormat10_" error="" formatString="(##) ####-####"  areaCodeFormat="(##)" />
+		<mx:PhoneFormatter 	id="phoneFormat11_" error="" formatString="(##) ####-#####" areaCodeFormat="(##)" / -->
+		
+		<mx:Fade 			id="fade_" duration="500" startDelay="900" />
+		
+	</fx:Declarations>
+	
+	<elements:elementStageBoxPopUp />
+	<s:Image source="{COMPANY_.selectedValue==0?gnncEmbedBlackWhite.bw_client_128_v2:gnncEmbedBlackWhite.bw_client_128_company_v2}" left="10" bottom="10" alpha=".05"/>
+	<elements:elementLabelFont id="titlePopUp_" text="CLIENTE RÁPIDO" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="10">
+		<s:TabBar dataProvider="{panelCenter_}" height="30" focusEnabled="false" />
+		<s:Rect width="100%"/>
+		<s:Image source="{gnncEmbedBlackWhite.bw_client_16_v2}"/>
+		<s:RadioButton id="COMPANY_NO_" 	label="Pessoa Física" 	group="{COMPANY_}" value="0" click="{}" change="{}" />
+		<s:Rect width="5"/>
+		<s:Image source="{gnncEmbedBlackWhite.bw_client_16_company_v2}"/>
+		<s:RadioButton id="COMPANY_YES_" 	label="Pessoa Jurídica" group="{COMPANY_}" value="1" click="{}" change="{}" selected="true" />
+	</s:HGroup>
+	
+	<mx:ViewStack id="panelCenter_" left="20" right="20" top="55" bottom="52">
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:HorizontalLayout gap="5" />
+			</s:layout>
+			
+			<s:Group width="250" height="100%">
+				
+				<elements:elementBarGray radiusX="4" top="15" bottom="0" alpha=".4"/>
+				
+				<s:VGroup width="100%" height="100%" top="20" paddingBottom="10" paddingLeft="20" paddingRight="20" paddingTop="10" gap="2">
+					
+					<s:Label text="{_peopleDescription.getItemAt(uint(COMPANY_.selectedValue)).cpf_cnpj}" paddingLeft="0" fontWeight="bold" width="100%" height="20" verticalAlign="middle" />
+					<s:Group height="25" width="100%">
+						<s:TextInput id="CPF_"  text="" width="100%" height="30" maxChars="11" restrict="[0-9]" keyUp="{V_CPF.validate()}" visible="{uint(COMPANY_.selectedValue)==0}" paddingLeft="7" paddingRight="7" />
+						<s:TextInput id="CNPJ_" text="" width="100%" height="30" maxChars="14" restrict="[0-9]" keyUp="{V_CNPJ.validate()}" visible="{uint(COMPANY_.selectedValue)==1}" paddingLeft="7" paddingRight="7" />
+					</s:Group>
+					<!-- s:TextInput id="CNPJ_" width="100%" height="30" prompt="" maxChars="300" restrict="[0-9]" paddingLeft="7" paddingRight="7" /-->
+					
+					<s:Rect height="10"/>
+					
+					<s:Label text="Endereço" paddingLeft="0" fontWeight="bold" width="160" height="20" verticalAlign="middle" />
+					<s:HGroup width="100%" gap="-1" >
+						<s:TextInput id="ZIPCODE_" width="100%" height="30" restrict="[0-9]" maxChars="9" paddingLeft="7"
+									 enter="{__searchCep()}" prompt="CEP"
+									 />
+						<s:Button  id="btnZipCode_" icon="{gnncEmbedBlackWhite.bw_search_16}" label="Pesquisar CEP" click="{__searchCep()}" height="30" width="30" fontWeight="bold" />
+					</s:HGroup>
+					
+					<!--s:Label text="CEP" paddingLeft="0" fontWeight="bold"/>
+					<elements:elementInputSearch id="ZIPCODE_" width="120" _RESTRICT="[0-9]" _MAXCHARS="10" _FUNCTION_Event_="{function(e:*):void{ __SEARCH_CEP() }}" _PROMPT="CEP" /-->
+					
+					<s:TextInput id="ADDRESS_" width="100%" height="30" prompt="Endereço. Ex: Avenida, Rua  etc " maxChars="300" restrict="[A-Z][a-z][Çç][ÁáÀàÂâÃã][ÊêÉé][ÍíÎî][ÓóÔôÕõ][ÚúÛû][0-9][ ][\,\-]" paddingLeft="7" />
+					
+					<!-- s:HGroup width="100%" gap="2" >
+					<s:Label text="Número" paddingLeft="0" fontWeight="bold" width="100%"/>
+					<s:Label text="Compl." paddingLeft="0" fontWeight="bold" width="100%"/>
+					</s:HGroup -->
+					<s:HGroup width="100%" gap="2" >
+						<s:TextInput id="ADDRESS_NUMBER_" 	  width="100%" height="30"  restrict="[0-9]" prompt="Ex:100" maxChars="5" paddingLeft="7"/>
+						<s:TextInput id="ADDRESS_COMPLEMENT_" width="100%" height="30" restrict="[0-9][a-z][A-Z]" prompt="Ex:101B" maxChars="5" paddingLeft="7" />
+					</s:HGroup>
+					
+					<s:Label text="Bairro" paddingLeft="0" fontWeight="bold" height="20" verticalAlign="middle"/>
+					<s:TextInput id="NEIGHBORHOOD_" width="100%" maxChars="50" height="30" restrict="[A-Z][a-z][Çç][ÁáÀàÂâÃã][ÊêÉé][ÍíÎî][ÓóÔôÕõ][ÚúÛû][ ]" prompt="Bairro" paddingLeft="7" />
+					
+					<s:HGroup width="100%" gap="2">
+						<s:Label text="Cidade" paddingLeft="0" fontWeight="bold" height="20" verticalAlign="middle" width="100%"/>
+						<s:Label text="Estado" paddingLeft="0" fontWeight="bold" height="20" verticalAlign="middle" width="50"/>
+					</s:HGroup>
+					<s:HGroup width="100%" gap="2">
+						<s:TextInput id="CITY_" width="100%" maxChars="60" height="30" restrict="[A-Z][a-z][Çç][ÁáÀàÂâÃã][ÊêÉé][ÍíÎî][ÓóÔôÕõ][ÚúÛû][ ]" prompt="Cidade" paddingLeft="7" />
+						<s:TextInput id="STATE_" width="50" maxChars="60" height="30" restrict="[A-Z][a-z][Çç][ÁáÀàÂâÃã][ÊêÉé][ÍíÎî][ÓóÔôÕõ][ÚúÛû][ ]" prompt="Estado" paddingLeft="7" />
+					</s:HGroup>
+					
+				</s:VGroup>
+			</s:Group>
+			
+			<s:Form width="100%" height="100%" fontSize="11" fontWeight="normal">
+				<s:layout>
+					<s:FormLayout gap="-15" paddingBottom="0" paddingLeft="0" paddingRight="0" paddingTop="0" />
+				</s:layout>
+				<s:FormItem label="{_peopleDescription.getItemAt(uint(COMPANY_.selectedValue)).firt_name}" width="100%" required="true">
+					<s:TextInput id="FIRST_NAME_" fontSize="15" prompt="Nome Completo" width="100%" height="35" paddingLeft="10" paddingRight="5" maxChars="200" restrict="[A-Z][a-z][Çç][ÁáÀàÂâÃã][ÊêÉé][ÍíÎî][ÓóÔôÕõ][ÚúÛû][0-9][ ][\-\_\(\)][@]" creationComplete="{FIRST_NAME_.setFocus()}" focusOut="{FIRST_NAME_.text.toUpperCase()}" />
+				</s:FormItem>
+				<s:FormItem label="Grupo *" width="100%" required="true" >
+					<select:conSelect_GROUP id="GROUP_" _MIX="{_MIX}" _ICON="false" height="30"  />
+				</s:FormItem>
+				<!-- s:FormItem label="{_peopleDescription.getItemAt(uint(COMPANY_.selectedValue)).cpf_cnpj}" width="100%" required="true" showErrorTip="false" >
+					<s:Group height="25">
+						<s:TextInput id="CPF_"  text="26262626260" width="200" height="25" maxChars="11" restrict="[0-9]" keyUp="{V_CPF.validate();  CLEAR_CPF_CNPJ(true); /*if(gnncKeyboard.__ENTER(event)) __CPF_CNPJ_SEARCH()*/}" visible="{uint(COMPANY_.selectedValue)==0}" />
+						<s:TextInput id="CNPJ_" text="26262626262620" width="200" height="25" maxChars="14" restrict="[0-9]" keyUp="{V_CNPJ.validate(); CLEAR_CPF_CNPJ(true); /*if(gnncKeyboard.__ENTER(event)) __CPF_CNPJ_SEARCH()*/}" visible="{uint(COMPANY_.selectedValue)==1}" />
+						<mx:ProgressBar id="SEARCH_CPF_CNPJ_" label="Pesquisando..." visible="{_connClient._loading}" labelPlacement="left" indeterminate="true" width="200" paddingLeft="6" paddingRight="8" top="3" />
+					</s:Group>
+					<s:Image id="V_VALID" source="{gnncEmbedImage.OK_16_BW}" toolTip="Valida o CPF ou CNPJ." width="16" height="16" />
+					<s:Image id="V_FOUND" source="{gnncEmbedImage.OK_16_BW}" toolTip="Verifica se CPF ou CNPJ já existe. Click em pesquisar." width="16" height="16" />
+				</s:FormItem-->
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="E-mail" width="100%" required="true" >
+					<s:layout>
+						<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="EMAIL_" width="100%" height="30" maxChars="50" restrict="[0-9][a-z][A-Z][\@\.\_\-]" />
+					<s:Rect width="30"/>
+					<s:Rect width="30"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<s:FormItem label="Telefone" width="100%" >
+					<s:layout>
+						<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+					</s:layout>
+					<s:TextInput id="PHONE_" width="130" height="30" keyDown="{__fValidatePhone(event)}" keyUp="{__fValidatePhone(event)}" maxChars="16" restrict="[0-9]\//\(\)\ \-" paddingLeft="10" fontSize="12"/>
+					<!-- gnncTextInputMasked:gnncTextInputMasked id="PHONE_" inputMask="(##) ####-#####"  width="40" cellColor="0xFFFFFF" height="25" maxChars="11" / -->
+					<s:Button icon="{gnncEmbedBlackWhite.bw_clear_14_selection}	" width="25" toolTip="Limpar seleção" click="{PHONE_.text = ''}" skinClass="GNNC.skin.button.skin_buttonLink" />
+					<s:DropDownList id="PHONE_OPERATOR_" width="75" height="30" dataProvider="{gnncGlobalArrays._operatorCelPhone}" prompt="Selecione..." change="{__operatorIconChange(PHONE_OPERATOR_,icon1)}" />
+					<s:Rect width="4"/>
+					<s:BitmapImage id="icon1" source="{null}"/>
+				</s:FormItem>
+				<s:FormItem label="Celular" width="100%" >
+					<s:layout>
+						<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+					</s:layout>
+					<!-- gnncTextInputMasked:gnncTextInputMasked id="PHONE_CEL_" inputMask="(##) ####-#####"  width="40" cellColor="0xFFFFFF" height="25" maxChars="11" / -->
+					<s:TextInput id="PHONE_CEL_" width="130" height="30" keyDown="{__fValidatePhone(event)}" keyUp="{__fValidatePhone(event)}" maxChars="16" restrict="[0-9]\//\(\)\ \-" paddingLeft="10" fontSize="12"/>
+					<s:Button icon="{gnncEmbedBlackWhite.bw_clear_14_selection}	" width="25" toolTip="Limpar seleção" click="{PHONE_CEL_.text = ''}" skinClass="GNNC.skin.button.skin_buttonLink" />
+					<s:DropDownList id="PHONE_CEL_OPERATOR_" width="75" height="30" dataProvider="{gnncGlobalArrays._operatorCelPhone}" prompt="Selecione..." change="{__operatorIconChange(PHONE_CEL_OPERATOR_,icon2)}" />
+					<s:Rect width="4"/>
+					<s:BitmapImage id="icon2" source="{null}"/>
+				</s:FormItem>
+				<elements:elementHLine height="25" alpha=".5" />
+				<!-- s:FormItem label="Profissão" width="100%" visible="{uint(COMPANY_.selectedValue)==0}" >
+					<s:layout>
+						<s:HorizontalLayout gap="2"/>
+					</s:layout>
+					<s:DropDownList id="PROFESSIONAL_" width="100%" height="30" dataProvider="{new ArrayCollection()}" prompt="Selecione..." />
+					<s:Button icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" width="30" height="30" toolTip="Limpar seleção" skinClass="GNNC.skin.button.skin_buttonLink" />
+					<s:Rect width="30"/>
+				</s:FormItem-->
+				<s:FormItem label="{_peopleDescription.getItemAt(uint(COMPANY_.selectedValue)).birth}" width="100%" visible="{uint(COMPANY_.selectedValue)==0}" >
+					<s:layout>
+						<s:HorizontalLayout gap="1" verticalAlign="middle" paddingTop="5" paddingBottom="5" />
+					</s:layout>
+					<s:TextInput id="BIRTH_" width="100" prompt="DD/MM/AAAA" height="30" keyUp="{__fValidateDate(event)}" keyDown="{__fValidateDate(event)}" maxChars="10" restrict="[0-9]\//" paddingLeft="10" fontSize="12" />
+					<s:Rect height="25" width="1"/>
+					
+					<!-- s:DropDownList id="DAY_" width="50" selectedItem="0" height="30"/>
+					<s:DropDownList id="MONTH_" dataProvider="{gnncGlobalArrays._MONTH}" width="80" height="30" selectedIndex="0" change="{__changeMonth()}" />
+					<s:NumericStepper id="YEAR_" maximum="2050" minimum="1900" value="1900" height="30" width="60" textAlign="center" maxChars="4" / -->
+					<!-- s:Label paddingLeft="7" text="{'Idade: '+gnncDate.__age(YEAR_.value+'-'+MONTH_.selectedItem.data+'-'+gnncDataNumber.__setZero(DAY_.selectedItem),new Date())}"/ -->
+				</s:FormItem>
+				<s:FormItem label="{_peopleDescription.getItemAt(uint(COMPANY_.selectedValue)).sex}" width="100%" visible="{uint(COMPANY_.selectedValue)==0}">
+					<s:layout>
+						<s:HorizontalLayout gap="7" verticalAlign="middle"/>
+					</s:layout>
+					<s:RadioButton id="SEX_O" label="Outro"  	group="{SEX_}" value="O" click="{}" change="{}" selected="true" />
+					<s:RadioButton id="SEX_M" label="Masculino" group="{SEX_}" value="M" click="{}" change="{}" fontWeight="bold" color="0x000000" />
+					<s:RadioButton id="SEX_F" label="Feminino"  group="{SEX_}" value="F" click="{}" change="{}" fontWeight="bold" color="0x444444"/>
+					<s:Label text="|" visible="false"/>
+				</s:FormItem>
+			</s:Form>
+			
+		</s:NavigatorContent>
+
+	</mx:ViewStack>
+	
+	<s:VGroup id="boxCompany_" verticalCenter="0" horizontalCenter="0" visible="true" hideEffect="{fade_}" >
+		<!-- s:Image source="{COMPANY_.selectedValue==0?gnncEmbedBlackWhite.bw_client_128:gnncEmbedBlackWhite.bw_client_128_group}" >
+		<s:filters>
+		<s:DropShadowFilter blurX="8" blurY="8" alpha=".5" />
+		</s:filters>
+		</s:Image -->
+		<s:Group width="100%" height="30" alpha=".9">
+			<s:Rect width="100%" height="100%" radiusX="4">
+				<s:fill>
+					<s:SolidColor color="0x777777"/>
+				</s:fill>
+			</s:Rect>
+			<elements:elementLabelFont text="{COMPANY_.selectedValue==0?'Pessoa Física':'Pessoa Jurídica'}" verticalCenter="0" horizontalCenter="0" fontSize="20" paddingTop="4" color="0xFFFFFF" paddingLeft="15" paddingRight="15" textAlign="center" />
+		</s:Group>
+	</s:VGroup>
+	
+	<s:HGroup width="100%" height="34" gap="2" paddingLeft="5" paddingRight="5" verticalAlign="middle" bottom="0">
+		<elements:elementLabelBackgroudColor id="ENROLLMENT_" buttonMode="true" text="{__ENROLLMENT().replace('.','')}" _color="0xffffff" _colorBackground="0x777777" height="25" _paddingLeftText="10" _paddingRightText="10" click="{__copyEnrollment()}" toolTip="Copiar matrícula" />
+		<!-- component:con_labelBackgroudColor text="Matrícula" _color="0xffffff" _colorBackground="0x777777" height="25" _paddingLeftText="10" _paddingRightText="10" click="{}" / -->
+		<s:Rect width="100%" />
+		<!-- s:Button label="Cadastrar e Agendar" icon="{gnncEmbedBlackWhite.bw_calendar_16_today}" click="{__save()}" 	keyDown="{if(gnncKeyboard.__ENTER(event)) __save()}" fontWeight="bold" / -->
+		<s:Button label="{'Cadastrar'}" icon="{gnncEmbedBlackWhite.bw_new_16}" click="{__save()}" 	keyDown="{if(gnncKeyboard.__ENTER(event)) __save()}" fontWeight="bold" />
+		<s:Button label="Fechar" icon="{gnncEmbedBlackWhite.app_close_16_clean}" click="{__close()}"  />
+	</s:HGroup>
+	
+	<s:Group width="100%" height="100%" id="blockSelectCompany_" visible="false">
+		<elements:elementStageBox />
+		<s:Rect left="20" top="20" right="20" bottom="20" radiusX="4" radiusY="4">
+			<s:stroke>
+				<s:SolidColorStroke color="0xdddddd"/>
+			</s:stroke>
+		</s:Rect>
+		<s:VGroup width="200" gap="1" padding="10" horizontalCenter="0" verticalCenter="0">
+			
+			<elements:elementLabelDropShadow fontSize="12" fontWeight="normal" text="CADASTRO" width="100%"/>
+			<elements:elementLabelDropShadow height="30" fontSize="25" fontWeight="normal" text="RÁPIDO" width="100%"/>
+
+			<s:Button label="Pessoa Física" width="100%" height="30" icon="{gnncEmbedBlackWhite.bw_client_16_v2}" 
+					  click="{ setType(false) }" skinClass="GNNC.skin.button.skin_buttonTextLeft"/>
+			<s:Button label="Empresa" width="100%" height="30" icon="{gnncEmbedBlackWhite.bw_client_16_company_v2}" 
+					  click="{ setType(true) }" skinClass="GNNC.skin.button.skin_buttonTextLeft"/>
+			
+			<s:Rect height="40"/>
+			
+		</s:VGroup>
+	</s:Group>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

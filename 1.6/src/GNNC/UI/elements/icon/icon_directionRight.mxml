@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Path xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		xmlns:s="library://ns.adobe.com/flex/spark" 
+		xmlns:mx="library://ns.adobe.com/flex/mx"
+		 data="M415.812,288.36c3.167,3.167,6.333,6.334,9.5,9.501c-0.002-0.518-0.005-1.036-0.008-1.553
+		 c-3.167,3.167-6.333,6.334-9.5,9.5c-1.001,1.001,0.558,2.549,1.562,1.546c3.167-3.168,6.333-6.334,9.5-9.501
+		 c0.424-0.425,0.413-1.132-0.008-1.553c-3.167-3.167-6.334-6.334-9.501-9.5C416.356,285.798,414.809,287.357,415.812,288.36
+		 L415.812,288.36z" 
+		>
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			public function set _COLOR(value_:uint):void
+			{
+				COLOR.color = value_;
+			}
+		]]>
+	</fx:Script>
+	<s:fill>
+		<s:SolidColor id="COLOR" color="0x999999" />
+	</s:fill>
+</s:Path>

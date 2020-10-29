@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+
+		 minHeight="25"
+		 minWidth="70"
+		 
+		 creationComplete="{__start()}"
+
+		 xmlns:date="GNNC.elements.component.date.*" 
+		 xmlns:stage="GNNC.elements.stage.*" 
+		 xmlns:select="GNNC.elements.component.select.*"
+		 
+		 >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.date.gnncDate;
+			import GNNC.gnncEmbedBlackWhite;
+		
+			private var _date:Date = null;
+			private var _labelNull:String = 'Nenhuma data';
+			
+			public function set label(value_:String):void 			{ button_.label = value_ 					}
+			public function get label():String 						{ return button_.label						}
+
+			public function set icon(src_:Object):void 				{ button_.setStyle('icon',src_)				};
+
+			public function set popUpPosition(value_:String):void 	{ showCalendar_.popUpPosition = value_ 		}
+			public function get popUpPosition():String 				{ return showCalendar_.popUpPosition		}
+
+			public function get selectedDate():Date 				{ return _date 								};
+			public function set selectedDate(value_:Date):void 		{ 
+				_date = value_; 
+
+				if(value_ && value_!=null && gnncDate.__isValid(value_)){
+					calendar_.selectedDate = value_;
+				}else{
+					button_.label = _labelNull;
+				}
+					
+			};
+
+			private function __start():void
+			{
+				__config();
+			}
+
+			private function __config():void
+			{
+				button_.label = _labelNull;
+				calendar_._changeEvent = __changeDate;
+				
+				if(height!=25){
+					button_.height = height;
+				}
+			}
+
+			private function __changeDate(e:*=null):void
+			{
+				//showCalendar_.displayPopUp = false;
+				_date = calendar_.selectedDate;
+				
+				button_.label = gnncDate.__date2Legend('',_date,true,false,'',true,true);
+			}
+
+			//topLeft,above,below,center,left,right,
+		
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:Button id="button_" minHeight="25" maxHeight="35" height="25" width="100%" icon="{gnncEmbedBlackWhite.bw_calendar_16}" label="" fontWeight="normal" 
+			  click="{showCalendar_.displayPopUp=!showCalendar_.displayPopUp}" />
+	
+	<s:PopUpAnchor id="showCalendar_" popUpPosition="above" width="200" displayPopUp="false" >
+		<s:Group width="100%" height="100%">
+			
+			<s:RectangularDropShadow  left="0" top="0" right="0" bottom="0" 
+									  color="0x648ec3"
+									  distance="0" 
+									  alpha=".5"
+									  blurX="5" blurY="5" 
+									  blRadius="0" brRadius="0"/>
+			
+			<s:Rect left="0" top="0" right="0" bottom="0" radiusX="0" radiusY="0" >
+				<s:fill>
+					<s:LinearGradient rotation="90">
+						<s:GradientEntry color="0xFFFFFF" />
+						<s:GradientEntry color="0xF7F7F7" />
+					</s:LinearGradient>
+				</s:fill>
+				<s:stroke>
+					<s:SolidColorStroke color="0xBBBBBB" weight="1"/>
+				</s:stroke>
+			</s:Rect>
+			
+			<s:VGroup width="100%" gap="0" paddingTop="10">
+				<select:conDateCalendar id="calendar_" width="100%" />
+				<s:Rect height="10"/>
+				<s:HGroup width="100%" gap="-1">
+					<s:Button width="100%" height="25" label="Limpar" 		icon="{gnncEmbedBlackWhite.app_close_16_clean}" 	click="{selectedDate=null; showCalendar_.displayPopUp=!showCalendar_.displayPopUp}" />
+					<s:Button width="100%" height="25" label="Selecionar" 	icon="{gnncEmbedBlackWhite.bw_ok_16}" 				click="{showCalendar_.displayPopUp=!showCalendar_.displayPopUp}" />
+				</s:HGroup>
+			</s:VGroup>
+			
+			<s:Button right="2" top="2" width="10" height="10" click="{showCalendar_.displayPopUp=!showCalendar_.displayPopUp}" tabFocusEnabled="false" toolTip="Fechar"/>
+		
+		</s:Group>
+	</s:PopUpAnchor>
+
+</s:Group>

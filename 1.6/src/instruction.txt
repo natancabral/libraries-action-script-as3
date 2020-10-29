@@ -1,0 +1,46 @@
+
+	<!-- 
+	Flex Compiler Arg
+			App
+					-locale pt_BR -services "GNNC/SERVER/services-config.xml" 
+			Library
+					-locale pt_BR -services "GNNC/dataConnection/AMFPhp/xml/services-config.xml"
+	-->
+
+	<s:WindowedApplication preloader="GNNC.preloader.Preloader">
+		<s:preinitialize>
+			<![CDATA[
+			
+			var gnncValues:gnncStartValues 		= new gnncStartValues();
+			gnncValues.login	 				= true;
+			gnncValues.windowsWidth				= 830;
+			gnncValues.windowsHeight			= 550;
+			gnncValues.windowsMaximized			= true;
+			
+			new gnncStart						(this,'MONEY',gnncValues).__preInitialize(); 
+			new gnncStartAIR					(this,'MONEY',gnncValues).__preInitializeAIR();
+			new gnncStartStyle					(this).__apply();
+			
+			gnncGlobalStatic._programIcon16 	= GNNC.gnncEmbedImage.LOGO_MONEY_16;
+			gnncGlobalStatic._programIcon32 	= GNNC.gnncEmbedImage.LOGO_MONEY_32;
+			gnncGlobalStatic._programIcon48 	= GNNC.gnncEmbedImage.LOGO_MONEY_48;
+			gnncGlobalStatic._programIcon128 	= GNNC.gnncEmbedImage.LOGO_MONEY_128;
+			
+			]]>
+		</s:preinitialize>
+	</s:WindowedApplication>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.gnncEmbedImage;
+			import GNNC.main.gnncStart;
+			import GNNC.main.gnncStartAIR;
+			import GNNC.main.gnncStartStyle;
+			import GNNC.main.gnncStartValues;
+
+			[Bindable] public var _START:gnncStart = new gnncStart(this,'MONEY');
+			
+		]]>
+	</fx:Script>
+	

@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				
+				height="{Number(data.VALUE_ACCOUNT)==0?28:55}" width="100%" 
+				autoDrawBackground="false" fontSize="11" fontWeight="{Number(data.VALUE_ACCOUNT)==0?'normal':'bold'}"
+				xmlns:stage="GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*"
+								
+				>
+	
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.permission.gnncPermission;
+			import GNNC.gnncEmbedBank;
+			import GNNC.gnncEmbedBlackWhite;
+			
+			/*
+			+
+			'\n'+
+			'\nReceita atual do mês: '+(((!gnncPermission.__access('account-safes','v'))?'':gnncDataNumber.__safeReal(data.VALUE_IN))+
+			'\nDespesa atual do mês: '+(((!gnncPermission.__access('account-safes','v'))?'':gnncDataNumber.__safeReal(data.VALUE_OUT))+
+			'\n'+
+			'\nReceita restante do mês: '+(((!gnncPermission.__access('account-safes','v'))?'':gnncDataNumber.__safeReal(data.VALUE_IN_ACCOUNT_MONTH))+
+			'\nDespesa restante do mês: '+(((!gnncPermission.__access('account-safes','v'))?'':gnncDataNumber.__safeReal(data.VALUE_OUT_ACCOUNT_MONTH))+
+			''
+			
+			*/
+			
+			private function __getBank(obj:Object):Object
+			{
+				//if(obj.ACCOUNT_TYPE == 'CCOFRE' || obj.ACCOUNT_TYPE == 'DINHEI')
+				//	return gnncEmbedBlackWhite.bw_financial_16;
+				
+				var x:int = new gnncDataArrayCollection().__getIndex(gnncGlobalArrays._financialBankSimple,'data',obj.BANK);
+				//img_.alpha = x < 0 ? .5 : 1; 
+				return x < 0 ? gnncEmbedBlackWhite.bw_financial_16_account : gnncEmbedBank[gnncGlobalArrays._financialBankSimple.getItemAt(x).image+'_16'];
+			}
+
+			private function title(d:Object):String
+			{
+				var s:String = String(d.NAME);
+				if(s.substr(0,1)=='-')
+					s = s.substring(1);
+				return gnncData.__firstLetterUpperCase(s);
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="hoveredAndShowsCaret,hovered"
+			radiusX="4" radiusY="4"
+			>
+		<s:fill>
+			<s:SolidColor color="0xEEEEEE"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret"
+			radiusX="4" radiusY="4"
+			>
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Group left="0" top="0" right="0" bottom="0" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+			 visible="{Number(data.VALUE_ACCOUNT)==0?false:true}"
+			 >
+		<s:Group left="5" top="5" >
+			<s:Image id="img_" source="{__getBank(data)}" toolTip="{'Conta, Id: '+data.ID}" height="16" width="16"
+					 />
+		</s:Group>
+		<s:Label text="{title(data)}" fontSize="11" left="28" right="5" top="9" maxDisplayedLines="1" showTruncationTip="true"
+				 toolTip="{gnncData.__firstLetterUpperCase(data.NAME)+(data.ALLOW_NEGATIVE==0 ? '' : '\n(Permite saldo negativo)' )}"
+				 />
+		<s:Label text="{data.ACCOUNT_TYPE}" right="5" top="25" fontSize="9" fontWeight="normal" color="0xcccccc" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" />
+		
+		<s:Label text="{(!gnncPermission.__access('account-safes','a'))?'Bloqueado':gnncDataNumber.__safeReal(data.VALUE_ACCOUNT)}" right="5" bottom="6" color="{Number(data.VALUE_ACCOUNT)==0?0x2170cf:Number(data.VALUE_ACCOUNT)>0?0x339900:0xcc3300}" 
+				 color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+				 fontWeight="bold" fontSize="12" verticalAlign="middle"
+				 showTruncationTip="true" maxDisplayedLines="1"
+				 />
+		
+		<s:Label text="{(!gnncPermission.__access('account-safes','a'))?'':gnncDataNumber.__safeReal(data.VALUE_IN_ACCOUNT_MONTH)}" left="5" bottom="18" color="{0x339900}" 
+				 color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" 
+				 fontWeight="normal" fontSize="9" verticalAlign="middle" alpha=".5"
+				 visible="{Number(data.VALUE_IN_ACCOUNT_MONTH)==0?false:true}"
+				 showTruncationTip="true" maxDisplayedLines="1"
+				 toolTip="Receita prevista para o mês atual."
+				 />
+		
+		<s:Label text="{(!gnncPermission.__access('account-safes','a'))?'':gnncDataNumber.__safeReal(data.VALUE_OUT_ACCOUNT_MONTH)}" left="5" bottom="6"  color="{0xcc3300}" 
+				 color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" 
+				 fontWeight="normal" fontSize="9" verticalAlign="middle" alpha=".5" 
+				 visible="{Number(data.VALUE_OUT_ACCOUNT_MONTH)==0?false:true}"
+				 showTruncationTip="true" maxDisplayedLines="1"
+				 toolTip="Despesa prevista para o mês atual."
+				 />
+		
+	</s:Group>
+	
+	<s:HGroup left="5" top="0" right="5" bottom="0" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+			 visible="{Number(data.VALUE_ACCOUNT)!=0?false:true}"
+			 gap="1" verticalAlign="middle"
+			 >
+		<s:Image source="{__getBank(data)}" toolTip="{'Conta, Id: '+data.ID}" height="16" width="16"
+				 />
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME)}" width="100%" fontSize="11" maxDisplayedLines="1" showTruncationTip="true" 
+				 color="0x777777" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+				 paddingLeft="5"
+				 />
+		<s:Label text="{(!gnncPermission.__access('account-safes','a'))?'Bloqueado':gnncDataNumber.__safeReal(data.VALUE_ACCOUNT)}" right="5" bottom="6" 
+				 color="0xcccccc" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+				 fontWeight="bold" fontSize="11" verticalAlign="middle"
+				 showTruncationTip="false" maxDisplayedLines="1"
+				 />
+		
+	</s:HGroup>
+
+	<s:Group width="10" height="10" top="5" right="5" visible="{Number(data.VALUE_ACCOUNT)==0?false:data.ALLOW_NEGATIVE==0?false:true}"
+			 toolTip="Permitido saldo negativo"
+			 >
+		<s:Rect width="10" height="10" radiusX="5" radiusY="5">
+			<s:fill>
+				<s:LinearGradient rotation="90">
+					<s:GradientEntry color="0xff9900"/>
+					<s:GradientEntry color="0xff9900"/>
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+		<s:Rect width="8" height="2" horizontalCenter="0" verticalCenter="0">
+			<s:fill>
+				<s:SolidColor color="0xff0000"/>
+			</s:fill>
+		</s:Rect>
+	</s:Group>
+	
+	<elements:elementHLine bottom="0" left="0" right="0" _COLOR="0xeeeeee" includeIn="normal,normalAndShowsCaret"/>
+	
+</s:ItemRenderer>

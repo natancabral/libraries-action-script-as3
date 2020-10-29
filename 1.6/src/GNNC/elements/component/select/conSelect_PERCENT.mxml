@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="100%" height="25">
+	<fx:Declarations>
+	</fx:Declarations>
+	<s:layout>
+		<s:HorizontalLayout gap="2" verticalAlign="middle" />
+	</s:layout>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.globals.gnncGlobalArrays;
+			
+			import mx.collections.ArrayCollection;
+			
+			[Bindable] public var _PERCENT_NUMBER:uint = 0;
+			
+			private const _PERCENT_STEP:ArrayCollection = new ArrayCollection([
+				{NAME: '0%', 	DATA: 0},
+				{NAME: '5%', 	DATA: 5},
+				{NAME: '10%', 	DATA: 10},
+				{NAME: '15%', 	DATA: 15},
+				{NAME: '20%', 	DATA: 20},
+				{NAME: '25%', 	DATA: 25},
+				{NAME: '30%', 	DATA: 30},
+				{NAME: '40%', 	DATA: 40},
+				{NAME: '50%', 	DATA: 50},
+				{NAME: '60%', 	DATA: 60},
+				{NAME: '70%', 	DATA: 70},
+				{NAME: '80%', 	DATA: 80},
+				{NAME: '90%', 	DATA: 90},
+				{NAME: '100%', 	DATA: 100},
+			])
+
+			private function __CHANGE_COLOR(ID_NAME_:String):void
+			{
+				if(ID_NAME_ == 'PERCENT_STEP_')
+				{
+					_PERCENT_NUMBER 		= P_STEP_.selectedItem.DATA; 
+				}
+				else if(ID_NAME_ == 'PERCENT_NUMBER_')
+				{
+					_PERCENT_NUMBER 		= P_NUMBER_.value; 
+				}
+				
+				//P_NAME_.text				= _PERCENT_NUMBER + '%';
+				//P_NUMBER_.value				= _PERCENT_NUMBER;
+				//P_COLOR_LEVEL_.color		= uint(new ARRAYS()._TIMELINECOLOR_COLLECTION.getItemAt(Math.round(_PERCENT_NUMBER/2)));
+			}
+
+			
+		]]>
+	</fx:Script>
+	<s:Rect width="25" height="25" radiusX="3" radiusY="3" >
+		<s:fill>
+			<s:SolidColor id="P_COLOR_LEVEL_" color="{uint(gnncGlobalArrays._TIMELINECOLOR_COLLECTION.getItemAt(_PERCENT_NUMBER))}" />
+		</s:fill>
+	</s:Rect>
+	<s:Group width="100%" height="25">
+		<s:Rect width="100%" height="25" radiusX="3" radiusY="3" >
+			<s:fill>
+				<s:LinearGradient>
+					<s:GradientEntry color="{uint(gnncGlobalArrays._TIMELINECOLOR_COLLECTION.getItemAt(0))}" />
+					<s:GradientEntry color="{uint(gnncGlobalArrays._TIMELINECOLOR_COLLECTION.getItemAt(20))}" />
+					<s:GradientEntry color="{uint(gnncGlobalArrays._TIMELINECOLOR_COLLECTION.getItemAt(40))}" />
+					<s:GradientEntry color="{uint(gnncGlobalArrays._TIMELINECOLOR_COLLECTION.getItemAt(60))}" />
+					<s:GradientEntry color="{uint(gnncGlobalArrays._TIMELINECOLOR_COLLECTION.getItemAt(80))}" />
+					<s:GradientEntry color="{uint(gnncGlobalArrays._TIMELINECOLOR_COLLECTION.getItemAt(100))}" />
+				</s:LinearGradient>
+			</s:fill>
+		</s:Rect>
+		<s:HSlider id="P_NUMBER_" value="{_PERCENT_NUMBER}" left="15" right="15" change="{__CHANGE_COLOR('PERCENT_NUMBER_')}" minimum="0" maximum="100" verticalCenter="0" />
+	</s:Group>
+	<s:Label id="P_NAME_" text="{_PERCENT_NUMBER+'%'}" fontSize="12" fontWeight="bold" width="50" textAlign="right" paddingRight="10" />
+	<s:DropDownList id="P_STEP_" width="100" height="25" dataProvider="{_PERCENT_STEP}" labelField="NAME" change="{__CHANGE_COLOR('PERCENT_STEP_')}" prompt="Selecione..." />
+
+</s:Module>

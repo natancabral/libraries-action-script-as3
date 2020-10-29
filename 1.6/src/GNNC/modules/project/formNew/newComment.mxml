@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module 
+	xmlns:fx="http://ns.adobe.com/mxml/2009" 
+	xmlns:s="library://ns.adobe.com/flex/spark" 
+	xmlns:mx="library://ns.adobe.com/flex/mx" 
+	
+	width="400" height="400"
+	
+	creationComplete="{__start()}" 
+	
+	xmlns:select="GNNC.elements.component.select.*" 
+	xmlns:stage="GNNC.elements.stage.*" 
+	xmlns:elements="GNNC.UI.elements.*" 
+	xmlns:gnncTextEdit="GNNC.UI.gnncTextEdit.*" 
+	>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_comment;
+			
+			import mx.rpc.Fault;
+			import mx.rpc.events.ResultEvent;
+			
+			private var _connComment:gnncAMFPhp 		= new gnncAMFPhp();
+			
+			[Bindable] public  var _tableComment:table_comment 	= new table_comment();
+			[Bindable] public  var _MIX:String = 'COMMENT';
+			
+			public var _CHANGE:Boolean = false;
+			
+			private var _gnncPopUp:gnncPopUp = new gnncPopUp();
+			
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void
+					{
+						if(gnncKeyboard.__CONTROL_ENTER(event)) __save();
+					}
+				);
+				
+				__checkEdit();
+				callLater(__firstInput);
+			}
+			
+			public function __firstInput():void 
+			{ 
+				MESSAGE_.setFocus();
+			}
+			
+			private function __checkEdit():void
+			{
+				if(_tableComment != null)
+				{
+					if(_tableComment.ID)
+					{
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						var _SQL:String 		= new gnncSql().__SELECT(new table_comment(_tableComment.ID));
+						_connComment.__sql				(_SQL,'','',__fResult,__fFault);
+					}
+				} 
+				else 
+				{
+					_tableComment = new table_comment();
+				}
+			}
+			
+			protected function __fFault(e:*):void
+			{
+				_gnncPopUp.__close();
+			}
+			
+			protected function __fResult(e:*):void
+			{
+				if(!_connComment.DATA_ROWS)
+					return;
+				
+				var _object:Object 			= _connComment.DATA_ARR.getItemAt(0);
+				
+				_tableComment.ID			= _object.ID;
+				_tableComment.ID_CLIENT		= _object.ID_CLIENT;
+				_tableComment.ID_PROJECT	= _object.ID_PROJECT;
+				_tableComment.ID_STEP		= _object.ID_STEP;
+				_tableComment.ID_JOB 		= _object.ID_JOB;
+
+				_tableComment.ID_USER		= _object.ID_USER;
+
+				MESSAGE_.text				= _object.MESSAGE;
+				
+				/*_tableComment.ID_DEPARTAMENT	= _object.ID_DEPARTAMENT;
+				_tableComment.ID_GROUP		= _object.ID_GROUP;
+				_tableComment.ID_CATEGORY		= _object.ID_CATEGORY;*/
+				
+				_tableComment.DATE_FINAL		= _object.DATE_FINAL;
+				/*_tableComment.DATE_CANCELED		= _object.DATE_CANCELED*/;
+				
+				_tableComment.ACTIVE			= _object.ACTIVE;
+				/*_tableComment.VISIBLE			= _object.VISIBLE;
+				_tableComment.CONTROL			= _object.CONTROL;*/
+				
+				_gnncPopUp.__close();
+			}
+			
+			private function __close():void
+			{
+				new gnncPopUp().__close(this);
+			}
+			
+			private function __save():void
+			{
+				if(!MESSAGE_.text)
+				{
+					new gnncAlert().__alert('O commentário é obrigatórios.');
+					return
+				}
+				
+				_gnncPopUp.__loading();
+				
+				var mm:String = gnncData.__trimText(MESSAGE_.text);
+				
+				mm = gnncData.__replace(mm,'´','\"');
+				mm = gnncData.__replace(mm,'`','\"');
+				mm = gnncData.__replace(mm,'"','\"');
+				mm = gnncData.__replace(mm,"'",'\"');
+				mm = gnncData.__replace(mm,'\\','\\\\');
+				mm = gnncData.__replace(mm,'  ',' ');
+				mm = gnncData.__replace(mm,'  ',' ');
+				
+				var _object:table_comment 		= new table_comment();
+				
+				_object.ID					= _tableComment.ID;
+				_object.ID_CLIENT			= _tableComment.ID_CLIENT > 0 ? _tableComment.ID_CLIENT : gnncGlobalStatic._userIdClient;
+				_object.ID_PROJECT			= _tableComment.ID_PROJECT;
+				_object.ID_STEP				= _tableComment.ID_STEP;
+				_object.ID_JOB 				= _tableComment.ID_JOB;
+				
+				_object.ID_USER				= _tableComment.ID_USER > 0 ? _tableComment.ID_USER : gnncGlobalStatic._userId;
+				
+				_object.MESSAGE				= mm; //Description in List
+				
+				/*_object.ID_DEPARTAMENT		= _tableComment.ID_DEPARTAMENT;
+				_object.ID_GROUP			= _tableComment.ID_GROUP;
+				_object.ID_CATEGORY			= _tableComment.ID_CATEGORY;*/
+				
+				_object.ACTIVE				= _tableComment.ACTIVE;
+				/*_object.CONTROL				= _tableComment.CONTROL;
+				_object.VISIBLE				= _tableComment.VISIBLE;*/
+				
+				var _sql:String = new gnncSql().__INSERT(_object,false,true,true);
+				
+				_connComment.__sql	(_sql,'','',__FRESULT,__FFAULT);
+			}
+			
+			protected function __FRESULT(event:*):void
+			{
+				_CHANGE 			= true;
+				_gnncPopUp.__close	();
+				__close				();
+			}
+			
+			protected function __FFAULT(event:*):void
+			{
+				_gnncPopUp.__close();
+			}
+			
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<elements:elementStageBox/>
+	
+	<mx:ViewStack id="panelCenter_" top="10" left="10" right="10" bottom="42">
+		<s:NavigatorContent label="" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:VerticalLayout gap="1" paddingTop="12"/>
+			</s:layout>
+			
+			<s:Group width="100%" height="100%">
+				<s:TextArea id="MESSAGE_" width="100%" height="100%" fontSize="12" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="15" borderVisible="false" focusAlpha="0"/>
+				<s:Rect left="0" top="0" right="0" height="5" radiusX="0" radiusY="0">	
+					<s:fill>
+						<s:LinearGradient rotation="83">
+							<s:GradientEntry color="0x3785e2" />
+							<s:GradientEntry color="0x2170cf" />
+						</s:LinearGradient>
+					</s:fill>
+				</s:Rect>	
+			</s:Group>
+			
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:Group left="0" bottom="0" right="0">
+		<s:Rect width="100%" height="34">
+			<s:fill>
+				<s:SolidColor color="0xdddddd" />
+			</s:fill>
+		</s:Rect>
+		<s:HGroup width="100%" height="34" gap="2" verticalAlign="middle" paddingLeft="5" paddingRight="5" >
+			<s:Rect width="100%" />
+			<s:Button icon="{_tableComment.ID?gnncEmbedBlackWhite.bw_edit_16:gnncEmbedBlackWhite.bw_new_16}" label="{_tableComment.ID?'Salvar Edição':'Cadastrar (Ctrl+Enter) '}" click="{__save()}" fontWeight="bold" />
+			<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" />	
+		</s:HGroup>
+	</s:Group>
+	
+	<s:Button top="10" right="10" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

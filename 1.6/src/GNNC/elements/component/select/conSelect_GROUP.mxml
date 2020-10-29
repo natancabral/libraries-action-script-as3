@@ -1,0 +1,342 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  creationComplete="{__start()}" 
+		  width="100%" height="25" 
+		  >
+	<s:layout>
+		<s:HorizontalLayout gap="2" verticalAlign="middle"/>
+	</s:layout>
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncBook.book.limited;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.data.gnncDataObject;
+			import GNNC.data.globals.gnncGlobalLog;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.modules.group.formNew.newGroup;
+			import GNNC.sqlTables.table_group;
+			import GNNC.time.gnncFunctions;
+			
+			import mx.collections.ArrayCollection;
+			import mx.collections.IList;
+			import mx.core.IVisualElement;
+			import mx.events.FlexEvent;
+			
+			import spark.events.DropDownEvent;
+			import spark.events.IndexChangeEvent;
+			
+			[Bindable] private var _gnncGlobal:gnncGlobalStatic	= new gnncGlobalStatic(true);
+			
+			public var _myMix:String 						= 'GROUP';
+			
+			public const _component:String 					= 'GROUP';
+			public const _name:String 						= 'Grupo';
+			public const _iconComponent:Object 				= gnncEmbedBlackWhite.bw_series_group_16;
+			public const _iconClear:Object 					= gnncEmbedBlackWhite.bw_clear_14_selection;
+			public const _iconNew:Object 					= gnncEmbedBlackWhite.bw_series_group_16_new;
+			public const _iconEdit:Object 					= gnncEmbedBlackWhite.bw_series_group_16_edit;
+			public const _iconRemove:Object 				= gnncEmbedBlackWhite.bw_series_group_16_delete;
+			
+			public var _ICON:Boolean 						= true;
+			public var _ADD:Boolean 						= true;
+			public var _EDIT:Boolean 						= false;
+			public var _DELETE:Boolean 						= false;
+			public var _FILTER:Boolean 						= false;
+			
+			public var setWidthFix:Boolean = false;
+
+			public function set _MIX(value_:String)			:void{ _myMix = value_; __refresh() };
+			public function get _MIX()						:String{ return _myMix };
+
+			public function set prompt(value_:String)		:void{ LIST_.prompt = value_ };
+			public function get prompt()					:String{ return LIST_.prompt };
+
+			public function set dataProvider(value_:IList)	:void{ LIST_.dataProvider = value_ };
+			public function get dataProvider()              :IList{ return LIST_.dataProvider };
+
+			public function set selectedIndex(value_:int)	:void{ LIST_.selectedIndex = value_ };
+			public function get selectedIndex()	:int{ 		return LIST_.selectedIndex };
+
+			public function get selectedItem():Object{ 		return LIST_.selectedIndex>-1?LIST_.selectedItem:null; };
+
+			public function set value(value_:uint)			:void{ __selectedId(value_) };
+			public function get value()						:uint{ return LIST_.selectedIndex>-1?LIST_.selectedItem.ID:0 };
+
+			public function get label()						:String{ return LIST_.selectedIndex>-1?String(LIST_.selectedItem.NAME):'' };
+
+			public var _CHANGE_EVENT:Function = function(e:IndexChangeEvent):void{ };
+			
+			private var cloneFilter:ArrayCollection = new ArrayCollection();
+			private var idPrivateFilter:int = 0;
+			
+			private function __start():void
+			{
+				if(this.height!=25)
+				{
+					var h:Number = this.height;
+					LIST_.height        = h;
+					buttonClear.height  = buttonClear.width  = h;
+					buttonNew.height    = buttonNew.width    = h;
+					buttonEdit.height   = buttonEdit.width   = h;
+					buttonDelete.height = buttonDelete.width = h;
+					
+					buttonFilter.width = buttonFilter.height = 
+					filterTextList_.width = filterTextList_.height = h;
+				}
+				
+				filterTextList_.addEventListener(KeyboardEvent.KEY_UP,filterKeyBoard);
+				LIST_.addEventListener(DropDownEvent.CLOSE,closeDropDownList);
+				LIST_.addEventListener(IndexChangeEvent.CARET_CHANGE,changeEventCaret);
+				LIST_.addEventListener(FlexEvent.VALUE_COMMIT,changeEventCommit);
+				//LIST_.addEventListener(DropDownEvent.OPEN ,openDropDownList);
+				//filter_.addEventListener(KeyboardEvent.KEY_UP,filterDropDownList);
+
+				if(!_MIX){
+					new gnncAlert().__error(_name+'.Administrador, selecione um MIX.');
+					this.enabled = false;
+				}
+				
+				if(!_ICON) 		removeElement(icon);
+				if(!_ICON) 		removeElement(margin);
+				
+				if(!_ADD) 		removeElement(buttonNew);
+				if(!_EDIT) 		removeElement(buttonEdit);
+				if(!_DELETE) 	removeElement(buttonDelete);
+				if(!_FILTER) 	removeElement(buttonFilter);
+				
+				callLater(resizeDropDownList);
+			}
+
+			private function setOnItem():void
+			{
+				callLater(function():void{
+					if(LIST_.dataProvider.length==1)
+						LIST_.selectedIndex = 0;
+				});
+			}
+
+			private function resizeDropDownList():void
+			{
+				var fi:String = gnncData.__trimText(gnncDataObject.__getClassName(IVisualElement(Object(owner))));
+
+				setWidthFix = fi == 'FormItem' ? true : false ;
+
+				if(setWidthFix)
+					gnncFunctions.delayedCall(function():void{
+						var w:Number = Number(LIST_.width);
+						LIST_.width = w;
+						LIST_.maxWidth = w;
+					},100);
+				new gnncDataBindable().__monitoring(_gnncGlobal._GROUP,'DATA_ARR',__refresh);
+				__refresh();
+			}
+			
+			private function filterKeyBoard(e:KeyboardEvent):void
+			{
+				//gnncKeyboard.__stopPropagation(e);
+				//e.stopPropagation();
+
+				//getCloneFilter();
+				LIST_.openDropDown();
+				LIST_.selectedIndex = -1;
+				var arr:ArrayCollection = gnncData.__clone(cloneFilter) as ArrayCollection;
+				var arc:ArrayCollection = new gnncDataArrayCollection().__filterNumeric(arr,'ACTIVE',0);
+			    arc = new gnncDataArrayCollection().__filter(arc,'NAME',filterTextList_.text);
+				LIST_.dataProvider = arc;
+				LIST_.openDropDown();
+				LIST_.selectedIndex = -1;
+
+				if(gnncKeyboard.__ENTER(e)){
+					//LIST_.openDropDown();
+					//if(LIST_.dataProvider.length > 0)
+					//	LIST_.selectedIndex = 0;
+					
+					if(LIST_.dataProvider.length==1){
+						LIST_.setFocus();
+						//idPrivateFilter = LIST_.selectedItem.ID;
+						LIST_.closeDropDown(false);
+						LIST_.selectedIndex = 0;
+					}
+					filterTextList_.visible = false;
+					filterTextList_.text = '';					
+					return;
+				}
+				if(e.keyCode == Keyboard.DOWN){
+					LIST_.setFocus();
+					if(LIST_.dataProvider.length>0)
+					LIST_.selectedIndex = 0;
+					//gnncKeyboard.__stopPropagation(e);
+					return;
+				}
+				if(e.keyCode == Keyboard.UP){
+					LIST_.setFocus();
+					if(LIST_.dataProvider.length>0)
+						LIST_.selectedIndex = 0;
+					//gnncKeyboard.__stopPropagation(e);
+					return;
+				}
+			}
+
+			public function __changeEvent(e:IndexChangeEvent):void
+			{
+				icon.toolTip  = _name+', Id: '+value;
+				//indexPrivate  = selectedIndex;// = selectedIndex;
+				
+				if(selectedIndex<0)
+					return;
+				
+				//gnncGlobalLog.__add('__changeEvent1:'+LIST_.selectedIndex);
+				idPrivateFilter = LIST_.dataProvider.getItemAt(selectedIndex).ID;
+				//gnncGlobalLog.__add('__changeEvent2:'+LIST_.selectedIndex);
+			}
+			
+			private function changeEventCaret(e:*=null):void
+			{
+				//gnncGlobalLog.__add('changeEventCaret:'+LIST_.selectedIndex);
+
+			}
+
+			private function changeEventCommit(e:*=null):void
+			{
+				//gnncGlobalLog.__add('changeEventCommint:'+LIST_.selectedIndex);
+			}
+			
+			private function closeDropDownList(e:*=null):void
+			{
+				if(selectedIndex<0)
+					return;
+
+				var idx:int;
+				if(idPrivateFilter>0)
+				  idx = new gnncDataArrayCollection().__getIndex(cloneFilter,'ID',idPrivateFilter,true);
+
+				//gnncGlobalLog.__add('closeDropDownList1:'+LIST_.selectedIndex);
+
+				LIST_.dataProvider = cloneFilter;
+				//callLater(function():void{
+				//@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ PROBLEMA AQUI
+				
+				if(idx>0)
+					LIST_.selectedIndex = idx;
+					//LIST_.selectedIndex = idx;
+					//gnncGlobalLog.__add('close 3');
+				//});
+
+				//gnncGlobalLog.__add('closeDropDownList2:'+LIST_.selectedIndex);
+
+				filterTextList_.text    = '';
+				filterTextList_.visible = false;
+
+			}
+			
+			private function __refresh(e:*=null):void
+			{
+				if(_gnncGlobal._GROUP.DATA_ROWS)
+					LIST_.dataProvider = cloneFilter = new gnncDataArrayCollection().__hierarchy(new gnncDataArrayCollection().__filter(_gnncGlobal._GROUP.DATA_ARR,'MIX',_MIX,false));
+				callLater(setOnItem);
+			}
+			
+			private function __selectedId(value_:uint):void
+			{
+				if(LIST_.dataProvider.length)
+					LIST_.selectedIndex = new gnncDataArrayCollection().__getIndex(LIST_.dataProvider as ArrayCollection,'ID',value_);
+				callLater(setOnItem);
+			}
+			
+			private function __NEW():void
+			{
+				var _page:newGroup 		= new newGroup();
+				_page._MIX 					= _MIX;
+				new gnncPopUp().__creation	(_page);
+			}
+			
+			private function __EDIT():void
+			{
+				if(LIST_.selectedIndex<0)
+					return;
+				
+				var _obj:Object				= LIST_.selectedItem;
+				var _page:newGroup 			= new newGroup();
+				_page._MIX 					= _MIX;
+				_page._TABLE_GROUP 			= new table_group(_obj.ID);
+				new gnncPopUp().__creation	(_page);
+			}
+			
+			private function __DELETE():void
+			{
+				new gnncAlert().__error('Não suportando abrir a janela. v1.5');
+				//new DAYBYDAY_MODULES(parentApplication).__DEPARTAMENT(_MIX);
+			}
+			
+			public function __CLEAR():void
+			{
+				value = 0;
+				if(cloneFilter.length>0)
+					LIST_.dataProvider = cloneFilter;
+				LIST_.selectedIndex = -1;
+				_CHANGE_EVENT(null);				
+			}
+			
+			private function __labelFuncton(item:Object):String
+			{
+				return gnncData.__firstLetterUpperCase(item.NAME);
+			}
+			
+			/*
+			labelFunction="__labelFuncton" 
+			*/
+
+		]]>
+	</fx:Script>
+	
+	<s:Image id="icon" source="{_iconComponent}" toolTip="{_name+', ID: 0'}" />
+	<s:Rect id="margin" width="3" />
+
+	<s:Button id="buttonFilter" icon="{gnncEmbedBlackWhite.bw_search_16}" width="25" height="25" 
+			  click="{filterTextList_.visible = !filterTextList_.visible; filterTextList_.setFocus();}"
+			  focusEnabled="false" tabEnabled="false"
+			  />
+
+	<!-- s:TextInput id="filterTextList_" width="25" height="25" 
+				 keyUp="{__filterList()}" 
+				 prompt="Filtrar listagem..."/ -->
+
+	<s:Group width="100%">
+		
+		<s:DropDownList id="LIST_" width="100%" minWidth="100" height="25" prompt="Selecione..."  
+						dataProvider="{new ArrayCollection()}"
+						labelField="NAME" change="{__changeEvent(event); _CHANGE_EVENT(event); }" 
+						labelFunction="__labelFuncton" enabled="{LIST_.dataProvider.length>0?true:false}" 
+						itemRenderer="GNNC.skin.dropDownList.itemRender.itemRender_hierarchyWithTitle_forList"
+						/>
+
+		<s:TextInput id="filterTextList_" left="0" top="0" bottom="0" width="70%" height="25" 
+					 paddingLeft="7" paddingRight="7" 
+					 visible="{ false }" prompt="Filtrar listagem..."
+					 focusOut="{ /*filterTextList_.visible = false; ;*/ filterTextList_.text = ''}"
+					 />
+	</s:Group>
+
+	<!-- s:ComboBox id="LIST_" width="100%" minWidth="100" height="25" prompt="Selecione..."  
+					dataProvider="{new ArrayCollection()}" 
+					labelField="NAME" change="{__changeEvent(event); _CHANGE_EVENT(event); }" 
+					enabled="{LIST_.dataProvider.length>0?true:false}" 
+					itemRenderer="GNNC.skin.dropDownList.itemRender.itemRender_hierarchyWithTitle_forList"
+					/ -->
+
+	<s:Button id="buttonClear"		icon="{_iconClear}	"		width="25" toolTip="Limpar seleção" 	click="{__CLEAR()}" skinClass="GNNC.skin.button.skin_buttonLink" focusEnabled="false" tabEnabled="false" />
+	<s:Button id="buttonNew" 		icon="{_iconNew}"			width="25" toolTip="Novo" 				click="{__NEW()}" focusEnabled="false" tabEnabled="false" />
+	<s:Button id="buttonEdit" 		icon="{_iconEdit}"			width="25" toolTip="Editar" 			click="{__EDIT()}" focusEnabled="false" tabEnabled="false" />
+	<s:Button id="buttonDelete" 	icon="{_iconRemove}" 		width="25" toolTip="Excluir" 			click="{__DELETE()}" focusEnabled="false" tabEnabled="false" />
+	
+</s:Group>

@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="600" height="400" 
+		  
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:select			= "GNNC.elements.component.select.*" 
+		  xmlns:stage			= "GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:gnncDateField4	= "GNNC.UI.gnncDateField4.*" 
+		  xmlns:list			= "GNNC.elements.component.list.*" xmlns:gnncDateButton="GNNC.UI.gnncDateButton.*" 
+		  
+		  >
+	<fx:Script>		
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.globals.gnncGlobalStaticProjects;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.sqlTables.table_job;
+			import GNNC.sqlTables.table_project_team;
+			
+			public var _tableJob:table_job = new table_job();
+			public const _MIX:String = 'JOB';
+			
+			private var _connJob:gnncAMFPhp		= new gnncAMFPhp();
+			private var _gnncPopUp:gnncPopUp 	= new gnncPopUp();
+			
+			public var _change:Boolean 			= false;
+
+			public var _nameClient:String 		= '';
+			public var _nameProject:String 		= '';
+			public var _nameStep:String 		= '';
+
+			private function __start():void
+			{
+				this.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void{
+						//if(gnncKeyboard.__CONTROL_ENTER(event)) __save();
+					}
+				)
+				
+				TITLE_.addEventListener(KeyboardEvent.KEY_DOWN,
+					function(event:KeyboardEvent):void{
+						if(!gnncKeyboard.__ENTER(event))
+							return;
+						
+						TITLE_.text = gnncData.__trimText(TITLE_.text);
+						MESSAGE_.setFocus();
+					}
+				);
+				
+				callLater(function():void{
+					TITLE_.setFocus();
+				});
+				
+				__check();
+				__calendarShow();
+				__calendarShow();
+				__setValuesInit();
+			}
+
+			private function __setValuesInit():void
+			{
+				if(Number(_tableJob.ID_CLIENT)==0 && _tableJob.ID==0 && String(_tableJob.TITLE).length>0){
+					new gnncNotification().__show('Cliente indefinido','Os Jobs são vinculados à clientes.');
+					__close();
+					return;
+				}
+				
+				var tt:String = gnncData.__trimText(_tableJob.TITLE);
+				var mm:String = gnncData.__trimText(_tableJob.MESSAGE);
+				
+				tt = gnncData.__replace(tt,"\t",' ');
+				tt = gnncData.__replace(tt,"\\t",' ');
+				tt = gnncData.__replace(tt,'´','\"');
+				tt = gnncData.__replace(tt,'`','\"');
+				tt = gnncData.__replace(tt,'"','\"');
+				tt = gnncData.__replace(tt,"'",'\"');
+				tt = gnncData.__replace(tt,'\\','\\\\');
+				tt = gnncData.__replace(tt,'  ',' ');
+				tt = gnncData.__replace(tt,'  ',' ');
+				
+				mm = gnncData.__replace(mm,"\t",' ');
+				mm = gnncData.__replace(mm,"\\t",' ');
+				mm = gnncData.__replace(mm,'´','\"');
+				mm = gnncData.__replace(mm,'`','\"');
+				mm = gnncData.__replace(mm,'"','\"');
+				mm = gnncData.__replace(mm,"'",'\"');
+				mm = gnncData.__replace(mm,'\\','\\\\');
+				mm = gnncData.__replace(mm,'  ',' ');
+				mm = gnncData.__replace(mm,'  ',' ');
+				
+				TITLE_.text   = tt;
+				MESSAGE_.text = mm;
+				
+				if(gnncGlobalStatic._userClient==true){
+					PUBLIC_0_.selected = false;
+					PUBLIC_2_.selected = false;
+					PUBLIC_1_.selected = true;
+					publicGroup_.enabled = false;
+				}
+				
+				dateStart_.selectedDate = new Date();
+				dateEnd_.selectedDate = new Date();
+				
+				dateStart_.eventChange = __changeDate;
+				dateEnd_.eventChange = __changeDate;
+
+				//if(_tableJob.ID==0)
+					//_tableJob.ID_CLIENT_INSERT = gnncGlobalStatic._userIdClient;
+			}
+			
+			
+			private function __check():void
+			{
+				if(_tableJob != null)
+				{
+					if(Number(_tableJob.ID)>0)
+					{
+						var _columns:Array = ["*"/*,
+						"coalesce((select NAME from dbd_client  where dbd_client.ID  = dbd_job.ID_CLIENT  ),'') NAME_CLIENT",
+						"coalesce((select name from dbd_project where dbd_project.ID = dbd_job.ID_PROJECT ),'') NAME_PROJECT",
+						"coalesce((select name from dbd_step    where dbd_step.ID    = dbd_job.ID_STEP	  ),'') NAME_STEP"*/
+						];
+						
+						_gnncPopUp.__loading	('Recolhendo dados...');
+						var _sql:String 		= new gnncSql().__SELECT(new table_job(_tableJob.ID),false,_columns);
+						_connJob.__sql			(_sql,'','',__fResultEdit,__fFaultEdit);
+						return;
+					}
+				}
+				__configTeam();
+			}
+
+			protected function __fFaultEdit(event:*):void
+			{
+				_gnncPopUp.__close();
+				new gnncAlert().__error('Não foi possível carregar as informações. Tente novamente.');
+				__close();
+			}
+			
+			protected function __fResultEdit(event:*):void
+			{
+				__calendarShow();
+				
+				if(!_connJob.DATA_ROWS)
+				{
+					new gnncAlert().__error('O identificador não foi encontrado. Tente novamente.');
+					__close();
+					return;
+				}
+				
+				var o:Object					= _connJob.DATA_ARR.getItemAt(0);
+				
+				_tableJob.ID_KEY 				= o.ID_KEY;
+				_tableJob.ID 					= o.ID;
+				_tableJob.ID_CLIENT 			= o.ID_CLIENT;
+				_tableJob.ID_PROJECT 			= o.ID_PROJECT;
+				_tableJob.ID_STEP 				= o.ID_STEP;
+				_tableJob.ID_USER 				= o.ID_USER;
+				_tableJob.ID_CLIENT_INSERT      = uint(o.ID_CLIENT_INSERT) > 0 ? uint(o.ID_CLIENT_INSERT) : gnncGlobalStatic._userIdClient ;
+
+				_tableJob.IDS_CLIENT_TEAM       = o.IDS_CLIENT_TEAM;
+
+				TITLE_.text 					= gnncData.__trimText(o.TITLE);
+				MESSAGE_.text 					= o.MESSAGE;
+				
+				_tableJob.KANBAN 			    = o.KANBAN;
+				
+				dateStart_.selectedDate 		= gnncDate.__string2Date(o.DATE_START,false);
+				dateEnd_.selectedDate 			= gnncDate.__string2Date(o.DATE_END,false);
+				_tableJob.DATE_FINAL			= o.DATE_FINAL;
+				_tableJob.DATE_CANCELED			= o.DATE_CANCELED;
+				
+				//_tableJob.ACTIVE 				= o.ACTIVE;designergnnc
+				
+				_tableJob.VISIBLE 				= o.VISIBLE;
+				_tableJob.CONTROL				= o.CONTROL;
+				
+				//###
+				
+				__setActive(uint(o.ACTIVE));
+				
+				PUBLIC_0_.selected = Number(o.PUBLIC)==0?true:false;
+				PUBLIC_1_.selected = Number(o.PUBLIC)==1?true:false;
+				PUBLIC_2_.selected = Number(o.PUBLIC)==2?true:false;
+				
+				_tableJob.ORDER_ITEM = o.ORDER_ITEM;
+
+				__calendarShow();
+				__configTeam();
+			}
+			
+			private function __close():void
+			{
+				_gnncPopUp.__close(this);
+			}
+			
+			private function __calendarShow():void
+			{
+				panel_.selectedIndex = 0;
+				currentState = currentState == 'calendar' ? 'normal' : 'calendar';
+			}
+			
+			private function __save():void
+			{
+				if(gnncData.__trimText(TITLE_.text).length < 3){
+					panel_.selectedIndex = 0;
+					TITLE_.setFocus();
+					return ;
+				}
+
+				if(_tableJob.ID_CLIENT==0 || _tableJob.ID_PROJECT==0 ){
+					panel_.selectedIndex = 0;
+					__changeHierarchy();
+					return;
+				}
+				
+				_gnncPopUp.__loading();
+				
+				_tableJob.ID_KEY = _tableJob.ID_KEY ? _tableJob.ID_KEY : gnncDataRand.__key();
+				
+				var tt:String = gnncData.__trimText(TITLE_.text);
+				var mm:String = gnncData.__trimText(MESSAGE_.text);
+				
+				tt = gnncData.__replace(tt,"\t",' ');
+				tt = gnncData.__replace(tt,"\\t",' ');
+				tt = gnncData.__replace(tt,'´','\"');
+				tt = gnncData.__replace(tt,'`','\"');
+				tt = gnncData.__replace(tt,'"','\"');
+				tt = gnncData.__replace(tt,"'",'\"');
+				tt = gnncData.__replace(tt,'\\','\\\\');
+				tt = gnncData.__replace(tt,'  ',' ');
+				tt = gnncData.__replace(tt,'  ',' ');
+				
+				mm = gnncData.__replace(mm,"\t",' ');
+				mm = gnncData.__replace(mm,"\\t",' ');
+				mm = gnncData.__replace(mm,'´','\"');
+				mm = gnncData.__replace(mm,'`','\"');
+				mm = gnncData.__replace(mm,'"','\"');
+				mm = gnncData.__replace(mm,"'",'\"');
+				mm = gnncData.__replace(mm,'\\','\\\\');
+				mm = gnncData.__replace(mm,'  ',' ');
+				mm = gnncData.__replace(mm,'  ',' ');
+
+				var t:table_job  	= new table_job();
+				
+				t.ID_KEY 			= _tableJob.ID_KEY;
+				
+				t.ID 				= _tableJob.ID;
+				t.ID_CLIENT 		= _tableJob.ID_CLIENT;
+				t.ID_PROJECT 		= _tableJob.ID_PROJECT; ////PROJECT_.value;
+				t.ID_STEP 			= _tableJob.ID_STEP; ////STEP_.value;
+				t.ID_USER 			= _tableJob.ID_USER ? _tableJob.ID_USER : gnncGlobalStatic._userId;
+				t.ID_CLIENT_INSERT  = uint(_tableJob.ID_CLIENT_INSERT) > 0 ? uint(_tableJob.ID_CLIENT_INSERT) : gnncGlobalStatic._userIdClient ;
+				
+				t.IDS_CLIENT_TEAM   = _tableJob.IDS_CLIENT_TEAM;
+				
+				t.TITLE 			= tt;
+				t.MESSAGE 			= mm;
+				
+				t.MIX               = _MIX;
+
+				t.KANBAN 		    = _tableJob.KANBAN;
+
+				t.DATE_START 		= gnncDate.__date2String(dateStart_.selectedDate,false);
+				t.DATE_END 		    = gnncDate.__date2String(dateEnd_.selectedDate,false);
+				t.DATE_FINAL		= _tableJob.DATE_FINAL;
+				t.DATE_CANCELED	    = _tableJob.DATE_CANCELED;
+				
+				t.PUBLIC            = PUBLIC_2_.selected?2:PUBLIC_1_.selected?1:0;
+				t.ORDER_ITEM		= _tableJob.ORDER_ITEM;
+
+				t.ACTIVE 			= ACTIVE_3_.selected?3:ACTIVE_2_.selected?2:ACTIVE_1_.selected?1:0;
+				t.VISIBLE 			= _tableJob.VISIBLE;
+				t.CONTROL			= 0;//_tableJob.CONTROL;
+				
+				var _sql:String 		= new gnncSql().__INSERT(t,false,true,true);
+				_connJob.__sql			(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(event:*):void
+				{
+					_change = true;
+					_gnncPopUp.__close();
+					__close();
+				}
+				
+				function __fFault(event:*):void
+				{
+					_gnncPopUp.__close();
+				}
+
+			}
+			
+			private function __setActive(value_:uint):void
+			{
+				ACTIVE_3_.selected = false;
+				ACTIVE_2_.selected = false;
+				ACTIVE_1_.selected = false;
+				ACTIVE_0_.selected = false;
+				
+				switch(value_)
+				{
+					case 3: ACTIVE_3_.selected = true; break;
+					case 2: ACTIVE_2_.selected = true; break;
+					case 1: ACTIVE_1_.selected = true; break;
+					case 0: ACTIVE_0_.selected = true; break;
+				}
+				
+			}
+
+			private function __setPublic(e:MouseEvent):void
+			{
+				PUBLIC_0_.selected = false;
+				PUBLIC_1_.selected = false;
+				PUBLIC_2_.selected = false;
+				e.currentTarget.selected = true;
+			}
+
+			private function __changeDate():void
+			{
+				if(dateStart_.selectedDate == null || dateEnd_.selectedDate == null )
+					return;
+				
+				if(dateEnd_.selectedDate.getTime() < dateStart_.selectedDate.getTime())
+					dateEnd_.selectedDate = dateStart_.selectedDate;
+			}
+			
+			private function __changeHierarchy(_save:Boolean=true):void
+			{
+				var _table:table_project_team = new table_project_team();
+				_table.ID_CLIENT 			= _tableJob.ID_CLIENT;
+				_table.ID_PROJECT 			= _tableJob.ID_PROJECT;
+				_table.ID_STEP 				= _tableJob.ID_STEP;
+
+				var p:newJobHierarchy = new newJobHierarchy();
+				
+				p.dataProviderClient  = gnncGlobalStaticProjects.arrClient;//connListClient.DATA_ARR;
+				p.dataProviderProject = gnncGlobalStaticProjects.arrProject;//connListProject.DATA_ARR;
+				p.dataProviderStep    = gnncGlobalStaticProjects.arrStep;//connListStep.DATA_ARR;
+				
+				p._tableProjectTeam 	= _table;
+				
+				if(uint(_tableJob.ID_CLIENT)>0)
+					p.setClient(_nameClient,_tableJob.ID_CLIENT);
+					
+				new gnncPopUp().__creation(p,false,false,__fRemove);
+				
+				function __fRemove(e:*):void
+				{
+					if(p._change==false)
+						return;
+					
+					_tableJob.ID_CLIENT 	= p._tableProjectTeam.ID_CLIENT;
+					_tableJob.ID_PROJECT 	= p._tableProjectTeam.ID_PROJECT;
+					_tableJob.ID_STEP 		= p._tableProjectTeam.ID_STEP;
+
+					if(_save==false)
+						return;
+
+					//neste caso clicou em SELECIONAR
+					__save();
+				}
+			}
+			
+			private function __configTeam():void
+			{
+				if(gnncGlobalStatic._userClient==true)
+					return;
+				//idsClientTeamList_._changeEvent = __configTeamCheck;
+				idsClientTeamList_._sqlConsult = "" +
+					" select " +
+					" l.ID,l.ID_CLIENT,l.ID_GROUP,l.USER,l.USER_EMAIL,l.IS_ADMIN,l.IS_CLIENT,l.ACTIVE," +
+					" 0 as SELECTED," +
+					" c.NAME as NAME_CLIENT," +
+					" g.NAME as NAME_GROUP," +
+					" coalesce(( select a.FILE_LINK from dbd_attach a WHERE a.MIX = 'CLIENT_PHOTO' and a.ID_MIX = l.ID_CLIENT AND (a.EXTENSION = 'jpg' or a.EXTENSION = 'jpeg' or a.EXTENSION = 'png' or a.EXTENSION = 'gif') ORDER BY a.ORDER_ITEM asc,a.ID desc LIMIT 1	),'') ATTACH_CLIENT" +
+					" from dbd_project_team p " +
+					" left join dbd_login l on (p.ID_CLIENT_TEAM = l.ID_CLIENT) " +
+					" left join dbd_client c on (c.ID = l.ID_CLIENT) " +
+					" left join dbd_group g on (g.ID = l.ID_GROUP) " +
+					" where l.ACTIVE > 0 AND p.ID_CLIENT = "+_tableJob.ID_CLIENT+" " +
+					" group by l.ID " +
+					" order by NAME_CLIENT asc, l.USER asc " ;
+				
+				idsClientTeamList_.__select(false,fResultTeam,fFaultTeam);
+			}
+
+			private function __configTeamCheck(e:*=null):void
+			{
+				if(idsClientTeamList_._length==0)
+					return;
+				
+				_tableJob.IDS_CLIENT_TEAM = String(idsClientTeamList_.selectedCheckIdsList().join(','));
+			}
+
+			private function fResultTeam(e:*=null):void
+			{
+				callLater(function():void{
+					idsClientTeamList_.selectedCheckIds(_tableJob.IDS_CLIENT_TEAM);
+					callLater(function():void{
+						__configTeamCheck();
+					});
+				});
+			}
+			
+			private var maxTryTeam:uint = 0;
+			private function fFaultTeam(e:*=null):void
+			{
+				if(maxTryTeam>3)
+					return;
+				__configTeam();
+				maxTryTeam++;
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal"/>
+		<s:State name="calendar"/>
+	</s:states>
+	
+	<elements:elementStageBoxPopUp heightBar="40" />
+	<elements:elementLabelFont id="titlePopUp_" text="JOB / TAREFA" fontSize="9" fontWeight="normal" left="1" top="6" right="1" textAlign="center" color="0x555555"/>
+	
+	<!-- s:HGroup gap="2" verticalAlign="middle" height="40" top="10" left="20">
+		<s:Image id="ICON_" source="{gnncEmbedImage.JOB_32}" />
+		<elements:elementLabelFont id="TITLEPAGE_" text="SOLICITAÇÃO (JOB)" fontSize="24" fontWeight="normal" height="32" paddingLeft="10" />
+	</s:HGroup-->
+	
+	<s:HGroup left="20" right="20" top="20" height="30" verticalAlign="middle" paddingRight="5">
+		<s:TabBar dataProvider="{panel_}" height="30" />
+	</s:HGroup>
+	
+	<mx:ViewStack id="panel_" left="20" right="20" top="55" bottom="52" >
+		<s:NavigatorContent label="BÁSICO" width="100%" height="100%" creationPolicy="all">
+			<s:layout>
+				<s:HorizontalLayout gap="10" padding="10"/>
+			</s:layout>
+			
+			<s:VGroup width="100%" gap="-1" height="100%">
+				<s:TextArea id="TITLE_" text="" width="100%" height="100%" fontSize="15" paddingLeft="10" paddingTop="15" paddingBottom="10" prompt="Título / Tarefa" maxChars="255" focusAlpha=".1" borderAlpha=".3"
+							/>
+				<s:TextArea id="MESSAGE_" text="" width="100%" height="100%" paddingLeft="10" paddingTop="15" paddingRight="10" paddingBottom="15" prompt="Descrição longa (opcional)" contentBackgroundAlpha=".5" focusAlpha=".1" borderAlpha=".3"
+							fontSize="14"
+							/>
+			</s:VGroup>
+			<s:VGroup width="130" gap="-1" height="100%">
+				<s:Label text="Prioridade" verticalAlign="middle" maxDisplayedLines="1" fontWeight="bold" width="100%" height="20" />
+				<s:ToggleButton id="ACTIVE_0_" icon="{gnncEmbedBlackWhite.bw_project_job_16}" 		height="30" width="100%" label="Normal" 	click="{__setActive(0)}" skinClass="GNNC.skin.toggleButton.skin_toggleButtonTextLeft" selected="true"/>
+				<s:ToggleButton id="ACTIVE_1_" icon="{gnncEmbedBlackWhite.bw_urgent_16}" 			height="30" width="100%" label="Urgente" 	click="{__setActive(1)}" skinClass="GNNC.skin.toggleButton.skin_toggleButtonTextLeft" />
+				<s:ToggleButton id="ACTIVE_2_" icon="{gnncEmbedBlackWhite.bw_alert_error_16}" 		height="30" width="100%" label="Erro" 		click="{__setActive(2)}" skinClass="GNNC.skin.toggleButton.skin_toggleButtonTextLeft" />
+				<s:ToggleButton id="ACTIVE_3_" icon="{gnncEmbedBlackWhite.bw_fire_16}" 				height="30" width="100%" label="Fire!" 		click="{__setActive(3)}" skinClass="GNNC.skin.toggleButton.skin_toggleButtonTextLeft" />
+				<s:Rect height="5"/>
+				<s:Label text="Público" verticalAlign="middle" maxDisplayedLines="1" fontWeight="bold" width="100%" height="20" />
+				<s:VGroup id="publicGroup_" width="100%" gap="-1">
+					<s:ToggleButton id="PUBLIC_0_" icon="{gnncEmbedBlackWhite.bw_access_16_lock}" 		height="30" width="100%" label="Privado" toolTip="Privado / Particular" 		click="{__setPublic(event)}" skinClass="GNNC.skin.toggleButton.skin_toggleButtonTextLeft" selected="true"/>
+					<s:ToggleButton id="PUBLIC_2_" icon="{gnncEmbedBlackWhite.bw_client_16_group}" 		height="30" width="100%" label="Equipe Interna" 	click="{__setPublic(event)}" skinClass="GNNC.skin.toggleButton.skin_toggleButtonTextLeft" />
+					<s:ToggleButton id="PUBLIC_1_" icon="{gnncEmbedBlackWhite.bw_global_16}" 			height="30" width="100%" label="Público / Cliente" 	click="{__setPublic(event)}" skinClass="GNNC.skin.toggleButton.skin_toggleButtonTextLeft" />
+				</s:VGroup>
+				<s:Rect height="5"/>
+			</s:VGroup>
+
+		</s:NavigatorContent>
+		<s:NavigatorContent label="EQUIPE" creationPolicy="all">
+
+			<list:conList_clientTeam id="idsClientTeamList_" _autoLoad="false" height="100%" width="100%" _backgroundAlpha="0"
+									 click="{__configTeamCheck()}"
+									 />
+			
+		</s:NavigatorContent>
+	</mx:ViewStack>
+	
+	<s:HGroup left="1" right="1" bottom="1" height="39" gap="1" paddingLeft="5" paddingRight="5" verticalAlign="middle">
+		<gnncDateButton:gnncDateButton id="dateStart_" width="110" height="30" enabled="true"/>
+		<gnncDateButton:gnncDateButton id="dateEnd_" width="110" height="30" enabled="true"/>
+		<s:Button width="30" height="30" icon="{gnncEmbedBlackWhite.bw_project_step_16}" click="{__changeHierarchy(false)}"
+				  toolTip="Alterar cliente, projeto e fase."
+				  />
+		<s:Rect width="100%" />
+		<!--s:ToggleButton id="STATE_" icon="{gnncEmbedImage.SETTING_16}" label="Opções Avançadas" height="25" click="{STATE_.selected?currentState='advanced':currentState=''}"/-->
+		<s:Button icon="{gnncEmbedBlackWhite.bw_new_16}" label="Cadastrar" click="{__save()}" fontWeight="bold" height="30" />
+		<s:Button icon="{gnncEmbedBlackWhite.app_close_16_clean}" label="Fechar" click="{__close()}" skinClass="GNNC.skin.button.skin_buttonLink" height="30" />	
+	</s:HGroup>
+	
+	<s:Button top="4" right="4" click="{__close()}" width="10" height="10" tabFocusEnabled="false" toolTip="Fechar" />
+	
+</s:Module>

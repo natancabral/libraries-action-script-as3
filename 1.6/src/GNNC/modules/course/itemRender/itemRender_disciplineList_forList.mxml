@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				width="100%" height="30" 
+				
+				creationComplete="{__start()}" 
+				
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				
+				doubleClickEnabled="true" 
+				
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			
+			private function __start():void
+			{
+			}
+
+			private function __selectComplete():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._complete));
+			}
+			
+			private function __selectIndex():void
+			{
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				if(Object(owner).hasOwnProperty('_contextMenu'))
+					this.contextMenu = Object(owner)._contextMenu;
+			}
+
+
+			
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret" />
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<!-- s:Rect left="0" top="0" right="0" bottom="0" radiusX="3">
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF"/>
+		</s:fill>
+	</s:Rect-->
+	
+	<!--- LINE DIVISION LINES -->
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha=".8" includeIn="hoveredAndShowsCaret,hovered" radiusX="3" radiusY="3">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+		
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" radiusX="3" radiusY="3" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<elements:elementHLine left="2" right="2" bottom="0" alpha=".5"/>
+	
+	<s:HGroup left="0" right="0" top="1" bottom="1" gap="1" verticalAlign="middle" paddingLeft="4" paddingTop="1" paddingBottom="1" paddingRight="4" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+			   toolTip="{'Disciplina Id : '+data.ID }" 
+			  >
+
+		<!-- s:Image source="{gnncEmbedBlackWhite.bw_project_step_16}" width="16" height="16" toolTip="{'Etapa Id : '+data.ID }" /-->
+
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME)}" paddingLeft="5" maxDisplayedLines="1" paddingRight="5" width="100%" fontSize="11" fontWeight="bold" showTruncationTip="true" color="0x000000" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"/>
+		<!--s:Label text="{DAYBYDAY_DATE.__DATE_LEFT_TEXT(Number(DAYBYDAY_DATE.__DATE_LEFT(false,'2012-01-10','2012-01-10')),'2012-01-10')}" fontSize="11" fontWeight="bold" color="{DAYBYDAY_DATE.__DATE_LEFT_COLOR(0,'2012-01-10','2012-01-10','2012-01-10')}"/-->
+		<elements:elementLabelBackgroudColor width="30" height="18" textAlign="center" text="{Number(data.ROWS_JOB)>0?data.ROWS_JOB:'0'}" _colorBackground="{0x777777}" _colorBackgroundAlpha=".5" toolTip="{Number(data.ROWS_JOB)==0?'Aulas: 0':'Aulas: '+Number(data.ROWS_JOB)}" />
+		
+		<s:Rect width="5"/>
+		
+		<s:Image source="{gnncEmbedBlackWhite.bw_series_group_16}" toolTip="{data.ID_GROUP!=null?'Grupo, Id: '+data.ID_GROUP:'Grupo'}" />
+		<s:Label text="{data.NAME_GROUP!=null?gnncData.__firstLetterUpperCase(data.NAME_GROUP):'-'}" paddingLeft="3" maxDisplayedLines="1" paddingRight="2" width="70" fontSize="11" fontWeight="normal" showTruncationTip="true" color="0x000000" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"/>
+		
+		<s:Label width="35" text="TEÓR:" fontSize="8" paddingLeft="5" color="0x666666" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" toolTip="Carga Horária: Teórica"/>
+		<s:Label text="{uint(data.TIME_HOUR_THEORY)>0?uint(data.TIME_HOUR_THEORY):''}" fontSize="11" fontWeight="bold" paddingRight="5" paddingLeft="5" color="0x336699"  color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" width="37" toolTip="Carga Horária: Teórica"/>
+		
+		<s:Label width="35" text="PRÁT:" fontSize="8" paddingLeft="5" color="0x666666" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" toolTip="Carga Horária: Prática"/>
+		<s:Label text="{uint(data.TIME_HOUR_PRACTICE)>0?uint(data.TIME_HOUR_PRACTICE):''}" fontSize="11" fontWeight="bold" paddingRight="5" paddingLeft="5" color="0x950600" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" width="37" toolTip="Carga Horária: Prática"/>
+		
+		<s:Image source="{gnncEmbedBlackWhite.bw_all_16}" toolTip="Mova pra cima ou para baixo" />
+		
+	</s:HGroup>
+	
+</s:ItemRenderer>

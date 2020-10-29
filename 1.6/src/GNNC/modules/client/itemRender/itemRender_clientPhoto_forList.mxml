@@ -1,0 +1,181 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx"
+				autoDrawBackground="false"
+				width="100%" height="90" 
+
+				creationComplete="{__start()}" 
+				rightMouseDown="{__rDown()}" 
+				mouseDown="{__rDown()}"
+				doubleClick="{__mDC()}"
+				doubleClickEnabled="true" 
+				
+				rollOver			= "{__rollOver()}"
+				rollOut				= "{__rollOut()}" 
+				
+				cacheAsBitmap="true"
+				xmlns:stage="GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			import mx.graphics.SolidColor;
+			import mx.graphics.SolidColorStroke;
+			
+			import spark.core.ContentCache;
+
+			static public const imgcache:ContentCache = new ContentCache();
+
+			private const _boxW:Number = 250;
+			private const _boxH:Number = 90;
+			private const _directionVorH:String = 'V';
+
+			//private function __rollOver():void{	BOX1.play() }
+			private function __rollOver():void{ i = 1; __play() }
+			private function __rollOut(): void{ i = 0; boxTwo_.play() }
+			
+			private var i:uint = 0;
+			
+			private function __start():void
+			{
+			}
+			
+			private function __selectIndex():void
+			{
+				if(Object(owner).selectedItems.length > 1)
+					return;
+				
+				Object(owner).selectedIndex = itemIndex;
+			}
+			
+			private function __rDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._rightMouseDown,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDown():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDown,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __mDC():void
+			{
+				__selectIndex();
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._mouseDoubleClick,data));
+				this.contextMenu = Object(owner)._contextMenu;
+			}
+			
+			private function __play():void
+			{
+				if(!i)
+				{
+					
+				}
+				else if(i < 25)
+				{
+					i++;
+					callLater(__play);
+				}
+				else
+				{
+					i = 0;
+					boxOne_.play();
+				}
+			}
+			
+			private function __attachFile(data_:Object):String
+			{
+				return gnncGlobalStatic._httpHost+'/ATTACH/'+String(gnncGlobalStatic._dataBase).toUpperCase()+'/thumbnail/'+data_.ATTACH_CLIENT;
+			}
+
+			private function __selectComplete():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._complete));
+			}
+			
+			private function __star():void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._star,data));
+			}
+	
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<s:Move id="boxOne_" 	target="{box}" yTo="{-box.height/2}" duration="300" />
+		<s:Move id="boxTwo_" 	target="{box}" yTo="0" duration="300" />
+	</fx:Declarations>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="hoveredAndShowsCaret,hovered">
+		<s:fill>
+			<s:SolidColor color="0xEFEFEF"/>
+		</s:fill>
+	</s:Rect>
+
+	<!-- s:Rect left="0" top="0" right="0" bottom="0" fill="{new SolidColor(0xd2e1f1)}" stroke="{new SolidColorStroke(0xbcd5ef)}" visible="{!data.CONTROL}" / -->
+
+	<s:Scroller left="0" top="0" right="0" bottom="0" horizontalScrollPolicy="off" verticalScrollPolicy="off">
+		<s:Group left="0" top="0" right="0" bottom="0">
+			
+			<s:VGroup id="box" width="100%" gap="0">
+				<s:Group width="100%" height="{_boxH}" >
+
+					<!--s:Rect left="5" top="5" width="79" height="79" fill="{new SolidColor(0xF9F9F9)}" /-->
+					<s:BitmapImage source="{ data.COMPANY ? gnncEmbedBlackWhite.bw_client_32_group : gnncEmbedBlackWhite.bw_client_32 }" left="30" top="30" alpha.hovered="1" alpha.selected="1" alpha.normal=".15"/>
+					<s:BitmapImage source="{ data.ATTACH_CLIENT ? __attachFile(data) : null}" left="5" top="5" width="79" height="79" smooth="true" scaleMode="zoom" contentLoader="{imgcache}" smoothingQuality="high"/>
+					<s:Label left="100" right="10" top="10" bottom="10" text="{gnncData.__firstLetterUpperCase(data.NICK_NAME ? data.NICK_NAME : data.NAME)}" fontSize="12" fontWeight="bold" maxDisplayedLines="3" showTruncationTip="true" paddingTop="1" />
+					<s:Label left="100" right="10" bottom="10" text="{data.COMPANY ? '' : gnncDate.__date2Legend(data.DATE_BIRTH,null,true,false,'Sem aniversário',true) }" width="100%" fontSize="11" height="15" showTruncationTip="true" maxDisplayedLines="1" verticalAlign="middle" />
+					<s:Rect left="5" top="5" width="79" height="79" stroke="{new SolidColorStroke(0xEEEEEE)}" stroke.hovered="{new SolidColorStroke(0xCCCCCC)}" stroke.hoveredAndShowsCaret="{new SolidColorStroke(0xCCCCCC)}" stroke.selected="{new SolidColorStroke(0xCCCCCC)}" stroke.selectedAndShowsCaret="{new SolidColorStroke(0xCCCCCC)}" />
+					
+					<s:Image source="{!data.ACTIVE?gnncEmbedImage.STATUS_RED_16:data.ACTIVE==1?gnncEmbedImage.STATUS_GREEN_16:data.ACTIVE==2?gnncEmbedImage.STATUS_YELLOW_16:gnncEmbedImage.STATUS_GREY_16}" left="5" top="5" />
+					<s:Image source="{data.STAR==1?gnncEmbedBlackWhite.bw_favorite_16:gnncEmbedBlackWhite.bw_favorite_16_unselected}" click="{__star()}" toolTip="{data.STAR==1?'Favoritos (Remover)':'Favoritos (Adicionar)'}" right="5" bottom="5" buttonMode="true"/>
+
+				</s:Group>
+				<s:Group width="100%" height="{_boxH}" >
+					
+					<s:Rect  left="0" top="0" right="0" bottom="0" fill="{new SolidColor(0xEEEEEE)}" stroke="{new SolidColorStroke(0xBBBBBB)}" alpha=".9" />
+					<elements:elementHDropShadow height="4" alpha=".3"/>
+					
+					<s:VGroup left="11" top="11" right="11" bottom="11" gap="1">
+						<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME)}" width="100%" fontWeight="bold" height="42" fontSize="12" showTruncationTip="true" maxDisplayedLines="3" color="0x3785e2" />
+						<s:Label text="{data.DESCRIPTION}" width="100%" height="100%" fontSize="10" maxDisplayedLines="4" showTruncationTip="true" paddingTop="3" />
+						<s:Label text="{data.EMAIL ? String(data.EMAIL).toLowerCase() : ''}" width="100%" fontSize="11" height="15" showTruncationTip="true" maxDisplayedLines="1" verticalAlign="middle" textDecoration="underline" color="0x3785e2" buttonMode="true" />
+						<s:Label text="{data.COMPANY? 'Id: '+data.ID : data.SEX == 'F'? 'Feminino - Id: '+data.ID : data.SEX == 'M'? 'Masculino - Id: '+data.ID : 'Outro - Id: '+data.ID }" width="100%" fontSize="11" height="15" showTruncationTip="true" maxDisplayedLines="1" verticalAlign="middle" />
+					</s:VGroup>
+					
+				</s:Group>
+			</s:VGroup>
+			
+		</s:Group>
+	</s:Scroller>
+
+	<s:Rect  left="0" top="0" right="0" bottom="0" stroke="{new SolidColorStroke(0x3785e2,2)}" radiusX="2" includeIn="selectedAndShowsCaret,selected"  />
+
+	<!--
+	<s:HGroup gap="1" right="10" bottom="10" visible="false" visible.hovered="true" visible.hoveredAndShowsCaret="true" visible.selected="true" visible.selectedAndShowsCaret="true">
+		<s:Button icon="{!data.CONTROL ? gnncEmbedImage.CONTROL_16 : gnncEmbedImage.CONTROL_16_OK}" width="20" height="20" click="{__fControl(null)}" toolTip="{ !data.CONTROL ? 'Desaprovado no Controle' : 'Aprovado no Controle' }"/>
+		<s:Button icon="{gnncEmbedImage.VIEW_16}" width="20" height="20" click="{__clientView()}"/>
+	</s:HGroup>
+	-->
+
+</s:ItemRenderer>

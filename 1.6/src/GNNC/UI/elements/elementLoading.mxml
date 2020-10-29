@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx		= "http://ns.adobe.com/mxml/2009" 
+		 xmlns:s		= "library://ns.adobe.com/flex/spark" 
+		 xmlns:mx		= "library://ns.adobe.com/flex/mx"
+		 
+		 creationComplete	= "{__start()}"
+		 rightMouseDown		= "{__rightMouseDown(event)}" 
+		 >
+
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.time.gnncTime;
+			
+			import mx.core.IVisualElement;
+			import mx.graphics.SolidColor;
+			
+			public var label:String = '';
+			private var t:gnncTime = new gnncTime();
+			
+			private function __start():void
+			{
+			}
+			
+			public function set backgroundColor(v:uint):void
+			{
+				popBackground_.fill = new SolidColor(v);
+			}
+			
+			private function __toFront(e:*=null):void 
+			{
+				new gnncPopUp().__toFront(this);
+			}
+
+			private function __close():void 
+			{
+				this.visible = false;
+				if(isPopUp)
+					new gnncPopUp().__close(this);
+			}
+
+			private function __rightMouseDown(e:MouseEvent):void
+			{
+				var close:ContextMenuItem = new ContextMenuItem("Loading...", false, true);
+				close.addEventListener (Event.SELECT,function(event:Event):void{ __close() });
+				
+				// Create custom context menu. 
+				var cm:ContextMenu 	= new ContextMenu();
+				cm.hideBuiltInItems	();
+				cm.customItems 		= [close];
+				this.contextMenu 	= cm;
+			}
+			
+		]]>
+	</fx:Script>
+
+	<s:states>
+		<s:State name="normal"/>
+	</s:states>
+	
+	<s:Rect id="popBackground_" width="100%" height="100%" alpha="1" fill="{new SolidColor(0xffffff)}" />
+	
+	<mx:ProgressBar width="400" horizontalCenter="0" verticalCenter="0"
+					indeterminate="true" chromeColor="{0xffffff}" fontSize="11" color="{0x444444}"
+					labelPlacement="top" label="Carregando módulo"/>
+
+	<s:Button id="buttonClose_" click="{__close()}" width="10" height="10" top="5" right="5" visible="false" />
+
+
+</s:Group>

@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false"
+				
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.gnncEmbedImage;
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+	
+	<!--s:Rect left="0" top="0" right="0" bottom="0" fill="{new SolidColor(0xd2e1f1)}" visible="{!data.CONTROL}" /-->
+	
+	<s:Rect left="0" top="0" right="0" height="5" radiusX="0" radiusY="0">	
+		<s:fill>
+			<s:LinearGradient rotation="83">
+				<s:GradientEntry color="0xffd547" />
+				<s:GradientEntry color="0xffd547" />
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>	
+
+	<!-- ffea99 -->
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" radiusX="0" radiusY="0">	
+		<s:stroke>
+			<s:SolidColorStroke color="0xAAAAAA" weight="1" weight.hoveredAndShowsCaret="2" weight.hovered="2" weight.selected="2" weight.selectedAndShowsCaret="2"/>
+		</s:stroke>
+	</s:Rect>	
+
+	<s:RectangularDropShadow distance="1" brRadius="0" blRadius="0" tlRadius="0" trRadius="0" 
+							 includeIn="selectedAndShowsCaret,selected" color="0x888888"
+							 blurX="4" blurY="4" width="100%" height="100%" />
+	
+	<!--- NOTE -->
+
+	<s:VGroup left="10" top="10" right="10" bottom="10" gap="2" horizontalAlign="center" verticalAlign="middle">
+		<s:Label text="{data.TITLE}" fontWeight="bold" fontSize="12" maxDisplayedLines="1" showTruncationTip="true" width="100%" textAlign="center" />
+		<s:Label text="{data.MESSAGE}" fontWeight="normal" fontSize="11" maxDisplayedLines="3" showTruncationTip="true" width="100%" textAlign="center" />
+	</s:VGroup>
+	
+	<s:Image left="1" top="1" source="{gnncEmbedImage.OK_16_BW}" width="13" height="13" smooth="true" />
+	
+</s:ItemRenderer>

@@ -1,0 +1,677 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 width="100%" height="100%"
+		 creationComplete="{start()}" 
+		 xmlns:components="GNNC.UI.components.*"
+		 >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncNotification.gnncNotification;
+			import GNNC.UI.gnncNotification.gnncNotificationConst;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataRand;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.permission.gnncPermission;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.event.gnncCloseEvent;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.keyboard.gnncKeyboard;
+			import GNNC.modules.attach.formNew.newAttach;
+			import GNNC.modules.project.formNew.newJob;
+			import GNNC.modules.project.formView.viewComment;
+			import GNNC.modules.project.formView.viewJobCompact;
+			import GNNC.others.gnncScrollPosition;
+			import GNNC.others.gnncUpdateItemList;
+			import GNNC.sqlTables.table_attach;
+			import GNNC.sqlTables.table_comment;
+			import GNNC.sqlTables.table_job;
+			
+			import mx.collections.ArrayCollection;
+			import mx.events.FlexEvent;
+			
+			public var _tableComment:table_comment = new table_comment();
+			public var getDiscussionAndComments:Boolean = false; //caso coloque TRUE, traz discussão e comentários (anulando o de baixo)
+			public var getDiscussion:Boolean = true; //caso coloque FALSE, traz os comentários
+			public var allowOnlyReply:Boolean = true; //caso coloque TRUE nao deixa escrever sem um JOB, caso FALSE usado para CANAIS
+			
+			private var overListElement:Object = null;
+			private var tableCommentObject:Object = null;
+			
+			private var connDiscussion:gnncAMFPhp = new gnncAMFPhp(); //general
+			private var connExec:gnncAMFPhp = new gnncAMFPhp(); //general
+
+			public var eventResult:Function = null;
+
+			public function set getList(v:Boolean):void { listComment(); }
+
+			public function start():void
+			{
+				REPLY_.addEventListener(KeyboardEvent.KEY_UP,
+					function(event:KeyboardEvent):void{
+						if(gnncKeyboard.__CONTROL_ENTER(event)) 
+							__replyCommentSet();
+					}
+				);
+				
+				__setEvent();
+			}
+
+			public function stopAll():void
+			{
+				connDiscussion.__destroy();
+				connExec.__destroy();
+				//stopAllMovieClips();
+			}
+
+			public function listComment():void
+			{
+				loading.addElement(new componentLoadingBoxText());
+				listDiscussionGlobal_.dataProvider = new ArrayCollection();
+				
+				var sql:String = '';
+				sql += " select "+getColumnsComment('c').join(',');
+				sql += " from dbd_comment c left join dbd_project_team as t ON ( t.ID_CLIENT = c.ID_CLIENT ) ";
+				sql += " left join dbd_comment rep ON (rep.ID = c.ID_COMMENT_REPLY) ";
+				sql += " left join dbd_job j ON (j.ID = c.ID_JOB) ";
+				sql += " where c.ID >= 0 ";
+				
+				if(getDiscussionAndComments){
+					
+				}else if(getDiscussion){
+					sql += " AND c.ID_CLIENT = '"+_tableComment.ID_CLIENT+"' ";
+					sql += " AND c.ID_PROJECT = '"+_tableComment.ID_PROJECT+"' ";
+					sql += " AND c.ID_STEP = '"+_tableComment.ID_STEP+"' ";
+					sql += " AND c.ID_JOB = '0' ";
+				}else{
+					if(_tableComment.ID_CLIENT)
+						sql += " AND c.ID_CLIENT  = '"+_tableComment.ID_CLIENT+"' ";
+					if(_tableComment.ID_PROJECT)
+						sql += " AND c.ID_PROJECT = '"+_tableComment.ID_PROJECT+"' ";
+					if(_tableComment.ID_STEP)
+						sql += " AND c.ID_STEP    = '"+_tableComment.ID_STEP+"' AND c.ID_STEP > 0 ";
+					if(_tableComment.ID_JOB)
+						sql += " AND c.ID_JOB     = '"+_tableComment.ID_JOB+"'  AND c.ID_JOB  > 0 ";
+				}
+				
+				if(gnncGlobalStatic._userAdmin == false || gnncGlobalStatic._userClient == true)
+				{
+					sql += " AND (" +
+						" (t.ID_CLIENT_TEAM = "+gnncGlobalStatic._userIdClient+" AND t.ID_PROJECT = 0 ) OR"+
+						" (t.ID_CLIENT_TEAM = "+gnncGlobalStatic._userIdClient+" AND t.ID_PROJECT = c.ID_PROJECT AND t.ID_STEP = 0) OR"+
+						" (t.ID_CLIENT_TEAM = "+gnncGlobalStatic._userIdClient+" AND t.ID_PROJECT = c.ID_PROJECT AND t.ID_STEP = c.ID_STEP)"+
+						" ) "+
+						" ";
+				}
+				
+				sql += " group by c.ID ";
+				sql += " order by c.ID desc limit 0,50 ";
+
+				enabled = false;
+				connDiscussion = new gnncAMFPhp();
+				connDiscussion.__sql(sql,'','',fResult,fFault);
+				
+				function fResult(e:*):void
+				{
+					//listDiscussionGlobal_.enabled = true;
+					listDiscussionGlobal_.dataProvider = new ArrayCollection(connDiscussion.DATA_ARR.toArray().reverse());
+					
+					callLater(function():void{
+						//gnncScrollPosition.__setEnd(listComment_);
+						gnncScrollPosition.__setEnd(listDiscussionGlobal_);
+						
+						if(eventResult!=null)
+							eventResult.call();
+					});
+					
+					loading.removeAllElements();
+					enabled = true;
+				}
+				
+				function fFault(e:*):void
+				{
+					//listDiscussionGlobal_.enabled = true;
+					loading.removeAllElements();
+					enabled = true;
+				}
+			}
+
+			private function openViewCommentDicussion(e:*=null):void
+			{
+				overListElement = e.currentTarget;
+				openViewComment(e);
+			}
+			
+			private function __newJob(e:gnncEventGeneral):void
+			{
+				var objDat:Object         = listDiscussionGlobal_.selectedItem;
+				var idxDat:int            = listDiscussionGlobal_.selectedIndex;
+				//var idxArr:int            = _financial.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = listDiscussionGlobal_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(idxDat<0)
+					return;
+				
+				if(Number(objDat.ID_CLIENT)==0){
+					new gnncNotification().__show('Cliente','Selecione um cliente.');
+					return;
+				}
+				if(Number(objDat.ID_PROJECT)==0){
+					new gnncNotification().__show('Projeto','Selecione um projeto.');
+					return;
+				}
+				if(Number(objDat.ID_STEP)==0){
+					new gnncNotification().__show('Etapa','Selecione uma etapa.');
+					return;
+				}
+				
+				var t:table_job = new table_job();
+				
+				t.ID_KEY        = gnncDataRand.__key();
+				t.ID_CLIENT     = objDat.ID_CLIENT;
+				t.ID_PROJECT    = objDat.ID_PROJECT;
+				t.ID_STEP       = objDat.ID_STEP;
+				
+				t.MESSAGE = e.data.MESSAGE;
+				
+				t.ID_CLIENT_INSERT = gnncGlobalStatic._userIdClient;
+				t.ID_USER = gnncGlobalStatic._userId;
+				
+				t.DATE_START    = gnncDate.__date2String(new Date(),false);
+				t.DATE_END 		= gnncDate.__date2String(DateUtils.dateAdd(DateUtils.DAY_OF_MONTH,3,new Date()),false);
+				t.DATE_FINAL	= '';
+				t.DATE_CANCELED = '';
+				
+				var p:newJob = new newJob();
+				p._tableJob = t;
+				new gnncPopUp().__creation(p,true,false,fRemove);
+				
+				function fRemove(e:FlexEvent):void
+				{/*
+					if(p._change==true){
+					if(edit==true)
+					updateItemRender([idJob]);
+					else
+					updateItemRender(null,null,[p._tableJob.ID_KEY]);
+					}*/
+					if(p._change==true)
+						new gnncNotification().__show('Novo Job','Adicionado com sucesso');
+				}
+			}
+			
+			private function openViewComment(e:*=null):void
+			{
+				if(e!=null)
+					if(e.hasOwnProperty('currentTarget'))
+						overListElement = e.currentTarget;
+				
+				if(overListElement==null)
+					return;
+				
+				//checkSelection();
+				
+				var objDat:Object         = overListElement.selectedItem;
+				var idxDat:int            = overListElement.selectedIndex;
+				//var idxArr:int            = _financial.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = overListElement.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				//if(!gnncPermission.__access('safe-attach','n',true))
+				//return;
+				
+				if(idxDat<0)
+					return;
+				
+				var t:table_comment = new table_comment();
+				t.ID = objDat.ID;
+				
+				var p:viewComment = new viewComment();
+				p._tableComment = t;
+				
+				new gnncPopUp().__creation(p,true,false,removePopUp);
+				function removePopUp(e:*):void
+				{
+					//if(o._)
+					//new gnncNotification().__show('Arquivo anexado','Arquivo(s) foi(ram) anexados.',gnncEmbedBlackWhite.bw_attach_32);
+					//updateItemRender([objDat.ID],null,null,overListElement);
+				}
+			}
+
+			protected function clearBreak(s:Object):String
+			{
+				return String(s).split('\n').join(' ').split('\r').join(' ').split('\t').join(' ');
+			}
+
+			private function __setEvent():void
+			{
+				listDiscussionGlobal_.addEventListener(gnncEventGeneral._view,openViewCommentDicussion);
+				listDiscussionGlobal_.addEventListener('newAttach',__newAttach);
+				listDiscussionGlobal_.addEventListener('newJob',__newJob);
+				listDiscussionGlobal_.addEventListener('viewJob',__viewJob);
+				listDiscussionGlobal_.addEventListener(gnncEventGeneral._new,__replyComment);
+				listDiscussionGlobal_.addEventListener(gnncEventGeneral._delete,deleteDiscussion);
+			}
+			
+			private function __newAttach(e:gnncEventGeneral):void
+			{
+				var objDat:Object         = listDiscussionGlobal_.selectedItem;
+				var idxDat:int            = listDiscussionGlobal_.selectedIndex;
+				//var idxArr:int            = _financial.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = listDiscussionGlobal_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(idxDat<0)
+					return;
+				
+				if(objDat.ID_CLIENT_INSERT != gnncGlobalStatic._userIdClient && objDat.ID_USER != gnncGlobalStatic._userId){
+					new gnncNotification().__show('Proprietário','Anexar somente o proprietário do comentário.',gnncEmbedBlackWhite.bw_client_32_v2,null,false,false,false,true,7,gnncNotificationConst.DISPLAY_LOCATION_TOP_RIGHT);
+					return;
+				}
+				if(String(objDat.DATE).substr(0,10) != String(gnncDate.__date2String(gnncGlobalStatic._dateToday)).substr(0,10)){
+					new gnncNotification().__show('Data de Hoje','Anexar somente em comentários do dia de hoje.',gnncEmbedBlackWhite.bw_calendar_32,null,false,false,false,true,7,gnncNotificationConst.DISPLAY_LOCATION_TOP_RIGHT);
+					return;
+				}
+				
+				/*
+				if(getDiscussionAndComments == false && getDiscussion = false)
+				{
+					if(Number(objDat.ID_CLIENT)==0){
+						new gnncNotification().__show('Cliente','Selecione um cliente.');
+						return;
+					}
+					if(Number(objDat.ID_PROJECT)==0){
+						new gnncNotification().__show('Projeto','Selecione um projeto.');
+						return;
+					}
+					if(Number(objDat.ID_STEP)==0){
+						new gnncNotification().__show('Etapa','Selecione uma etapa.');
+						return;
+					}
+				}	
+				*/
+				
+				var t:table_attach = new table_attach();
+				
+				t.ID_KEY        = gnncDataRand.__key();
+				t.ID_CLIENT     = objDat.ID_CLIENT;
+				t.ID_PROJECT    = objDat.ID_PROJECT;
+				t.ID_STEP       = objDat.ID_STEP;
+				
+				t.ID_MIX = objDat.ID;
+				t.MIX = 'COMMENT';
+				
+				//t.ID_CLIENT_INSERT = gnncGlobalStatic._userIdClient;
+				t.ID_USER = gnncGlobalStatic._userId;
+				
+				var p:newAttach = new newAttach();
+				p._tableAttach = t;
+				p._MIX = t.MIX;
+				
+				new gnncPopUp().__creation(p,true,false,fRemove);
+				
+				function fRemove(e:FlexEvent):void{
+					if( p._change == true )
+						updateItemRender([objDat.ID]);
+				}
+				
+				//tableCommentObject = objDat;
+			}
+			
+			private function __replyComment(e:gnncEventGeneral):void
+			{
+				var objDat:Object         = listDiscussionGlobal_.selectedItem;
+				var idxDat:int            = listDiscussionGlobal_.selectedIndex;
+				//var idxArr:int            = _financial.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = listDiscussionGlobal_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(idxDat<0)
+					return;
+				
+				REPLY_COMMENT_.text = clearBreak(objDat.MESSAGE);
+				REPLY_COMMENT_NAME_.text = objDat.NAME_USER?gnncData.__firstLetterUpperCase(objDat.NAME_USER):'Usuário não encontrado';
+				//REPLY_.text = '';
+				REPLY_.setFocus();
+				replyColor_.color = 0x33cc00;
+
+				PUBLIC_0_.selected = false;
+				PUBLIC_1_.selected = false;
+				PUBLIC_2_.selected = false;
+				this['PUBLIC_'+uint(objDat.PUBLIC)+'_'].selected = true;
+				
+				tableCommentObject = objDat;
+			}
+			
+			private function __viewJob(e:gnncEventGeneral):void
+			{
+				var objDat:Object         = listDiscussionGlobal_.selectedItem;
+				var idxDat:int            = listDiscussionGlobal_.selectedIndex;
+				//var idxArr:int            = _financial.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = listDiscussionGlobal_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(idxDat<0)
+					return;
+				
+				if(getDiscussion == false && uint(_tableComment.ID_JOB) > 0) //significa que esta dentro de um comentário ou job este component, nao precisa abrir o job
+					return;
+				if(Number(objDat.ID_CLIENT)==0)
+					return;
+				if(Number(objDat.ID_PROJECT)==0)
+					return;
+
+				var t:table_job = new table_job(objDat.ID_JOB);
+				
+				t.ID = e.data.ID_JOB;
+				
+				var p:viewJobCompact = new viewJobCompact();
+				p._tableJob = t;
+				new gnncPopUp().__creation(p,false,false,fRemove);
+				
+				function fRemove(e:FlexEvent):void{
+				}
+			}
+
+			private function __replyCommentSet():void
+			{
+				var mm:String = REPLY_.text;
+				
+				//if(mm.length < 2 || tableCommentObject ==null){
+				if(mm.length < 2){
+					//new gnncNotification().__show('Informações','Faltam informações para enviar a discussão, cliente ou projeto.');
+					return;
+				}
+				
+				if(allowOnlyReply==true)
+				{
+					var allowOnlyReplyOk:Boolean = true;
+					if(tableCommentObject == null)
+						allowOnlyReplyOk = false;
+					else if(tableCommentObject.hasOwnProperty('ID')==false)
+						allowOnlyReplyOk = false;
+					else if(tableCommentObject.ID==0)
+						allowOnlyReplyOk = false;
+					else if(REPLY_COMMENT_.text == '')
+						allowOnlyReplyOk = false;
+					if(allowOnlyReplyOk==false){
+						new gnncNotification().__show('Responder','Clique em responder para enviar seu comentário ou insira dentro de um Job.',gnncEmbedBlackWhite.bw_comment_32,'',false,false,true,true,15,gnncNotificationConst.DISPLAY_LOCATION_TOP_RIGHT);
+						return;
+					}
+				}
+				
+				if(tableCommentObject == null)
+					tableCommentObject = new table_comment();
+				
+				mm = gnncData.__replace(mm,'´','\"');
+				mm = gnncData.__replace(mm,'`','\"');
+				mm = gnncData.__replace(mm,'"','\"');
+				mm = gnncData.__replace(mm,"'",'\"');
+				mm = gnncData.__replace(mm,'\\','\\\\');
+				
+				var o:Object = tableCommentObject;
+				
+				var t:table_comment = new table_comment();
+				
+				t.ID_KEY = gnncDataRand.__key();
+				t.ID_CLIENT_INSERT = gnncGlobalStatic._userIdClient;
+				t.ID_USER = gnncGlobalStatic._userId;
+				
+				t.ID_CLIENT  = uint(o.ID_CLIENT)  > 0 ? o.ID_CLIENT  : _tableComment.ID_CLIENT;
+				t.ID_PROJECT = uint(o.ID_PROJECT) > 0 ? o.ID_PROJECT : _tableComment.ID_PROJECT;
+				t.ID_STEP    = uint(o.ID_STEP)    > 0 ? o.ID_STEP    : _tableComment.ID_STEP;
+				t.ID_JOB     = uint(o.ID_JOB)     > 0 ? o.ID_JOB     : _tableComment.ID_JOB;
+				
+				t.ID_CLIENT_REPLY = o.ID_CLIENT_INSERT;
+				t.ID_COMMENT_REPLY = o.ID;
+				
+				t.MESSAGE = mm;
+				
+				t.PUBLIC = PUBLIC_0_.selected?0:PUBLIC_1_.selected?1:PUBLIC_2_.selected?2:3;
+				
+				replyBox_.enabled = false;
+				
+				var sql:String = new gnncSql().__INSERT(t,false,false,true);
+				connExec.__sql(sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void{
+					
+					clearReply();
+					
+					replyBox_.enabled = true;
+					updateItemRender(null,null,[t.ID_KEY]);
+				}
+				function __fFault(e:*):void{ 
+					replyBox_.enabled = true;
+				}
+			}
+			
+			public function clearReply(clearList:Boolean=false):void
+			{
+				if(clearList)
+					listDiscussionGlobal_.dataProvider = new ArrayCollection();
+				
+				tableCommentObject = null;
+				REPLY_COMMENT_NAME_.text = '';
+				REPLY_COMMENT_.text = '';
+				replyColor_.color = 0xeeeeee;
+				REPLY_.text = '';
+				REPLY_.setFocus();
+			}
+
+			private function updateItemRender(ids:Array=null,key:Array=null,idKey:Array=null):void
+			{
+				var u:gnncUpdateItemList = new gnncUpdateItemList('ID','KEY','ID_KEY');
+				u.listElement = listDiscussionGlobal_;
+				u.amfPhpElement = connDiscussion;
+				u.sqlColumnsPredix = 'c';
+				u.sqlColumns = getColumnsComment('c');
+				u.tableObject = new table_comment();
+				u.functionInit = function():void{};
+				
+				u.sqlBaseToIds   = "" +
+					" select {{columns}} " +
+					" from {{table}} {{prefix}} left join dbd_project_team as t ON ( t.ID_CLIENT = c.ID_CLIENT ) " + 
+					" left join {{table}} rep ON (rep.ID = c.ID_COMMENT_REPLY) " +
+					" left join dbd_job j ON (j.ID = c.ID_JOB) " +
+					" where c.ID IN ({{values}}) group by c.ID " ;
+
+				u.sqlBaseToKey   = "" +
+					" select {{columns}} " + 
+					" from {{table}} {{prefix}} left join dbd_project_team as t ON ( t.ID_CLIENT = c.ID_CLIENT ) " + 
+					" left join {{table}} rep ON (rep.ID = c.ID_COMMENT_REPLY) " +
+					" left join dbd_job j ON (j.ID = c.ID_JOB) " +
+					" where c.KEY_ IN ({{values}}) group by c.ID " ;
+				
+				u.sqlBaseToIdKey = "" +
+					" select {{columns}} " + 
+					" from {{table}} {{prefix}} left join dbd_project_team as t ON ( t.ID_CLIENT = c.ID_CLIENT ) " + 
+					" left join {{table}} rep ON (rep.ID = c.ID_COMMENT_REPLY) " +
+					" left join dbd_job j ON (j.ID = c.ID_JOB) " +
+					" where c.ID_KEY IN ({{values}}) group by c.ID " ;
+
+				u.updateItemRender(ids,key,idKey);
+			}
+			
+			private function getColumnsComment(prefix:String=null):Array
+			{
+				if(prefix)
+					prefix = prefix+'.';
+				else 
+					prefix = 'dbd_comment.';
+
+				/*
+				var col:Array = [
+					"c.*",
+					"j.DATE_FINAL as DATE_FINAL_JOB",
+					"j.DATE_CANCELED as DATE_CANCELED_JOB",
+					"rep.MESSAGE as REPLY_MESSAGE",
+					"(select (select v.NAME from dbd_client v where v.ID = a.ID_CLIENT) from dbd_login a where a.ID = c.ID_USER) NAME_USER ",
+					"(select v.NAME from dbd_client v where v.ID = c.ID_CLIENT_REPLY) REPLY_NAME_USER ",
+					//"coalesce((select (select a.FILE_LINK from dbd_attach a WHERE a.MIX = 'CLIENT_PHOTO' and a.ID_MIX = a.ID_CLIENT AND (a.EXTENSION = 'jpg' or a.EXTENSION = 'jpeg' or a.EXTENSION = 'png' or a.EXTENSION = 'gif') ORDER BY a.ORDER_ITEM LIMIT 0,1	) from dbd_login l where l.ID = dbd_comment.ID_USER),'') ATTACH_CLIENT"
+					"coalesce((select a.FILE_LINK from dbd_attach a WHERE a.MIX = 'CLIENT_PHOTO' and a.ID_MIX = c.ID_CLIENT_INSERT AND (a.EXTENSION = 'jpg' or a.EXTENSION = 'jpeg' or a.EXTENSION = 'png' or a.EXTENSION = 'gif') ORDER BY a.ORDER_ITEM asc,a.ID desc LIMIT 0,1),'')  ATTACH_CLIENT",
+					"coalesce((select a.FILE_LINK from dbd_attach a WHERE a.MIX = 'COMMENT' and a.ID_MIX = c.ID ORDER BY a.ID desc LIMIT 0,1),'') ATTACH_LINKS"
+				];*/
+				
+				var columns:Array = [
+					prefix+'*',
+					"j.DATE_FINAL as DATE_FINAL_JOB",
+					"j.DATE_CANCELED as DATE_CANCELED_JOB",
+					"rep.MESSAGE as REPLY_MESSAGE",
+					"(select (select v.NAME from dbd_client v where v.ID = a.ID_CLIENT) from dbd_login a where a.ID = "+prefix+"ID_USER) NAME_USER ",
+					"(select v.NAME from dbd_client v where v.ID = "+prefix+"ID_CLIENT_REPLY) REPLY_NAME_USER ",
+					"coalesce((select a.FILE_LINK from dbd_attach a WHERE a.MIX = 'CLIENT_PHOTO' and a.ID_MIX = "+prefix+"ID_CLIENT_INSERT AND (a.EXTENSION = 'jpg' or a.EXTENSION = 'jpeg' or a.EXTENSION = 'png' or a.EXTENSION = 'gif') ORDER BY a.ORDER_ITEM asc,a.ID desc LIMIT 0,1 ),'')  ATTACH_CLIENT",
+					"coalesce((select GROUP_CONCAT(a.FILE_LINK order by a.ID desc) from dbd_attach a WHERE a.MIX = 'COMMENT' and a.ID_MIX = "+prefix+"ID ORDER BY a.ID desc LIMIT 0,5),'') ATTACH_LINKS"
+				];
+				return columns;
+			}			
+
+			private function __setPublic(e:MouseEvent):void
+			{
+				PUBLIC_0_.selected = false;
+				PUBLIC_1_.selected = false;
+				PUBLIC_2_.selected = false;
+				e.currentTarget.selected = true;
+			}
+			
+			private function deleteDiscussion(e:*=null):void
+			{
+				var objDat:Object         = listDiscussionGlobal_.selectedItem;
+				var idxDat:int            = listDiscussionGlobal_.selectedIndex;
+				//var idxArr:int            = _financial.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = listDiscussionGlobal_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(idxDat<0)
+					return;
+
+				if(itensCount>1)
+					return;
+
+				if(gnncGlobalStatic._userIdClient!=objDat.ID_CLIENT_INSERT){
+					gnncPermission.__alert();
+					return;
+				}
+
+				var sql:String = '';
+				
+				gnncAlert.__delete('Excluindo este comentário não será possível recuperar os dados. <b>Deseja continuar</b>?','Confirmação de exclusão',
+					function del(event:gnncCloseEvent):void
+					{
+						if(event.detail != gnncAlert.YES)
+							return;
+						
+						enabled = false;
+						sql = new gnncSql().__DELETE(new table_comment(),[objDat.ID],true);
+						connExec.__sql(sql,'.','',__fResult1,__fFault1);
+						
+						function __fResult1(e:*):void
+						{
+							listDiscussionGlobal_.dataProvider.removeItemAt(idxDat);
+							//update
+							//_financial.DATA_ARR = new ArrayCollection(FINANCIAL_.dataProvider.toArray());
+							clearReply();
+							enabled = true;
+							
+							connExec = new gnncAMFPhp();
+							connExec.__sql("delete from dbd_attach where ID_MIX = "+objDat.ID+" ");
+						}
+						
+						function __fFault1(e:*):void{ 
+							enabled = true;
+						}
+						
+					},[gnncAlert.YES,gnncAlert.CANCEL]);
+			}
+
+		]]>
+	</fx:Script>
+	<fx:Declarations>
+		<mx:Fade id="fade2" duration="300"/>
+	</fx:Declarations>
+	<s:VGroup width="100%" height="100%" gap="10" id="replyBox_">
+		
+		<s:Group width="100%" height="100%">
+			<s:List id="listDiscussionGlobal_" width="100%" height="100%" borderVisible="false" contentBackgroundAlpha="0" 
+					dataProvider="{new ArrayCollection()}"
+					itemRenderer="GNNC.modules.project.itemRender.itemRender_Project_Comment_forList"
+					horizontalScrollPolicy="off" verticalScrollPolicy="on"
+					>
+			</s:List>
+			<s:Group id="loading" width="100%" height="100%" />
+		</s:Group>
+		<s:HGroup gap="7" width="100%" paddingTop="0" paddingBottom="0">
+			
+			<s:Rect width="3" height="100%">
+				<s:fill>
+					<s:SolidColor id="replyColor_" color="0xeeeeee"/>
+				</s:fill>
+			</s:Rect>
+			
+			<s:VGroup width="100%" gap="1" padding="0" paddingLeft="5" paddingRight="5">
+				<!-- s:HGroup width="100%" verticalAlign="middle" paddingBottom="5">
+				<s:Label id="REPLY_COMMENT_" width="100%" showTruncationTip="true" height="20" verticalAlign="middle" color="0x777777" 
+				maxDisplayedLines="1" fontSize="12"
+				/>
+				<s:Label id="ID_COMMENT_" showTruncationTip="true" height="20" verticalAlign="middle" color="0x999999" fontSize="11"/>
+				</s:HGroup-->
+				<s:TextArea id="REPLY_" width="100%" height="60" 
+							paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10"
+							focusAlpha=".5" focusedTextSelectionColor="0x33cc00" focusColor="0x33cc00" fontSize="14" maxChars="3000" focusThickness="1"
+							
+							borderVisible="false" borderColor="0xe7e7e7"
+							contentBackgroundAlpha="1" contentBackgroundColor="0xefefef"
+							
+							prompt="Digite..."
+							/>
+				<s:HGroup width="100%" verticalAlign="middle" paddingBottom="1" gap="1">
+					<s:Label id="REPLY_COMMENT_NAME_" showTruncationTip="true" height="20" verticalAlign="middle" color="0x777777" 
+							 maxDisplayedLines="1" fontSize="11" fontWeight="bold" paddingRight="7"
+							 maxWidth="70"
+							 />
+					<s:Label id="REPLY_COMMENT_" width="100%" showTruncationTip="true" height="20" verticalAlign="middle" color="0x777777" 
+							 maxDisplayedLines="1" fontSize="12"
+							 />
+					<!-- s:Button width="50" icon="{gnncEmbedBlackWhite.bw_attach_16}" height="25"
+					label="selecionar arquivo" fontSize="11" color="0x33cc00" focusAlpha="0"
+					/ -->
+					<s:Rect width="5"/>
+					
+					<s:HGroup gap="-1" verticalAlign="middle" showEffect="{fade2}" visible="{REPLY_.text.length>2?true:false}" >
+						<s:ToggleButton id="PUBLIC_0_" width="30" height="30" label="Somento Eu"
+										click="{__setPublic(event)}"
+										icon="{gnncEmbedBlackWhite.bw_access_16_lock}" selected="true"/>
+						<s:ToggleButton id="PUBLIC_2_" width="30" height="30" label="Equipe Interna"
+										click="{__setPublic(event)}"
+										icon="{gnncEmbedBlackWhite.bw_client_16_group}"/>
+						<s:ToggleButton id="PUBLIC_1_" width="30" height="30" label="Público / Cliente"
+										click="{__setPublic(event)}"
+										icon="{gnncEmbedBlackWhite.bw_global_16}"/>
+					</s:HGroup>
+					
+					<s:Button icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" visible="{REPLY_.text.length>2?true:false}"
+							  height="30" width="30"
+							  label="Limpar" fontSize="11" focusAlpha="0"
+							  click="{clearReply()}"
+							  />
+					
+					<s:Button icon="{gnncEmbedImage.TEXT_ENTER_16}" height="30"
+							  label="Enviar" fontSize="11" color="0x333333" focusAlpha="0" fontWeight="bold"
+							  click="{__replyCommentSet()}"
+							  />
+				</s:HGroup>
+			</s:VGroup>
+			
+		</s:HGroup>
+	</s:VGroup>
+
+	
+</s:Group>

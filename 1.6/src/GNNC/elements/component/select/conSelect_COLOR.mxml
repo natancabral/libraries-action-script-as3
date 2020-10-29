@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  width="100%" height="25" 
+		  rightMouseDown="{__menuRight()}"
+		  >
+	<s:layout>
+		<s:HorizontalLayout gap="2" verticalAlign="middle" />
+	</s:layout>
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncClipBoard;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.color.formNew.NEW_COLOR;
+			
+			import mx.events.FlexEvent;
+			
+			private var _color:String = 'FFFFFF';
+			public  var _change:Boolean = false;
+
+			/** 000000 **/
+			public function set value(value_:String):void	{ _color = value_; __changeColor();	}
+			/** 000000 **/
+			public function get value():String				{ return _color 					}
+			
+			public function __changeColor(clearColor_:Boolean=false):void
+			{
+				colorHexValue_.text 				= (clearColor_)?'':(!value)?'':_color;
+				colorHexValue_.setStyle				('contentBackgroundColor',(clearColor_)?0xFFFFFF:(!value)?0xFFFFFF:uint('0x'+_color));
+				
+				if(clearColor_)
+					value = '';
+			}
+
+			/** **************************************************************************** **/
+			/** **************************************************************************** **/
+			/** **************************************************************************** **/
+
+			private function __openPallete():void
+			{
+				var _fR:Function					= function(e:FlexEvent):void
+				{
+					value = _page.value?gnncDataNumber.__toHexColor(_page.value,true).substring(2):'';
+					__changeColor();
+				};
+				var _page:NEW_COLOR 				= new NEW_COLOR();
+				new gnncPopUp().__creation			(_page,false,false,_fR,true);
+			}
+			
+			private function __menuRight():void
+			{
+				var deleteEvent:ContextMenuItem = new ContextMenuItem("Copiar Cor", 	false, true);
+				deleteEvent.addEventListener	(Event.SELECT,__fCopy);
+				
+				var refresh:ContextMenuItem 	= new ContextMenuItem("Colar Cor", 		true, true);
+				refresh.addEventListener		(Event.SELECT,__fPaste);
+				
+				var cm:ContextMenu 				= new ContextMenu();
+				cm.hideBuiltInItems				();
+				//cm.customItems 					= [view,newEvent,edit,deleteEvent,refresh,copy];
+				cm.customItems 					= [deleteEvent,refresh];
+				
+				this.contextMenu 				= cm;
+			}
+			
+			private function __fCopy(event:Event):void
+			{
+				gnncClipBoard.__copyText(colorHexValue_.text);
+			}
+			
+			private function __fPaste(event:Event):void
+			{
+				var _newColor:String = gnncClipBoard.__paste(gnncClipBoard.TEXT_FORMAT).toString();
+				_color = _newColor.replace("0x","").replace("#","0");
+				__changeColor();
+			}
+		]]>
+	</fx:Script>
+
+	<s:TextInput id="colorHexValue_" text="FFFFFF" minWidth="50" maxWidth="100" width="100%" height="25" editable="false" textAlign="center" />
+	<s:Button icon="{gnncEmbedImage.COLOR_16}" click="{__openPallete()}" width="25" toolTip="Paleta de milhões de cores" />
+	<s:Button width="25" height="25" label="Limpar campo..." icon="{gnncEmbedBlackWhite.bw_clear_14_selection}" click="{__changeColor(true)}" skinClass="GNNC.skin.button.skin_buttonLink" />
+
+</s:Module>

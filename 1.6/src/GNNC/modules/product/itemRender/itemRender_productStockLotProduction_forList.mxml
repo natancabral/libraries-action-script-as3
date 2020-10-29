@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false"  
+				
+				height="30" width="100%" minWidth="500"
+				
+				doubleClickEnabled="true" 
+				doubleClick="{__view()}" 
+				rightMouseDown="{__menuRight(event)}" 
+				
+				xmlns:stage="GNNC.elements.stage.*" 
+				xmlns:elements="GNNC.UI.elements.*" 
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.data.gnncDataNumberConvert;
+			import GNNC.data.date.DateUtils;
+			import GNNC.data.date.gnncDate;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			import mx.events.FlexEvent;
+			
+			import spark.core.ContentCache;
+			
+			private function __view(e:*=null):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._view,data));
+				/*
+				return;
+
+				if(data.MIX == 'FINANCIAL_NOTE')
+				{
+					return;
+				}
+				
+				var F:Function 						= function(e:FlexEvent):void{  };
+				var _PAGE:viewFinancial 			= new viewFinancial();
+				_PAGE._tableFinancial 				= new table_financial(data.ID);
+				new gnncPopUp().__creation			(_PAGE,true,false,F);
+				*/
+			}
+			
+			private function __viewFinancial(e:*=null):void
+			{
+				if(data.FINANCIAL_ID)
+				Object(owner).dispatchEvent(new gnncEventGeneral('VIEW_FINANCIAL',data));
+			}
+			
+			private function __menuRight(e:MouseEvent):void
+			{ /*
+				var IN_OR_OUT:String 				= Number(data.VALUE_IN)>0?'(Receita)':Number(data.VALUE_OUT)>0?'(Despesa)':'(Movimentação)';
+				var itemValue:ContextMenuItem  		= new ContextMenuItem('R$ '+Number(data.VALUE_IN+data.VALUE_OUT).toFixed(2).replace('.',',')+' '+IN_OR_OUT,false,false);
+				var itemView:ContextMenuItem 		= new ContextMenuItem('Visualizar',true,true);
+				itemView.addEventListener			(Event.SELECT,__view);
+				
+				// Create custom context menu. 
+				var cm:ContextMenu 	= new ContextMenu();
+				cm.hideBuiltInItems	();
+				cm.customItems 		= [itemValue,itemView];
+				
+				this.contextMenu 	= cm;
+				*/
+			}
+
+			/*private function getUnit(d:Object,returnHightWeight:Boolean=true,setUnitMetric:Boolean=true,returnNumber:Boolean=false):Object
+			{
+				var t:String = String(d.UNIT_TYPE).toLowerCase();
+				var n:Number = Number(d.UNIT);
+				var x:Object = n;
+				if(returnHightWeight==true)
+				{
+					x = n/1000;
+					if(t=='gg')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,1,'')+(!setUnitMetric?'':'Kg');
+					else if(t=='ml')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,2,'')+(!setUnitMetric?'':'L');
+				}
+				else if(returnHightWeight==false)
+				{
+					if(t=='gg')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,0,'')+(!setUnitMetric?'':'g');
+					else if(t=='ml')
+						return returnNumber == true ? x : gnncDataNumber.__safeReal(x,0,'')+(!setUnitMetric?'':'ml');
+				}
+				return String(d.UNIT);
+			}*/
+
+
+
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+		
+	<elements:elementHLine bottom="0" left="3" right="3" alpha="1" color="0xeeeeee" />
+
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha="1" includeIn="hoveredAndShowsCaret,hovered"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret"
+			radiusX="4" radiusY="4"
+			>
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<!--- ################# --> 
+	<!--- color --> 
+	
+	<s:HGroup left="0" top="0" right="0" bottom="0" gap="1" verticalAlign="middle" 
+			  color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF"
+			  paddingLeft="6" paddingRight="6"
+			  >
+
+		<s:Image source="{data.TYPE=='IN'?gnncEmbedBlackWhite.bw_stock_16_product_raw_material:gnncEmbedBlackWhite.bw_stock_16_product}" 
+				 toolTip="{(data.TYPE=='IN'?'Matéria-Prima':data.TYPE=='OUT'?'Produto Final de venda':'Produto')+', Id: '+data.ID}"
+				 />
+		
+		<s:Rect width="2"/>
+		
+		<s:Group width="12" height="12" toolTip="{data.TYPE=='IN'?'Matéria-Prima':data.TYPE=='OUT'?'Produto Final de venda':'Produto'}">
+			<s:Rect width="12" height="12" radiusX="4" radiusY="4">
+				<s:fill>
+					<s:SolidColor color="{data.TYPE=='IN'?0x00cc66:data.TYPE=='OUT'?0x0099ff:0x777777}"/>
+				</s:fill>
+			</s:Rect>
+		</s:Group>
+		
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME_PRODUCT)}" fontSize="11" fontWeight="bold" width="100%" 
+				 maxDisplayedLines="1" showTruncationTip="true" paddingLeft="5" paddingRight="5"/>
+
+		<elements:elementLabelBackgroudColor text="{gnncDataNumberConvert.getUnit(data)+''}" width="55" toolTip=""	height="20" verticalAlign="middle" _colorBackground="0xEEEEEE" textAlign="right" 
+											 _color="0x333333" _color.selected="0xFFFFFF" _color.selectedAndShowsCaret="0xFFFFFF" _colorBackgroundAlpha=".2" />
+		<elements:elementLabelBackgroudColor text="{gnncDataNumberConvert.getUnit(data,false)+''}" width="50" toolTip=""	height="20" verticalAlign="middle" _colorBackground="0xEEEEEE" textAlign="right" 
+											 _color="0x333333" _color.selected="0xFFFFFF" _color.selectedAndShowsCaret="0xFFFFFF" _colorBackgroundAlpha=".2" />
+		<!-- elements:elementLabelBackgroudColor text="{data.UNIT_TYPE}" 	width="30" toolTip="Unidade" height="20" verticalAlign="middle" textAlign="center" _colorBackground="0xFFFFFF" 
+											 _color="0x333333" _color.selected="0xFFFFFF" _color.selectedAndShowsCaret="0xFFFFFF" _colorBackgroundAlpha=".2" _fontSize="11"
+											 visible="true"/ -->
+
+		<s:Button icon="{gnncEmbedBlackWhite.bw_view_16}" width="20" height="20" toolTip="Visualizar..." skinClass="GNNC.skin.button.skin_buttonLink" click="{__view()}" />
+
+	</s:HGroup>
+	
+	
+</s:ItemRenderer>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" 
+				width="100%" height="25" 
+				>
+	<!---
+	
+	For request Dispatch
+	
+	ATTACH_.addEventListener(gnncEventGeneral._view,__ATTACH_VIEW);
+	ATTACH_.addEventListener(gnncEventGeneral._delete,__ATTACH_DELETE);
+	ATTACH_.addEventListener(gnncEventGeneral._edit,__ATTACH_EDIT);
+	ATTACH_.addEventListener(gnncEventGeneral._refresh,__ATTACH_LIST);
+	
+	-->
+		<fx:Script>
+			<![CDATA[
+				import GNNC.data.file.gnncFilesRemote;
+				import GNNC.gnncEmbedExtension;
+
+				private function __FILE(ext_:String):Object
+				{
+					var OBJ:Object = gnncEmbedExtension[ext_.toUpperCase()+'_16'];
+					
+					if(!OBJ)
+						OBJ = gnncEmbedExtension.ALL_16;
+					
+					return OBJ; 
+				}
+				
+
+			]]>
+		</fx:Script>
+		
+		<s:states>
+			<s:State name="normal" />
+			<s:State name="hovered" />
+			<s:State name="selected" />
+			<s:State name="normalAndShowsCaret"/>
+			<s:State name="hoveredAndShowsCaret"/>
+			<s:State name="selectedAndShowsCaret"/>
+		</s:states>
+		
+	<s:Rect left="0" top="0" right="0" bottom="0" >
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha=".8" includeIn="hoveredAndShowsCaret,hovered" >
+		<s:fill>
+			<s:SolidColor color="0xDDDDDD"/>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected,selectedAndShowsCaret" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+
+	<s:HGroup left="5" top="0" right="5" bottom="0" gap="4" verticalAlign="middle" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF" fontWeight.selected="bold" fontWeight.selectedAndShowsCaret="bold" fontSize="11" >
+		<s:Image source="{__FILE(data.ext)}" />
+		<s:Label text="{data.label}" showTruncationTip="true" maxDisplayedLines="1" fontSize="11" width="100%" paddingTop="1" paddingLeft="5" />
+		<s:Label text="{data.ext}" width="45" showTruncationTip="true" maxDisplayedLines="1" fontSize="11" paddingTop="1" paddingLeft="5" />
+		<s:Label text="{gnncFilesRemote.__bytes2Legend(data.size)}" maxDisplayedLines="1" showTruncationTip="true" fontSize="11" paddingTop="1" width="45" />
+	</s:HGroup>
+	
+</s:ItemRenderer>

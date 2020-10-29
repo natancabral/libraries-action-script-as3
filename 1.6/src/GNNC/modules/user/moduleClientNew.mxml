@@ -1,0 +1,1220 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Module xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		  xmlns:s="library://ns.adobe.com/flex/spark" 
+		  xmlns:mx="library://ns.adobe.com/flex/mx" 
+		  
+		  width="100%" height="100%"
+		  creationComplete="{__start()}" 
+		  
+		  xmlns:stage		= "GNNC.elements.stage.*" 
+		  xmlns:elements="GNNC.UI.elements.*" 
+		  xmlns:gnncLoading	= "GNNC.UI.gnncLoading.*" 
+		  xmlns:select		= "GNNC.elements.component.select.*" 
+		  xmlns:list		= "GNNC.elements.component.list.*" 
+		  >
+	<fx:Script>
+		<![CDATA[
+			import GNNC.UI.gnncAlert.gnncAlert;
+			import GNNC.UI.gnncPopUp.gnncPopUp;
+			import GNNC.data.conn.gnncAMFPhp;
+			import GNNC.data.data.gnncData;
+			import GNNC.data.data.gnncDataArrayCollection;
+			import GNNC.data.data.gnncDataBindable;
+			import GNNC.data.data.gnncDataNumber;
+			import GNNC.data.file.gnncFileCsv;
+			import GNNC.data.file.gnncFilePdf;
+			import GNNC.data.file.gnncFilesNative;
+			import GNNC.data.file.gnncFilesRemote;
+			import GNNC.data.globals.gnncGlobalArrays;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.permission.gnncPermission;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedExtension;
+			import GNNC.gnncEmbedImage;
+			import GNNC.modules.attach.formNew.newAttach;
+			import GNNC.modules.client.formNew.newClient;
+			import GNNC.modules.client.formNew.newClientQuick;
+			import GNNC.modules.client.itemRender.itemRender_clientName_forList;
+			import GNNC.modules.client.report.gnncFileReport_client_inListSimple;
+			import GNNC.modules.client.report.gnncFileReport_client_viewClient;
+			import GNNC.modules.course.formNew.selectCourse;
+			import GNNC.modules.document.formNew.newDocumentLabel;
+			import GNNC.sqlTables.table_attach;
+			import GNNC.sqlTables.table_client;
+			import GNNC.time.gnncTime;
+			
+			import mx.collections.ArrayCollection;
+			
+			private var _connClient:gnncAMFPhp 		= new gnncAMFPhp();
+			private var _connExec:gnncAMFPhp 		= new gnncAMFPhp();
+			//private var _ATTACH:gnncAMFPhp 		= new gnncAMFPhp();
+			
+			private const _MIX:String = 'CLIENT';
+			
+			private var _gnncFile:gnncFilesRemote 	= new gnncFilesRemote();
+			private var _gnncPopUp:gnncPopUp 		= new gnncPopUp();
+			private var _gnncPdf:gnncFilePdf 		= new gnncFilePdf();
+			private var _gnncTime:gnncTime 			= new gnncTime();
+			
+			private const _clientColumn:Array = 
+				[
+					'dbd_client.ID','NAME','LAST_NAME','MIDDLE_NAME','DATE_BIRTH','ACTIVE','CONTROL','SEX','STAR_RATING',
+					'NICK_NAME','EMAIL','ZIPCODE','CPF_CNPJ','ENROLLMENT','CITY','STATE','NEIGHBORHOOD','PHONE','PHONE_CEL','PHONE_FAX','ISO_COUNTRY',
+					'PHONE_COMPANY','ADDRESS','ADDRESS_NUMBER','ADDRESS_COMPLEMENT','CITY','PROFESSIONAL_NUMBER','PROFESSIONAL_STATE','COMPANY',
+					'ID_GROUP',
+					//birthday
+					'(RIGHT(DATE_BIRTH,2)) AS DAY',
+					//names
+					"coalesce((select NAME from dbd_group where dbd_group.ID = dbd_client.ID_GROUP),'') NAME_GROUP",
+					//star
+					//"coalesce((select ID 		from dbd_star s 	where s.ID_MIX = dbd_client.ID AND s.MIX = 'CLIENT' AND s.ID_USER = '"+gnncGlobalStatic._userId+"' LIMIT 0,1 ),0) ID_STAR",
+					//"coalesce((select ENABLED 	from dbd_star s 	where s.ID_MIX = dbd_client.ID AND s.MIX = 'CLIENT' AND s.ID_USER = '"+gnncGlobalStatic._userId+"' LIMIT 0,1 ),0) STAR",
+					//attach
+					"coalesce((select a.FILE_LINK from dbd_attach a WHERE a.MIX = 'CLIENT_PHOTO' and a.ID_MIX = dbd_client.ID AND (a.EXTENSION = 'jpg' or a.EXTENSION = 'jpeg' or a.EXTENSION = 'png' or a.EXTENSION = 'gif') ORDER BY a.ORDER_ITEM asc,a.ID desc LIMIT 0,1	),'') ATTACH_CLIENT"
+				];
+			
+			private const _letters:String = "*,A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,X,W,Y,Z";
+			private function __start():void
+			{
+				__config();
+				__letters();
+				__birthDay();
+				
+				client_.list_.addEventListener(KeyboardEvent.KEY_DOWN,__blockKey);
+				
+				client_.list_.addEventListener(KeyboardEvent.KEY_DOWN,__selected);
+				client_.list_.addEventListener(MouseEvent.MOUSE_DOWN,__selected);
+				
+				//gnncDataBindable.__loginSession(__getValuesClients);
+				gnncDataBindable.__loginSession(permission);
+			}
+			
+			private function permission(e:*=null):void
+			{
+				if(gnncGlobalStatic._userClient===true)
+					enabled = false;
+				else
+					gnncPermission.__blockModule(this,'module-client');
+			}
+			
+			
+			private function __blockKey(e:KeyboardEvent):void
+			{
+				if(e.currentTarget.enabled == false){
+					e.preventDefault();
+					e.stopImmediatePropagation();
+					e.stopPropagation();
+				}
+			}
+			
+			private function __config():void
+			{
+				letters_.addEventListener				(gnncEventGeneral._mouseClick,__clientLetter);
+				
+				client_._allowMultipleSelection 		= true;
+				client_._dragEnabled 					= true;
+				client_._sqlColumns						= _clientColumn;
+				client_.__layoutVertical(0,0,0,10,20,20);
+				
+				clientAlter_.itemRenderIndex			= 2;
+				clientAlter_.itemRenderClass			= itemRender_clientName_forList;
+				//clientAlter_._allowMultipleSelection 	= true;
+				clientAlter_._allowDuplicatePropertyId	= false;
+				clientAlter_._dropEnabled				= true;
+				//clientAlter_._contextMenu				= null;
+				//clientAlter_._contextMenuItems			= null;
+				
+				clientAlter_._contextMenuItems = new ArrayCollection(
+					[
+						{label:'Visualizar',				enabled:true,		separator:true,		visible:true,	dispatchEvent:'', 	fName:clientAlter_.__fView				},
+						{label:'Remover item(ns) da lista',	enabled:true,		separator:true,		visible:true,	dispatchEvent:'', 	fName:clientAlter_.__fRemoveItemList	}
+					]
+				);
+			}
+			
+			private function __letters():void
+			{
+				letters_.dataProvider 					= new ArrayCollection(_letters.split(",")); 
+				letters_.selectedIndex 					= 0;
+			}
+			
+			private function __birthDay():void
+			{
+				birthDayMonth_.selectedIndex 			= new Date().month;
+				birthDayDay_.selectedIndex 				= new Date().date-1;
+			}
+			
+			private function __clientClearSearch():void
+			{
+				letters_.selectedIndex 	= 0;
+				COMPANY_YES_.selected 	= COMPANY_NO_.selected 			= true;
+				STATUS_.selectedIndex 	= DEPARTAMENT_.selectedIndex 	= GROUP_.selectedIndex 	= CATEGORY_.selectedIndex 	= -1;
+				SEARCH_.text 			= clientFilter_.text = '';
+			}
+			
+			/**
+			 * 
+			 * Quando este pesquisa se tornar uma NOTIFICAÇÃO DO SISTEMA DAYBYDAY
+			 * a pasquisa serial agrupada por ID_GRUPO para que Aluno, Professores e Pacientes sejam Diferenciados.
+			 * 
+			 * NOTIFICAÇÃO (Ao lado de configurações)
+			 * Aniversariantes 	Hoje/Mês
+			 * Alunos			2/10
+			 * Professores		0/3
+			 * Pacientes 		0/1
+			 *  
+			 * 
+			 * */
+			private function __getValuesClients():void
+			{
+				clientRows_.text = clientBirthDay_.text = clientBirthMonth_.text = '...';
+				
+				var _date:Date = null; _date = new Date();
+				
+				var d:String = gnncDataNumber.__setZero(_date.date);
+				var m:String = gnncDataNumber.__setZero(_date.month+1);
+				
+				var _where:String = " c.COMPANY = '0' AND c.DATE_BIRTH <> '1900-01-01' AND c.DATE_BIRTH <> '0000-00-00' limit 0,1 "; //VISIBLE = '1' AND 
+				var _sql:String = " select " + 
+					" COUNT(ID) as ROWS, " + 
+					" (select COUNT(c.ID) from dbd_client c where RIGHT(c.DATE_BIRTH,5) like RIGHT('%-"+m+"-"+d+"',5) AND "+_where+" ) as DATE_BIRTH_DAY, " + 
+					" (select COUNT(c.ID) from dbd_client c where c.DATE_BIRTH like '%-"+m+"-%' AND "+_where+" ) as DATE_BIRTH_MONTH " + 
+					" from dbd_client " +
+					" where ID > 0 limit 0,1 ";
+				
+				_connExec.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{
+					if(_connExec.DATA_ROWS==0)
+						return;
+					
+					var o:Object   = _connExec.DATA_ARR.getItemAt(0);
+					var today:uint = _connExec.DATA_ROWS ? o.DATE_BIRTH_DAY : 0;
+					
+					clientRows_.text 		= _connExec.DATA_ROWS ? 'Total: ' + gnncDataNumber.__setThousand(o.ROWS) : '0' ;
+					clientBirthMonth_.text 	= _connExec.DATA_ROWS ? 'Mês: '   + gnncDataNumber.__setThousand(o.DATE_BIRTH_MONTH) : '0' ;
+					clientBirthDay_.text 	= _connExec.DATA_ROWS ? 'Hoje: '  + today : '0';
+					//clientBirthToday_.visible = !_connExec.DATA_ROWS ? false : o.DATE_BIRTH_DAY == 0 ? false : true;
+					
+					if(today)
+						__reportClientBirth('today');
+				}
+				
+				function __fFault(e:*):void
+				{ 
+					clientRows_.text 			= '0';
+					clientBirthMonth_.text 		= '0';
+					clientBirthDay_.text 		= '0';
+					//clientBirthToday_.visible = false;
+				}
+			}
+			
+			private function __clientNew(company_:Boolean):void
+			{
+				var p:newClient = new newClient();
+				p.showSelectCompany = true;
+				
+				if(company_)
+					p.setType(true);
+				
+				new gnncPopUp().__creation(p,true,false,__fClose);
+				function __fClose(e:*=null):void
+				{
+				}	
+				
+				//client_._tableClass['COMPANY'] = company_ ? 1 : 0 ;
+				//client_.__fNew();
+			}
+			
+			private function __clientNewQuick(company_:Boolean=false):void
+			{
+				var p:newClientQuick = new newClientQuick();
+				p.showSelectCompany = true;
+				
+				if(company_)
+					p.setType(true);
+				
+				new gnncPopUp().__creation(p,true,false,__fClose);
+				function __fClose(e:*=null):void
+				{
+				}				
+			}
+			
+			private function __clientEdit():void{
+				client_.__fEdit();
+			}
+			
+			private function __clientView():void{
+				client_.__fView();
+			}
+			
+			private function __clientDelete():void{
+				client_.__fDelete();
+			}
+			
+			private function __clientLetter(e:*=null):void{
+				if(letters_.selectedIndex < 0) 
+					return;
+				__clientList(letters_.selectedItem,true);
+			}
+			
+			private function __clientLast(rows_:uint):void
+			{
+				var _table:table_client = new table_client();
+				_table.VISIBLE 		= 0;
+				_table.ACTIVE 		= 0;
+				
+				var _sql:String = new gnncSql().__SELECT(_table,false,_clientColumn,null,null,null,null,['ID'],true,['0',rows_]);
+				
+				client_.__loading(true);
+				
+				_connClient.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{ 
+					client_.__loading(false);
+					client_.dataProvider 	= _connClient.DATA_ARR;
+					clientFilter_.text 		= '';  
+				}
+				
+				function __fFault(e:*):void
+				{ 
+					client_.__loading(false);
+				}
+			}
+			
+			private function __clientList(value_:String='',onlyFirstLetter_:Boolean=false):void
+			{
+				if(!onlyFirstLetter_)
+					letters_.selectedIndex = 0;
+				
+				_connClient._loading = false;
+				
+				var _columnsAnd:Array 		= new Array();
+				var _columnsOr:Array 		= new Array();
+				var _valuesOfBreak:Array 	= new Array();
+				
+				value_ = gnncData.__replace(value_,";","");
+				
+				var s:String = value_;
+				
+				s = gnncData.__replace(s,'´','\"');
+				s = gnncData.__replace(s,'`','\"');
+				s = gnncData.__replace(s,'"','\"');
+				s = gnncData.__replace(s,"'",'\"');
+				s = gnncData.__replace(s,'\\','\\\\');
+				s = gnncData.__replace(s,'  ',' ');
+				s = gnncData.__replace(s,'  ',' ');
+				
+				value_ = s;
+				
+				/** ACTIVE START ########################################### **/ 
+				
+				if(STATUS_.selectedIndex > -1)
+					switch(STATUS_.value)
+					{
+						case 0: _columnsAnd = ["ACTIVE = 0 "]; break;
+						case 1: _columnsAnd = ["ACTIVE = 1 "]; break;
+						case 2: _columnsAnd = ["ACTIVE = 2 "]; break;
+						case 3: _columnsAnd = ["ACTIVE = 3 "]; break;
+						case 4: _columnsAnd = ["ACTIVE = 4 "]; break;
+					}
+				
+				/** ACTIVE END ########################################### **/
+				
+				/** COMPANY START ########################################### **/
+				
+				if(COMPANY_YES_.selected && !COMPANY_NO_.selected)
+					_columnsAnd.push(" COMPANY LIKE '1' ");
+				
+				if(!COMPANY_YES_.selected && COMPANY_NO_.selected)
+					_columnsAnd.push(" COMPANY LIKE '0' ");
+				
+				//ORDER
+				
+				var _order:Array = new Array();
+				
+				if(CORDER_NAME.selected){
+					_order.push('NAME');
+				}else if(CORDER_LAST.selected){
+					_order.push('ID');
+					CORDERASC_DESC.selected = true; //wtf?
+				}else if(CORDER_BIRTH.selected){
+					_order.push('RIGHT(DATE_BIRTH,5)');
+				}else if(CORDER_YEARS_OLD.selected){
+					_order.push('DATE_BIRTH');
+				}else if(CORDER_STAR.selected){
+					_order.push('STAR');
+				}else if(CORDER_SEX.selected){
+					_order.push('SEX');
+				}else if(CORDER_DEPARTAMENT.selected){
+					_order.push('NAME_DEPARTAMENT');
+				}else if(CORDER_GROUP.selected){
+					_order.push('NAME_GROUP');
+				}else if(CORDER_CATEGORY.selected){
+					_order.push('NAME_CATEGORY');
+				}
+				
+				if(value_.indexOf(':')<0)
+				{
+					value_ 			= gnncData.__replace(value_,"%","");
+					
+					value_ 			= (value_=='*') 		? "%" : value_;
+					value_ 			= (onlyFirstLetter_) 	? value_+"%" : "%"+value_+"%";
+					_columnsOr		= (onlyFirstLetter_) 	? ["NAME LIKE '"+value_+"'"] : ["NAME LIKE '"+value_+"'","MIDDLE_NAME LIKE '"+value_+"'","LAST_NAME LIKE '"+value_+"'","CPF_CNPJ LIKE '"+value_+"'","RG_REGISTER LIKE '"+value_+"'","ID = '"+value_+"'","ENROLLMENT LIKE '"+value_+"'","EMAIL LIKE '"+value_+"'","DESCRIPTION LIKE '"+value_+"'","CITY LIKE '"+value_+"'","STATE LIKE '"+value_+"'","ADDRESS LIKE '"+value_+"'"];
+				}
+				else
+				{
+					_valuesOfBreak 	= value_.split(':');
+					_columnsOr		= [_valuesOfBreak[0]+" LIKE '"+gnncData.__trimText(_valuesOfBreak[1])+"'"];
+				}
+				
+				if(_columnsAnd)
+				{
+					if(!_columnsAnd.length)
+						_columnsAnd = null;
+				}
+				
+				var _table:table_client = new table_client();
+				_table.ID_DEPARTAMENT 	= DEPARTAMENT_.value;
+				_table.ID_GROUP 		= GROUP_.value
+				_table.ID_CATEGORY 		= CATEGORY_.value;
+				_table.ACTIVE			= 0;
+				
+				function __fResult(e:*):void
+				{ 
+					client_.__loading(false);
+					client_.dataProvider 	= _connClient.DATA_ARR;
+					clientFilter_.text 		= '';  
+				}
+				
+				function __fFault(e:*):void
+				{ 
+					client_.__loading(false);
+				}
+				
+				var _col:Array		= gnncDataArrayCollection.clone(new ArrayCollection(_clientColumn)).toArray();
+				
+				//star
+				_col.push	("coalesce((select ID 		from dbd_star s where s.ID_MIX = dbd_client.ID AND s.MIX like 'CLIENT' AND s.ID_USER like '"+gnncGlobalStatic._userId+"' LIMIT 0,1 ),0) ID_STAR");
+				_col.push	("coalesce((select ENABLED 	from dbd_star s where s.ID_MIX = dbd_client.ID AND s.MIX like 'CLIENT' AND s.ID_USER like '"+gnncGlobalStatic._userId+"' LIMIT 0,1 ),0) STAR");
+
+				_col.push	("coalesce(( select GROUP_CONCAT(s2.ID_PROJECT) from dbd_course_student s2 where s2.ID_CLIENT = dbd_client.ID LIMIT 1 ),'') IDS_COURSE_STUDENT ");
+				_col.push	("coalesce(( select GROUP_CONCAT(s2.ID_PROJECT) from dbd_course_teacher s2 where s2.ID_CLIENT = dbd_client.ID LIMIT 1 ),'') IDS_COURSE_TEACHER ");
+
+				client_.__loading(true);
+				
+				var _sql:String 	= new gnncSql().__SELECT(_table,false,_col,null,null,_columnsAnd,_columnsOr,_order,CORDERASC_DESC.selected?true:false,null,['NAME','MIDDLE_NAME']);
+				
+				_connClient.__sql	(_sql+' limit 0,1000','','',__fResult,__fFault);
+			}
+			
+			private function __clientRefresh():void
+			{
+				_connClient.__sqlRefresh();
+			}
+			
+			private function __clientAddressList():void
+			{
+				var _table:table_client = new table_client();
+				_table.CITY 			= !CITY_JUST_.selected 			? '%'+CITY_.text+'%' 			: CITY_.text;
+				_table.NEIGHBORHOOD 	= !NEIGHBORHOOD_JUST_.selected 	? '%'+NEIGHBORHOOD_.text+'%' 	: NEIGHBORHOOD_.text;
+				_table.ADDRESS 			= '%'+ADDRESS_.text+'%';
+				_table.EMAIL		 	= '%'+EMAIL_.text+'%';
+				_table.VISIBLE			= 0;
+				_table.ACTIVE			= 0;
+				
+				var _sql:String			= new gnncSql().__SELECT(_table,false,_clientColumn,null,null,null,null,['NAME'],false,null,['CITY','NEIGHBORHOOD','ADDRESS','EMAIL']);
+				
+				//group by email (repeated emails)
+				if(emailGroup_.selected && gnncData.__trimText(EMAIL_.text))
+					_sql = gnncData.__replace(_sql," ORDER BY "," group by EMAIL ORDER BY ");
+				
+				_connClient.__sql			(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{ 
+					client_.dataProvider 	= _connClient.DATA_ARR;
+					clientFilter_.text 		= '';
+				}
+				
+				function __fFault(e:*):void
+				{ 
+				}
+				
+			}
+			
+			private function __clientAddressClearSearch():void
+			{
+				CITY_.text				= '';
+				NEIGHBORHOOD_.text		= '';
+				ADDRESS_.text			= '';
+				EMAIL_.text				= '';
+				
+				NEIGHBORHOOD_JUST_.selected 	= false;
+				CITY_JUST_.selected				= false;
+			}
+			
+			private function __attachNew():void
+			{
+				var objDat:Object         = client_.selectedItem;
+				var idxDat:int            = client_.selectedIndex;
+				var idxArr:int            = _connClient.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = client_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(itensCount > 1){
+					new gnncAlert().__alert('Selecione apenas um item na lista.');
+					return;
+				}
+				if(idxDat < 0){
+					new gnncAlert().__alert('Selecione um item na lista.');
+					return;
+				}
+				
+				var _table:table_attach 		= new table_attach();
+				_table.ID_MIX					= client_.value;
+				_table.MIX						= _MIX;
+				
+				var page:newAttach 			   = new newAttach();
+				page._MIX 						= _MIX;
+				page._tableAttach 				= _table;
+				
+				new gnncPopUp().__creation		(page,true,false,__fRemove);
+				
+				function __fRemove(e:*):void
+				{ 
+					__clientRefresh();
+				}
+			}
+			
+			private function __clientExportEmails():void
+			{
+				var _csv:String = gnncFileCsv.__arrayCollection2Csv(new ArrayCollection(client_.dataProvider.toArray()),['NAME','EMAIL']);
+				new gnncFilesNative().__saveWithBrowserNative('DAYBYDAY - '+gnncGlobalStatic._programName+' - Relacao de Emails','txt',_csv,gnncFilesNative._documentDirectory,'',true);
+			}
+			
+			private function __reportClientForm(clear_:Boolean=false):void
+			{
+				var objDat:Object         = client_.selectedItem;
+				var idxDat:int            = client_.selectedIndex;
+				var idxArr:int            = _connClient.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = client_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(itensCount > 1){
+					new gnncAlert().__alert('Selecione apenas um item na lista.');
+					return;
+				}
+				if(idxDat < 0){
+					new gnncAlert().__alert("Selecione um cliente na listagem.");
+					return;
+				}
+				
+				/*var _object:Object 	= new Object();
+				_object.PHOTO		= null;//PHOTO_;
+				_object.ID			= client_.value;
+				
+				new gnncFileReport_client_viewClient().__create(clear_?null:_object);*/
+				
+				new gnncFileReport_client_viewClient().__createPersonalWithListCourse(objDat.ID,null);
+			}
+			
+			private function __reportClientList():void
+			{
+				var objDat:Object         = client_.selectedItem;
+				var idxDat:int            = client_.selectedIndex;
+				var idxArr:int            = _connClient.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = client_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(client_.dataProvider.length==0){
+					new gnncAlert().__alert("Não há itens na listagem principal.");
+					return;
+				}
+				new gnncFileReport_client_inListSimple().__createPersonal(new ArrayCollection(client_.dataProvider.toArray()));
+			}
+			
+			private function __reportClientBirth(type_:String):void
+			{
+				client_.__loading(true);
+				
+				var _sql:String 	= '';
+				var _x:Array 		= new Array();
+				
+				var _today:Date 	= new Date();
+				var _day:uint 		= birthDayDay_.selectedItem.value;
+				var _month:uint 	= birthDayMonth_.selectedItem.value;
+				
+				switch(type_)
+				{
+					case 'today': 
+						_x = [" DATE_BIRTH LIKE '%-"+gnncDataNumber.__setZero((_month))+"-"+gnncDataNumber.__setZero(_today.date)+"' "];
+						break;
+					case 'month': 
+						_x = [" DATE_BIRTH LIKE '%-"+birthDayMonth_.selectedItem.data+"-%' "];
+						break;
+					case 'dayMonth': 
+						_x = [" DATE_BIRTH LIKE '%-"+gnncDataNumber.__setZero((_month))+"-"+gnncDataNumber.__setZero(_day)+"' "];
+						break;
+					default:
+						return;
+				}
+				
+				_x.push(" COMPANY = '0' ");
+				_x.push(" DATE_BIRTH <> '1900-01-01' ");
+				
+				var _table:table_client = new table_client();
+				_table.ACTIVE 			= 0;
+				//_table.VISIBLE			= 1;
+				
+				_sql 	= new gnncSql().__SELECT(_table,false,_clientColumn,null,null,_x,null,['DAY','DATE_BIRTH'],false,null,['DATE_BIRTH']);
+				
+				//new gnncAlert().__alert(_sql)
+				
+				_connClient.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{
+					client_.__loading(false);
+					client_.dataProvider = _connClient.DATA_ARR;
+				}
+				
+				function __fFault(e:*):void
+				{
+					client_.__loading(false);
+				}
+			}
+			
+			/*private function __reportClientControl(control_:uint):void
+			{
+			var _sql:String 		= new gnncSql().__SELECT(new table_client(),false,_clientColumn,null,null,[" CONTROL LIKE '"+control_+"' "],null,['NAME'],false);
+			_connClient.__sql			(_sql);
+			}*/
+			
+			private function __newDocumentLabel():void
+			{
+				var _page:newDocumentLabel 	= new newDocumentLabel();
+				_page._list 				= new ArrayCollection(client_.dataProvider.toArray());
+				new gnncPopUp().__creation	(_page);
+			}
+			
+			private function __clientStar():void
+			{
+				client_.__selectStar();
+			}
+			
+			private function __clientCourse(student_:Boolean,both_:Boolean=false):void
+			{
+				var _page:selectCourse = new selectCourse();
+				
+				new gnncPopUp().__creation(_page,false,true,__fRemove);
+				
+				function __fRemove(e:*):void
+				{
+					if(!_page._idCourse)
+						return;
+					
+					//__courseStudentList(_page._idCourse);
+					
+					if(both_)
+						client_.__selectCourseAll(_page._idCourse);
+					else if(student_)
+						client_.__selectCourseStudents(_page._idCourse);
+					else
+						client_.__selectCourseTeachers(_page._idCourse);
+				}
+			}
+			
+			private function __clientAlter2client(inverse_:Boolean=false):void
+			{
+				if(!inverse_)
+				{
+					if(!clientAlter_._length)
+						return;
+					
+					client_.dataProvider 		= new gnncDataArrayCollection().__clone(new ArrayCollection(clientAlter_.dataProvider.toArray()));
+					clientAlter_.dataProvider 	= new ArrayCollection();
+				}
+				else
+				{
+					if(!client_._length)
+						return;
+					
+					clientAlter_.dataProvider 	= new gnncDataArrayCollection().__clone(new ArrayCollection(client_.dataProvider.toArray()));
+					client_.dataProvider 		= new ArrayCollection();
+				}
+				
+			}
+			
+			private function __clientItemIndex(e:MouseEvent,index_:uint):void
+			{
+				l1_.selected = false;
+				l2_.selected = false;
+				
+				e.currentTarget.selected = true;
+				
+				client_.itemRenderIndex = index_;
+				
+				if(index_ == 1)
+					client_.__layoutTile(200,90,2,2);
+				else
+					client_.__layoutVertical(0,0,0,20,20,20);
+			}
+			
+			private function __clientDuplicate():void
+			{
+				
+				/*
+				var _sql:String = " SELECT c.NAME FROM dbd_client as c " +
+				" INNER JOIN " +
+				" (SELECT d.NAME FROM dbd_client as d GROUP BY d.NAME HAVING count(ID) > 1) dup " +
+				" ON c.NAME = dup.NAME ";
+				*/
+				
+				client_.__loading(true);
+				
+				var _sql:String = " SELECT " +
+					" ID,dbd_client.NAME,NICK_NAME,DATE_BIRTH,PHONE,DATE,ACTIVE,EMAIL, " +
+					" coalesce((select NAME from dbd_group where dbd_group.ID like dbd_client.ID_GROUP ),'') NAME_GROUP " +
+					" FROM dbd_client " +
+					" INNER JOIN " +
+					" (SELECT d.NAME FROM dbd_client as d GROUP BY SOUNDEX(d.NAME) HAVING count(d.ID) > 1 ) dup " + 
+					" ON SOUNDEX(dbd_client.NAME) = SOUNDEX(dup.NAME) " +
+					" order by NAME ";
+				
+				_connClient.__sql(_sql,'','',__fResult,__fFault);
+				
+				function __fResult(e:*):void
+				{
+					client_.__loading(false);
+					client_.dataProvider = _connClient.DATA_ARR;
+					clientFilter_.text = '';  
+				}
+				
+				function __fFault(e:*):void
+				{
+					client_.__loading(false);
+				}
+				
+			}
+
+			private function __selected(e:*=null):void
+			{
+				var list:Object = e.currentTarget;
+				
+				var objDat:Object         = list.selectedItem;
+				var idxDat:int            = list.selectedIndex;
+				//var idxArr:int            = _financial.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = client_.list_.selectedItems;
+				var itensCount:uint       = itens.length;
+
+				clientCousesRows_.text = '0';
+				clientCousesList_.dataProvider = new ArrayCollection();
+
+				if(idxDat<0)
+					return;
+
+				if(itensCount>1)
+					return;
+				
+				if(objDat.IDS_COURSE_STUDENT=='' && objDat.IDS_COURSE_TEACHER=='' )
+					return;
+
+				clientCousesRows_.text = uint(String(objDat.IDS_COURSE_STUDENT).split(',').length + String(objDat.IDS_COURSE_TEACHER).split(',').length) + '';
+				__listCourses();
+			}
+			
+			private function __listCourses():void
+			{
+				if(clientCousesShow_.selected==false)
+					return;
+				
+				var objDat:Object         = client_.selectedItem;
+				var idxDat:int            = client_.selectedIndex;
+				//var idxArr:int            = _financial.DATA_ARR.getItemIndex(objDat);
+				var itens:Vector.<Object> = client_.list_.selectedItems;
+				var itensCount:uint       = itens.length;
+				
+				if(idxDat<0)
+					return;
+				
+				if(itensCount>1)
+					return;
+
+				var v:Array = new Array();
+				
+				if(objDat.IDS_COURSE_STUDENT!='')
+					v.push(objDat.IDS_COURSE_STUDENT);
+				if(objDat.IDS_COURSE_TEACHER!='')
+					v.push(objDat.IDS_COURSE_TEACHER);
+				
+				var _sql:String = " SELECT " +
+					" p.ID as ID, " +
+					" p.NAME as NAME " +
+					" from dbd_project p where p.ID IN ("+v.join(',')+") " +
+					" order by p.NAME ";
+				
+				clientCousesRows_.text = 'Carregando...';
+				
+				_connExec._allowGlobalError = false;
+				_connExec._allowGlobalLoading = false;
+				_connExec.__sql(_sql,'','',__fResult,__fFault);
+				
+				_gnncTime.__stop();
+				
+				function __fResult(e:*):void
+				{
+					clientCousesRows_.text = uint(String(objDat.IDS_COURSE_STUDENT).split(',').length + String(objDat.IDS_COURSE_TEACHER).split(',').length) + '';
+					clientCousesList_.dataProvider = _connExec.DATA_ARR;
+				}
+				
+				function __fFault(e:*):void
+				{
+					clientCousesRows_.text = '0';
+					clientCousesList_.dataProvider = new ArrayCollection();
+				}
+
+			}
+
+
+		]]>
+	</fx:Script>	
+	<fx:Declarations>
+		<mx:Fade id="fade_" duration="300" />
+	</fx:Declarations>
+	<fx:Style>		
+		.AC {
+			skin: ClassReference("GNNC.skin.accordion.skin_accordion_header");
+		}
+		
+	</fx:Style>
+	
+	<elements:elementBarStatus width="68" height="100%" />
+	
+	<s:HGroup width="100%" height="100%" gap="0">
+		
+		<s:VGroup width="67" height="100%" gap="1">
+			
+			<s:Button width="100%" height="60" icon="{gnncEmbedBlackWhite.bw_new_32}" 		toolTip="Cadastro Rápido" iconPlacement="top" skinClass="GNNC.skin.button.skin_buttonLink" click="{__clientNewQuick(false)}"/>
+			<s:Button width="100%" height="60" icon="{gnncEmbedBlackWhite.bw_client_32_v2}" toolTip="Cadastro Completo" iconPlacement="top" skinClass="GNNC.skin.button.skin_buttonLink" click="{__clientNew(false)}" />
+			
+			<s:HGroup width="100%" gap="1">
+				<s:Button width="100%" height="33" icon="{gnncEmbedBlackWhite.bw_view_16}"   toolTip="Visualizar" iconPlacement="right" skinClass="GNNC.skin.button.skin_buttonLink" click="{__clientView()}"/>
+				<s:Button width="100%" height="33" icon="{gnncEmbedBlackWhite.bw_edit_16}"   toolTip="Editar" 	iconPlacement="right" skinClass="GNNC.skin.button.skin_buttonLink" click="{__clientEdit()}"/>
+			</s:HGroup>
+			
+			<s:HGroup width="100%" gap="1">
+				<s:Button width="100%" height="33" icon="{gnncEmbedBlackWhite.bw_attach_16}" toolTip="Arquivo"    iconPlacement="right" skinClass="GNNC.skin.button.skin_buttonLink" click="{__attachNew()}" />
+				<s:Button width="100%" height="33" icon="{gnncEmbedBlackWhite.bw_delete_16}" toolTip="Excluir" 	iconPlacement="right" skinClass="GNNC.skin.button.skin_buttonLink" click="{__clientDelete()}"/>
+			</s:HGroup>
+			
+			<!-- s:Button width="100%" height="60" icon="{gnncEmbedBlackWhite.bw_client_32_v2}" 		toolTip="Cadastro Pessoa Física" iconPlacement="top" skinClass="GNNC.skin.button.skin_buttonLink" click="{__clientNew(false)}" />
+			<s:Button width="100%" height="60" icon="{gnncEmbedBlackWhite.bw_client_32_company_v2}" toolTip="Cadastro Pessoa Jurídica" iconPlacement="top" skinClass="GNNC.skin.button.skin_buttonLink" click="{__clientNew(true)}" /-->
+			
+			<s:Button width="100%" height="60" icon="{gnncEmbedBlackWhite.bw_label_32}" 	toolTip="Etiqueta" iconPlacement="top" skinClass="GNNC.skin.button.skin_buttonLink" click="{__newDocumentLabel()}" />
+			<s:Button width="100%" height="60" icon="{gnncEmbedBlackWhite.bw_birthday_32}" 	toolTip="Aniversário"   iconPlacement="top" skinClass="GNNC.skin.button.skin_buttonLink" click="{panelLeft_.selectedIndex = 0; panelSearch_.selectedIndex = 2; __reportClientBirth('today'); }" />
+			<s:Button width="100%" height="60" icon="{gnncEmbedBlackWhite.bw_printer_32}" 	toolTip="Imprimir Ficha"    iconPlacement="top" skinClass="GNNC.skin.button.skin_buttonLink" click="{__reportClientForm()}" />
+			
+			<s:Rect height="100%"/>
+			
+		</s:VGroup>
+		
+		<elements:elementVLine width="1" />
+		
+		<s:Group width="230" height="100%">
+			
+			<elements:elementBarStatus height="100%" width="230" alpha=".5"/>
+			
+			<mx:Accordion id="panelLeft_" width="230" top="2" bottom="1" headerHeight="31" fontSize="11" fontWeight="bold" contentBackgroundAlpha="0" borderVisible="false" openDuration="300" headerStyleName="AC" horizontalGap="0" verticalGap="-1">
+				<s:NavigatorContent showEffect="{fade_}" label="Home" fontWeight="normal" icon="{gnncEmbedBlackWhite.bw_home_16}" width="100%" height="100%" creationPolicy="all">
+					<s:layout>
+						<s:VerticalLayout gap="1" paddingBottom="10" paddingLeft="10" paddingRight="10" paddingTop="10" />
+					</s:layout>
+					
+					<s:HGroup width="100%" paddingRight="-10" paddingLeft="-10" paddingTop="-10">
+						<s:Group width="100%" height="30">
+							<elements:elementBarStatus width="100%" radiusX="3" radiusY="3"/>
+							<s:TabBar dataProvider="{panelSearch_}" height="30" width="100%"/>
+						</s:Group>
+					</s:HGroup>
+					
+					<mx:ViewStack id="panelSearch_" width="100%" height="100%">
+						<s:NavigatorContent label="BÁSICO" width="100%" height="100%">
+							<s:Scroller width="100%" height="100%" horizontalScrollPolicy="off">
+								<s:VGroup width="100%" height="100%" gap="1" paddingTop="10">
+									
+									<s:List id="letters_" width="100%" height="77" borderVisible="false" selectedIndex="0" fontSize="11" fontWeight="bold"
+											itemRenderer="GNNC.modules.user.itemRender.itemRender_letter_forList" >
+										<s:layout>
+											<s:TileLayout horizontalGap="1" verticalGap="1" columnWidth="22" rowHeight="25" horizontalAlign="justify" />
+										</s:layout>
+									</s:List>
+									
+									<elements:elementHLine height="16" alpha=".5"/>
+									
+									<select:conSelect_STATUS		id="STATUS_" 										width="100%" height="30"/>
+									<select:conSelect_DEPARTAMENT 	id="DEPARTAMENT_" 	_ADD="false" _MIX="DEPARTAMENT"	width="100%" height="30"/>
+									<select:conSelect_GROUP 		id="GROUP_" 		_ADD="false" _MIX="CLIENT"		width="100%" height="30"/>
+									<select:conSelect_CATEGORY 		id="CATEGORY_" 		_ADD="false" _MIX="CLIENT"		width="100%" height="30"/>
+									
+									<s:Rect height="15"/>
+									
+									<s:HGroup width="100%" gap="2">
+										<s:VGroup width="21" gap="6">
+											<s:Image source="{gnncEmbedBlackWhite.bw_client_16_company_v2}"/>
+											<s:Image source="{gnncEmbedBlackWhite.bw_client_16_v2}"/>
+										</s:VGroup>
+										<s:VGroup width="100%" gap="6">
+											<s:CheckBox id="COMPANY_YES_" 	label="Empresa" height="16" selected="true" toolTip="Empresas" />
+											<s:CheckBox id="COMPANY_NO_" 	label="Pessoa Física" 	height="16" selected="true" toolTip="Pessoas" />
+										</s:VGroup>
+									</s:HGroup>
+									
+									<elements:elementHLine height="16" alpha=".5"/>
+									
+									<s:HGroup width="100%" gap="1">
+										<s:Rect width="100%"/>
+										<s:Button height="30" width="40" label="10" 						click="{__clientLast(10)}" toolTip="10 últimos cadastros" fontSize="9" />
+										<s:Button height="30" width="30" label="Favoritos" 					icon="{gnncEmbedBlackWhite.bw_favorite_16}"   click="{__clientStar()}" />
+										<s:Button height="30" width="30" label="Limpar dados de pesquisa" 	icon="{gnncEmbedImage.CLEAR_16}"  click="{__clientClearSearch()}" />
+										<s:Button height="30" 			 label="Pesquisar" 					icon="{gnncEmbedBlackWhite.bw_search_16}" click="{__clientList(SEARCH_.text)}" fontWeight="bold"/>
+									</s:HGroup>
+									
+								</s:VGroup>
+							</s:Scroller>
+							
+						</s:NavigatorContent>
+						
+						<s:NavigatorContent label="ENDEREÇO" width="100%" height="100%">
+							
+							<s:Scroller width="100%" height="100%" horizontalScrollPolicy="off">
+								<s:VGroup width="100%" height="100%" gap="2" paddingTop="10">
+									
+									<elements:elementLabelDropShadow text="PESQUISAR POR ENDEREÇO" fontSize="13" height="35" fontWeight="normal"/>
+
+									<s:Label height="16" fontWeight="bold" text="Cidade" verticalAlign="middle"/>
+									<s:HGroup gap="4" width="100%" verticalAlign="middle">
+										<s:TextInput id="CITY_" width="100%" height="30" contentBackgroundAlpha="1" fontWeight="normal" enter="{__clientAddressList()}"/>
+										<s:CheckBox id="CITY_JUST_" label="Exato" toolTip="Pesquisar o valor exato."/>
+									</s:HGroup>
+									
+									<s:Label height="16" fontWeight="bold" text="Bairro" verticalAlign="middle"/>
+									<s:HGroup gap="4" width="100%" verticalAlign="middle">
+										<s:TextInput id="NEIGHBORHOOD_" width="100%" height="30" contentBackgroundAlpha="1" fontWeight="normal" enter="{__clientAddressList()}"/>
+										<s:CheckBox id="NEIGHBORHOOD_JUST_" label="Exato" toolTip="Pesquisar o valor exato."/>
+									</s:HGroup>
+									
+									<s:Label height="16" fontWeight="bold" text="Logradouro" verticalAlign="middle"/>
+									<s:HGroup gap="4" width="100%" verticalAlign="middle">
+										<s:TextInput id="ADDRESS_" width="100%" height="30" contentBackgroundAlpha="1" fontWeight="normal" enter="{__clientAddressList()}"/>
+									</s:HGroup>
+									
+									<s:Label height="16" fontWeight="bold" text="E-mail" verticalAlign="middle"/>
+									<s:HGroup gap="4" width="100%" verticalAlign="middle">
+										<s:TextInput id="EMAIL_" width="100%" height="30" contentBackgroundAlpha="1" fontWeight="normal" enter="{__clientAddressList()}"/>
+									</s:HGroup>
+									<s:CheckBox label="agrupar e-mails" id="emailGroup_" toolTip="{'agrupar e-mails repetidos'}" />
+									
+									
+									<elements:elementHLine height="16" alpha=".5"/>
+									
+									<s:HGroup width="100%" gap="1">
+										<s:Rect width="100%"/>
+										<s:Button height="30" width="30" label="Limpar dados de pesquisa" 	icon="{gnncEmbedImage.CLEAR_16}"  click="{__clientAddressClearSearch()}" />
+										<s:Button height="30" 			 label="Pesquisar" 					icon="{gnncEmbedBlackWhite.bw_search_16}" click="{__clientAddressList()}" fontWeight="bold" />
+									</s:HGroup>
+									
+								</s:VGroup>
+							</s:Scroller>
+							
+						</s:NavigatorContent>
+						
+						<s:NavigatorContent label="OUTROS" width="100%" height="100%">
+							
+							<s:Scroller width="100%" height="100%" horizontalScrollPolicy="off">
+								<s:VGroup width="100%" height="100%" gap="1" paddingTop="10">
+									
+									<elements:elementLabelDropShadow text="ANIVERSÁRIO" fontSize="13" height="35" fontWeight="normal"/>
+									
+									<s:HGroup gap="1" width="100%">
+										<s:DropDownList id="birthDayDay_" 	dataProvider="{gnncGlobalArrays._days}" 	selectedIndex="0" width="33%" height="30" textAlign="center" />
+										<s:DropDownList id="birthDayMonth_" dataProvider="{gnncGlobalArrays._MONTH}" 	selectedIndex="0" width="66%" height="30" textAlign="center" />
+									</s:HGroup>
+									
+									<s:HGroup gap="1" width="100%">
+										<s:Button label="Hoje" 		click="{__reportClientBirth('today')}"	 	width="33%" height="30" icon="{gnncEmbedImage.BIRTHDAY_16}"  />
+										<s:Button label="Dia / Mês" click="{__reportClientBirth('dayMonth')}" 	width="33%" height="30" />
+										<s:Button label="Mês" 		click="{__reportClientBirth('month')}" 		width="33%" height="30" />
+									</s:HGroup>
+									
+									<s:Rect height="4"/>
+									
+									<elements:elementLabelDropShadow text="DUPLICADOS" fontSize="13" height="35" fontWeight="normal"/>
+									
+									<s:Button label="Nomes duplicados" 	icon="{gnncEmbedBlackWhite.bw_clipboard_16_copy}" click="{__clientDuplicate()}" width="100%" height="30"
+											  skinClass="GNNC.skin.button.skin_buttonTextLeft"/>
+									<!-- s:Button label="E-mails" 	        icon="{gnncEmbedBlackWhite.bw_email_16}"          click="{__clientDuplicate()}" width="100%" height="30" / -->
+									
+									<!--elements:elementLabelDropShadow text="CONTROLE" fontSize="13" height="35" fontWeight="normal"/>
+									
+									<s:HGroup gap="1" width="100%">
+									<s:Button label="Aprovados" 	icon="{gnncEmbedImage.CONTROL_16_OK}" 	click="{__reportClientControl(1)}" width="100%" height="30 />
+									<s:Button label="Desaprovados" 	icon="{gnncEmbedImage.CONTROL_16}" 		click="{__reportClientControl(0)}" width="100%" height="30 />
+									</s:HGroup-->
+									
+									<elements:elementLabelDropShadow text="ALUNOS E PROFESSORES" fontSize="13" height="35" fontWeight="normal"/>
+									
+									<s:HGroup gap="1" width="100%">
+										<s:Button label="Alunos" 	  click="{__clientCourse(true)}"  width="50%" height="30" />
+										<s:Button label="Professores" click="{__clientCourse(false)}" width="50%" height="30" />
+									</s:HGroup>
+									<s:Button label="Alunos e professores" 	icon="{gnncEmbedBlackWhite.bw_course_16}" click="{__clientCourse(false,true)}" 	width="100%" height="30"
+											  skinClass="GNNC.skin.button.skin_buttonTextLeft"/>
+									
+									<s:Rect height="4"/>
+									
+								</s:VGroup>
+							</s:Scroller>
+							
+						</s:NavigatorContent>
+						
+						<s:NavigatorContent label="ORDEM" width="100%" height="100%">
+							
+							<s:Scroller width="100%" height="100%" horizontalScrollPolicy="off">
+								<s:VGroup width="100%" height="100%" gap="1" paddingTop="10">
+									
+									<elements:elementLabelDropShadow text="ORDENAR POR" fontSize="13" height="35" fontWeight="normal"/>
+									<s:VGroup width="100%" gap="6">
+										
+										<s:RadioButton id="CORDER_NAME" 				height="16" groupName="ORDER" label="Nome (Padrão)" selected="true"/>
+										<s:RadioButton id="CORDER_LAST" 				height="16" groupName="ORDER" label="Recente" />
+										
+										<s:RadioButton id="CORDER_BIRTH" 				height="16" groupName="ORDER" label="Aniversário" />
+										<s:RadioButton id="CORDER_YEARS_OLD" 			height="16" groupName="ORDER" label="Idade" />
+										
+										<s:RadioButton id="CORDER_STAR" 				height="16" groupName="ORDER" label="Estrela"/>
+										<s:RadioButton id="CORDER_ENROLLMENT" 			height="16" groupName="ORDER" label="Matrícola" />
+										
+										<s:RadioButton id="CORDER_SEX" 					height="16" groupName="ORDER" label="Gênero"/>
+										
+										<s:RadioButton id="CORDER_DEPARTAMENT" 			height="16" groupName="ORDER" label="Departamento" />
+										<s:RadioButton id="CORDER_GROUP" 				height="16" groupName="ORDER" label="Grupo" />
+										<s:RadioButton id="CORDER_CATEGORY" 			height="16" groupName="ORDER" label="Categoria" />
+										
+									</s:VGroup>
+									<s:Rect height="10"/>
+									<elements:elementLabelDropShadow text="LISTAR COMO" fontSize="13" height="35" fontWeight="normal"/>
+									<s:VGroup width="100%" gap="6">
+										<s:RadioButton id="CORDERASC_ASC" 			height="16" groupName="ORDERASC" label="Crescente (Normal)" selected="true"/>
+										<s:RadioButton id="CORDERASC_DESC" 			height="16" groupName="ORDERASC" label="Decrescente" />
+									</s:VGroup>
+									
+								</s:VGroup>
+							</s:Scroller>
+							
+						</s:NavigatorContent>
+						
+						
+					</mx:ViewStack>
+					
+				</s:NavigatorContent>
+				
+				<!-- s:NavigatorContent label="Ações" icon="{gnncEmbedImage.NEWS_24}" showEffect="{fade_}" width="251" height="100%" creationPolicy="all">
+				
+				<s:Scroller left="10" top="0" right="10" bottom="10" horizontalScrollPolicy="off" fontWeight="normal">
+				<s:VGroup width="100%" height="100%" gap="1">
+				
+				
+				<s:Rect height="4"/>
+				
+				<elements:elementLabelDropShadow text="AGENDAMENTO" fontSize="13" height="35" fontWeight="normal"/>
+				
+				<s:Button width="100%" height="25" label="Agendar Cliente" 			icon="{gnncEmbedBlackWhite.bw_calendar_16_new}" 	click="{__newCalendar()}" />
+				<s:Button width="100%" height="25" label="Agendar (Process Odonto)" icon="{gnncEmbedLogo.LOGO_PROCESS_16}" 				click="{__newCalendarProcessOdonto()}" / >
+				
+				</s:VGroup>
+				</s:Scroller>
+				
+				</s:NavigatorContent  -->
+				
+				<s:NavigatorContent label="Relatórios" icon="{gnncEmbedBlackWhite.bw_report_16}" showEffect="{fade_}" width="251" height="100%" creationPolicy="all">
+					<s:Scroller width="100%" height="100%" horizontalScrollPolicy="off" fontWeight="normal">
+						<s:VGroup width="100%" height="100%" gap="1" padding="10">
+							
+							<elements:elementLabelDropShadow text="FICHA" fontSize="13" height="35" fontWeight="normal"/>
+							
+							<s:Button width="100%" height="30" label="Ficha cadastral" 					icon="{gnncEmbedBlackWhite.bw_document_16_pdf}" click="{__reportClientForm()}" skinClass="GNNC.skin.button.skin_buttonTextLeft" />
+							<s:Button width="100%" height="30" label="Ficha cadastral (Limpa)" 			icon="{gnncEmbedBlackWhite.bw_document_16_pdf}" click="{__reportClientForm(true)}" enabled="false" skinClass="GNNC.skin.button.skin_buttonTextLeft" />
+							
+							<s:Rect height="4"/>
+							
+							<elements:elementLabelDropShadow text="LISTAGEM" fontSize="13" height="35" fontWeight="normal"/>
+							
+							<s:Button width="100%" height="30" label="Gerar documento da listagem" icon="{gnncEmbedBlackWhite.bw_document_16_pdf}" click="{__reportClientList()}" skinClass="GNNC.skin.button.skin_buttonTextLeft" />
+							
+							<elements:elementLabelDropShadow text="E-MAIL" fontSize="13" height="35" fontWeight="normal"/>
+							
+							<s:Button width="100%" height="30" label="Listagem de e-mail - CSV" icon="{gnncEmbedExtension.TXT_16}" click="{__clientExportEmails()}" skinClass="GNNC.skin.button.skin_buttonTextLeft" />
+							
+						</s:VGroup>
+					</s:Scroller>
+					
+				</s:NavigatorContent>
+				
+				
+			</mx:Accordion>
+		</s:Group>
+		
+		<elements:elementVLine width="1" />
+		
+		<s:VGroup width="100%" height="100%">
+			
+			<s:HGroup width="100%" padding="20" gap="1" verticalAlign="middle">
+				
+				<s:Image source="{gnncEmbedBlackWhite.bw_search_16}" toolTip="Pesquisar Cadastro"/>
+				<elements:elementInputSearch id="SEARCH_" width="170" height="25"
+											 _FUNCTION_Event_="{function(e:Event):void{ __clientList(SEARCH_.text)}}" rollOver="{panelLeft_.selectedIndex = 0; panelSearch_.selectedIndex = 0; }" />
+				
+				<s:Rect width="10"/>
+				
+				<s:Image source="{gnncEmbedImage.FILTER_16}" toolTip="Filtrar Cadastros"/>
+				<elements:elementInputSearch id="clientFilter_" width="170" height="25" _FILTER="true" 
+											 _FUNCTION_Event_="{function(e:Event):void{ client_.__filterBy(clientFilter_.text,['NAME']) }}" />
+				
+				<s:Rect width="100%"/>
+				<elements:elementLabelFont id="labelRows_" text="" paddingRight="10" height="25"/>
+			</s:HGroup>
+			
+			<list:conList_client id="client_" width="100%" height="100%" />
+			
+			<s:Group width="100%" height="35">
+				<elements:elementBarStatus height="35" />
+				<s:HGroup left="0" right="0" height="35" gap="1" paddingLeft="3" paddingRight="3" verticalAlign="middle">
+					
+					<s:Label id="statusBar_" text="" verticalAlign="middle" width="100%" fontSize="10" />
+					
+					<s:Button label="Lista Alternativa" icon="{gnncEmbedImage.DIRECTION_RIGHT_16}" height="30" fontWeight="bold" click="{__clientAlter2client(true)}" iconPlacement="right" />
+					<s:Button label="Remover item da lista" icon="{gnncEmbedBlackWhite.bw_delete_16}" height="30" width="30" click="{client_.__fRemoveItemList()}" />
+					<s:Button label="Limpar lista" icon="{gnncEmbedImage.CLEAR_16}" height="30" width="30" click="{client_.__clear()}" />
+					
+					<s:HGroup gap="-1">
+						<s:ToggleButton id="l1_" label="Lista" fontWeight="bold" click="{__clientItemIndex(event,0)}" height="30" icon="{gnncEmbedImage.LIST_16_TEXT}" selected="true"/>
+						<s:ToggleButton id="l2_" label="Foto"  fontWeight="bold" click="{__clientItemIndex(event,1)}" height="30" icon="{gnncEmbedImage.LIST_16_BOX}"/>
+					</s:HGroup>
+					
+				</s:HGroup>
+			</s:Group>
+			
+		</s:VGroup>
+		
+		<elements:elementVLine width="1" />
+		
+		<s:Group width="200" height="100%">
+			<elements:elementBarStatus height="100%" width="100%" alpha=".6"/>
+			<!-- s:VGroup width="100%" gap="1" padding="10" -->
+			
+			<s:Group left="0" right="0" height="30">
+				<s:HGroup gap="1" verticalAlign="middle" width="100%" height="30" paddingRight="4" paddingLeft="4">
+					<s:Image source="{gnncEmbedBlackWhite.bw_client_16}" toolTip="Cliente"/>
+					<elements:elementLabelDropShadow text="LISTA ALTERNATIVA" fontWeight="normal" fontSize="11" paddingLeft="5" paddingRight="5"/>
+					<s:Rect width="100%"/>
+					<elements:elementLabelDropShadow text="" fontWeight="normal" fontSize="11" paddingLeft="5" paddingRight="5" toolTip="Total da lista."/>
+				</s:HGroup>
+			</s:Group>
+			
+			<list:conList_client id="clientAlter_" left="0" top="30" right="0" bottom="30" _backgroundAlpha="0" />
+			<s:Label text="Selecione e arraste clientes aqui" bottom="50" horizontalCenter="0" visible="{ clientAlter_._length ? false : true }" showEffect="{fade_}" hideEffect="{fade_}"/>
+			
+			<s:VGroup width="100%" visible="{ clientAlter_._length ? false : true }" top="30" gap="0" showEffect="{fade_}" hideEffect="{fade_}">
+				
+				<s:HGroup width="100%" gap="1" horizontalCenter="0" verticalCenter="0" paddingBottom="0" paddingLeft="10" paddingRight="10" paddingTop="10"
+						  buttonMode="true" click="{__getValuesClients()}"
+						  >
+					<s:Group width="50" height="50">
+						<s:Rect width="50" height="50" radiusX="5" radiusY="5">
+							<s:stroke>
+								<s:SolidColorStroke color="0xeeeeee"/>
+							</s:stroke>
+							<s:fill>
+								<s:SolidColor color="0xf9f9f9"/>
+							</s:fill>
+						</s:Rect>
+						<s:Image source="{gnncEmbedBlackWhite.bw_birthday_32}" width="32" height="32" horizontalCenter="0" verticalCenter="0"/>
+					</s:Group>
+					<s:VGroup width="100%" gap="5" fontWeight="normal" paddingLeft="10">
+						<elements:elementLabelFont text="Aniversariantes" fontSize="13" color="0x333333" />
+						<s:HGroup gap="5">
+							<elements:elementLabelFont id="clientBirthDay_" text="0" fontSize="12" color="0x777777" />
+							<elements:elementLabelFont id="clientBirthMonth_" text="0" fontSize="12" color="0x777777" />
+						</s:HGroup>
+					</s:VGroup>
+				</s:HGroup>
+				
+				<s:HGroup width="100%" gap="1" horizontalCenter="0" verticalCenter="0" paddingBottom="0" paddingLeft="10" paddingRight="10" paddingTop="10"
+						  buttonMode="true" click="{__getValuesClients()}"
+						  >
+					<s:Group width="50" height="50">
+						<s:Rect width="50" height="50" radiusX="5" radiusY="5">
+							<s:stroke>
+								<s:SolidColorStroke color="0xeeeeee"/>
+							</s:stroke>
+						</s:Rect>
+						<s:Image source="{gnncEmbedBlackWhite.bw_client_32_v2}" width="32" height="32" horizontalCenter="0" verticalCenter="0"/>
+					</s:Group>
+					<s:VGroup width="100%" gap="5" paddingLeft="10">
+						<elements:elementLabelFont text="Cadastrados" fontSize="13" color="0x333333" />
+						<elements:elementLabelFont id="clientRows_" text="0" fontSize="12"  color="0x777777" />
+					</s:VGroup>
+				</s:HGroup>
+
+				<s:HGroup width="100%" gap="1" horizontalCenter="0" verticalCenter="0" paddingBottom="0" paddingLeft="10" paddingRight="10" paddingTop="10"
+						  >
+					<s:Group width="50" height="50">
+						<s:Rect width="50" height="50" radiusX="5" radiusY="5">
+							<s:stroke>
+								<s:SolidColorStroke color="0xeeeeee"/>
+							</s:stroke>
+						</s:Rect>
+						<s:Image source="{gnncEmbedBlackWhite.bw_course_32}" width="32" height="32" horizontalCenter="0" verticalCenter="0"/>
+					</s:Group>
+					<s:VGroup width="100%" gap="5" paddingLeft="10">
+						<elements:elementLabelFont text="Turmas" fontSize="13" color="0x333333" />
+						<elements:elementLabelFont id="clientCousesRows_" text="0" fontSize="12"  color="0x777777" />
+					</s:VGroup>
+				</s:HGroup>
+
+				<s:VGroup width="100%" gap="5" horizontalCenter="0" verticalCenter="0" paddingBottom="0" paddingLeft="10" paddingRight="10" paddingTop="10"
+						  >
+					<s:ToggleButton id="clientCousesShow_" width="100%" height="30" label="Mostrar turmas" toolTip="{'Mostrar turmas\nEste recurso deixa a pesquisa mais lenta.'}"
+									skinClass="GNNC.skin.toggleButton.skin_toggleButton"
+									/>
+
+					<s:List id="clientCousesList_" dataProvider="{new ArrayCollection()}" width="100%" height="200" 
+							contentBackgroundAlpha="0" borderVisible="false" horizontalScrollPolicy="off"
+							itemRenderer="GNNC.skin.dropDownList.itemRender.itemRender_label_forList"
+							/>
+				</s:VGroup>
+				
+			</s:VGroup>
+			
+			<s:Group left="0" right="0" bottom="0" height="35">
+				<elements:elementBarStatus height="35" />
+				<s:HGroup left="0" right="0" height="35" gap="1" paddingLeft="3" paddingRight="3" verticalAlign="middle">
+					<s:Button label="Mover" toolTip="Move lista acima para a lista principal, enviando todos os dados aqui contidos." icon="{gnncEmbedImage.DIRECTION_LEFT_16}" height="30" fontWeight="bold" click="{__clientAlter2client()}" />
+					<s:Rect width="100%"/>
+					<s:Button label="Remover item da lista" icon="{gnncEmbedBlackWhite.bw_delete_16}" height="30" width="30" click="{clientAlter_.__fRemoveItemList()}" />
+					<s:Button label="Limpar lista" icon="{gnncEmbedImage.CLEAR_16}" height="30" width="30" click="{clientAlter_.__clear()}" />
+				</s:HGroup>
+			</s:Group>
+			
+			<!-- /s:VGroup -->
+		</s:Group>
+		
+	</s:HGroup>
+	
+	
+</s:Module>

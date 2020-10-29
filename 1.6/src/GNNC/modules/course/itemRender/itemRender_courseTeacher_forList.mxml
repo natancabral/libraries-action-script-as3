@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:ItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+				xmlns:s="library://ns.adobe.com/flex/spark" 
+				xmlns:mx="library://ns.adobe.com/flex/mx" 
+				autoDrawBackground="false" height="30" width="100%" 
+				xmlns:stage="GNNC.elements.stage.*" xmlns:elements="GNNC.UI.elements.*"
+				>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.data.gnncData;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.gnncEmbedImage;
+			
+			private function __dispatche(send_:String):void
+			{
+				Object(owner).dispatchEvent(new gnncEventGeneral(send_,data));
+			}
+			
+			private function __fView(event:Event):void
+			{
+				__dispatche(gnncEventGeneral._view);
+			}
+			
+			private function __fTheMan(event:Event):void
+			{
+				__dispatche(gnncEventGeneral._free); //COORDENADOR
+			}
+
+			private function __fAccess(event:Event):void
+			{
+				__dispatche(gnncEventGeneral._update); //ACESSO
+			}
+
+			private function __act(active:String):void
+			{
+				if(active==String(data.ACTIVE))
+					return;
+				
+				var d:Object = gnncData.__clone(data);
+				d.ACTIVE = active;
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._free,d));
+			}
+		]]>
+	</fx:Script>
+
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+		<s:State name="normalAndShowsCaret"/>
+		<s:State name="hoveredAndShowsCaret"/>
+		<s:State name="selectedAndShowsCaret"/>
+	</s:states>
+
+	<elements:elementHLine left="4" right="4" bottom="0" alpha="1" color="0xeeeeee"/>
+	
+	<s:Rect includeIn="hoveredAndShowsCaret,hovered" left="0" right="1" top="0" bottom="0"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:SolidColor color="0xeeeeee"/>
+		</s:fill>
+	</s:Rect>
+
+	<s:Rect left="0" top="0" right="1" bottom="0" visible="{data.COORD == 'YES' ? true : false}"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:LinearGradient rotation="90"> 
+				<s:GradientEntry color="0xffcc33" alpha=".5"/>
+				<s:GradientEntry color="0xffcc33" alpha=".6"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect includeIn="selected,selectedAndShowsCaret" right="1" left="0" top="0" bottom="0"
+			radiusX="4" radiusY="4">
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:HGroup gap="3" left="0" top="0" right="0" bottom="0" paddingLeft="6" paddingRight="4" 
+			  verticalAlign="middle" color.selected="0xFFFFFF" color.selectedAndShowsCaret="0xFFFFFF">
+		<s:Image source="{gnncEmbedBlackWhite.bw_client_16_company_v2}" toolTip="Professor / Coordenador" />
+		<s:Image source="{data.ACTIVE_CLIENT==0?gnncEmbedImage.STATUS_RED_16:data.ACTIVE_CLIENT==1?gnncEmbedImage.STATUS_GREEN_16:data.ACTIVE_CLIENT==2?gnncEmbedImage.STATUS_YELLOW_16:gnncEmbedImage.STATUS_GREY_16}" toolTip="{data.ACTIVE_CLIENT==0?'Cadastro Inativo':data.ACTIVE_CLIENT==1?'Cadastro Ativo':data.ACTIVE_CLIENT==2?'Cadastro em Espera':'Cadastro Indefinido'}" width="12" height="12" horizontalCenter="0" verticalCenter="0" smooth="true" />		
+		<s:Label text="{gnncData.__firstLetterUpperCase(data.NAME_TEACHER)}" paddingLeft="4" fontSize="11" fontWeight="bold" maxDisplayedLines="1" showTruncationTip="true" width="100%"/>
+		<s:ToggleButton icon="{data.COORD == 'YES'?gnncEmbedImage.STAR_16:gnncEmbedImage.STAR_16_BW}" height="25" label="{data.COORD == 'YES'?'Coordenador':'Professor'}" width="110" selected="{data.COORD == 'YES'?true:false}" color.selected="0x333333" color.selectedAndShowsCaret="0x333333" fontWeight="normal" click="{__fTheMan(null)}" 
+						/>
+
+		<s:Group height="25" enabled="false">
+			<s:Button label="{data.ACTIVE==0?'Ativo':data.ACTIVE==1?'Inativo':'Indefinido'}" 
+					  height="25" width="95" click="{ADD_.displayPopUp=true}" fontSize="11" fontWeight="bold"  color="{data.ACTIVE==0?0x009900:data.ACTIVE==1?0xff3300:0x777777}"
+					  />
+			
+			<s:PopUpAnchor id="ADD_" popUpPosition="below" width="105" displayPopUp="false" popUpHeightMatchesAnchorHeight="false" top="0" >
+				<s:Group width="110" height="100%" rollOut="{ADD_.displayPopUp=false}">
+					<s:RectangularDropShadow width="100%" height="100%" blurX="10" blurY="10" alpha=".3" blendMode="darken" distance="0"/>
+					<s:Rect width="100%" height="100%" radiusX="0" radiusY="0">
+						<s:fill>
+							<s:SolidColor color="0xeeeeee"/>
+						</s:fill>
+						<s:stroke>
+							<s:SolidColorStroke color="0xe7e7e7"/>
+						</s:stroke>
+					</s:Rect>
+					<s:VGroup gap="1" width="100%" fontSize="11" fontWeight="bold" paddingLeft="5" paddingRight="5" paddingBottom="5">
+						<s:Label text="Opções" height="25" verticalAlign="middle" paddingLeft="8" color="0x444444"/>
+						<s:Button label="Ativo" 	width="100%" height="25" click="{__act('0')}" color="0x009900" />
+						<s:Button label="Inativo" 	width="100%" height="25" click="{__act('1')}" color="0xff3300"/>
+					</s:VGroup>
+				</s:Group>
+			</s:PopUpAnchor>
+		</s:Group>
+		<!-- s:ToggleButton icon="{data.ACCESS_WEB=='YES'?gnncEmbedImage.ACCESS_16:gnncEmbedImage.ACCESS_16_BW}" height="25" label="{data.ACCESS_WEB=='YES'?'Sim':'Não'}" toolTip="Acesso ao Aplicativo do Professor" width="70" selected="{data.ACCESS_WEB=='YES'?true:false}" color.selected="0x333333" color.selectedAndShowsCaret="0x333333" fontWeight="bold" click="{__fAccess(null)}" color="{data.ACCESS_WEB=='YES'?0x009900:0xff0000}" /-->
+		<s:Button icon="{gnncEmbedBlackWhite.bw_view_16}" width="23" height="25" toolTip="Visualizar Cadastro" click="{__fView(null)}"
+				  skinClass="GNNC.skin.button.skin_buttonLink"
+				  />
+	</s:HGroup>
+
+	<elements:elementHLine bottom="0" height="1" alpha=".3" />
+	
+</s:ItemRenderer>

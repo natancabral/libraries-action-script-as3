@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:MXTreeItemRenderer xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					  xmlns:s="library://ns.adobe.com/flex/spark" 
+					  xmlns:mx="library://ns.adobe.com/flex/mx"
+					  minHeight="35" xmlns:component="GNNC.elements.component.*"
+					  autoDrawBackground="true" 
+					  xmlns:elements="GNNC.UI.elements.*" 
+					  buttonMode="{treeListData.hasChildren?false:true}"
+					  >
+	<fx:Script>
+		<![CDATA[
+			import mx.collections.ArrayCollection;
+		]]>
+	</fx:Script>
+	
+	<s:states>
+		<s:State name="normal" />
+		<s:State name="hovered" />
+		<s:State name="selected" />
+	</s:states>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" includeIn="selected" >
+		<s:fill>
+			<s:LinearGradient rotation="90">
+				<s:GradientEntry color="0x3785e2"/>
+				<s:GradientEntry color="0x2170cf"/>
+			</s:LinearGradient>
+		</s:fill>
+	</s:Rect>
+	
+	<s:Rect left="0" top="0" right="0" bottom="0" visible="{treeListData.hasChildren}" alpha=".1" blendMode="multiply">
+		<s:fill>
+			<s:SolidColor color="0x555555"/>
+		</s:fill>
+	</s:Rect>
+
+	<s:Rect left="0" top="0" right="0" bottom="0" alpha="1" includeIn="hovered">
+		<s:fill>
+			<s:SolidColor color="0x444444"/>
+		</s:fill>
+	</s:Rect>
+
+	<elements:elementHLine width="100%" bottom="0" alpha=".1" _COLOR="0x000000" blendMode="multiply"/>
+	
+	<s:HGroup left="0" right="0" top="0" bottom="0" verticalAlign="middle" paddingRight="4"
+			
+			  >
+		<s:Rect id="indentationSpacer" width="{treeListData.indent}" percentHeight="100" alpha="0">
+			<s:fill>
+				<s:SolidColor color="0xFFFFFF" />
+			</s:fill>
+		</s:Rect>
+		<s:Group id="disclosureGroup">
+			<s:BitmapImage source="{treeListData.disclosureIcon}" visible="{treeListData.hasChildren}" blendMode="colorburn" />
+		</s:Group>
+		<s:BitmapImage source="{treeListData.icon}" />
+		<elements:elementLabelFont width="100%" fontSize="12" text="{treeListData.label}" paddingTop="2" paddingLeft="3"
+								 showTruncationTip="true" maxDisplayedLines="1"
+								 fontWeight="{treeListData.hasChildren==true?'bold':'normal'}"
+								 />
+		<elements:elementLabelBackgroudColor _label="{treeListData.hasChildren==false?'0':data.hasOwnProperty('children')==false?'0':data.children==null?'0':ArrayCollection(data.children).length}" _color="0xffffff"
+										   visible="{treeListData.hasChildren==false?false:data.hasOwnProperty('children')==false?false:data.children==null?false:true}"
+										   _paddingLeftText="9"
+										   _paddingRightText="9"
+										   _colorBackground="0x333333"
+										   height="20"
+										   />
+	</s:HGroup>
+	
+</s:MXTreeItemRenderer>

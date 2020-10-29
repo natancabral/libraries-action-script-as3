@@ -1,0 +1,624 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Group xmlns:fx="http://ns.adobe.com/mxml/2009" 
+		 xmlns:s="library://ns.adobe.com/flex/spark" 
+		 xmlns:mx="library://ns.adobe.com/flex/mx" 
+		 
+		 creationComplete="{__start()}"
+		 rollOver="{__mouse(true)}"
+		 rollOut="{__mouse(false);dots_.visible=true}"
+		 
+		 doubleClick="{doubleClickFunction(event)}"
+		 doubleClickEnabled="true"
+		 
+		 width="100%" height="100%" 
+		 xmlns:stage="GNNC.elements.stage.*" 
+		 xmlns:elements="GNNC.UI.elements.*" 
+		 
+		 >
+	<fx:Declarations>
+	</fx:Declarations>
+	<fx:Script>
+		<![CDATA[
+			import GNNC.data.date.gnncDate;
+			import GNNC.data.globals.gnncGlobalStatic;
+			import GNNC.data.sql.gnncSql;
+			import GNNC.event.gnncEventGeneral;
+			import GNNC.gnncEmbedBlackWhite;
+			import GNNC.sqlTables.table_calendar;
+			
+			import flash.desktop.Clipboard;
+			import flash.desktop.ClipboardFormats;
+			
+			import mx.collections.ArrayCollection;
+			import mx.rpc.events.FaultEvent;
+			import mx.rpc.events.ResultEvent;
+			
+			private var _today:String = '';
+			public var _date:String = "2000-00-00";
+
+			public var _MIX:String = "CALENDAR";
+
+			public function set _dateFilter(v:String):void
+			{ 
+				_date = String(v).substr(0,10);
+				update();
+			}
+			
+			public function get _dateFilter():String
+			{ 
+				return String(_date).substr(0,10);
+			}
+			
+			public function set dataProvider(v:ArrayCollection):void
+			{ 
+				listCalendar_.dataProvider = v; 
+				update();
+			}
+			
+			public function get dataProvider():ArrayCollection{ 
+				return new ArrayCollection(listCalendar_.dataProvider.toArray()); 
+			}
+
+			private function __start():void
+			{
+				listCalendar_.addEventListener	(gnncEventGeneral._refresh,__dispatcheRefresh);
+				listCalendar_.addEventListener	(gnncEventGeneral._loading,__dispatcheLoading);
+				listCalendar_.addEventListener	(gnncEventGeneral._new    ,__dispatcheNew);
+				listCalendar_.addEventListener	(gnncEventGeneral._edit   ,__dispatcheEdit);
+				listCalendar_.addEventListener	(gnncEventGeneral._delete ,__dispatcheDelete);
+				listCalendar_.addEventListener	(gnncEventGeneral._view   ,__dispatcheView);
+				listCalendar_.addEventListener	('zoom'                   ,__dispatcheZoom);
+				listCalendar_.addEventListener  ('gnncFocusOut'           ,__dispatcheFocusOut);
+				
+				this.addEventListener(KeyboardEvent.KEY_DOWN,
+					function(event:KeyboardEvent):void{
+						if ((event.charCode == Keyboard.V || event.charCode == 118) && event.ctrlKey == true) 
+							paste();
+					}
+				);
+			}
+			
+			public function update():void
+			{
+				_today = gnncDate.__date2String(new Date(),false).substr(0,10);
+
+				var d:String = _date.substr(8,2);//0000-00-00
+				
+				if(d == '00'){
+					DAY_.text = '';
+					listCalendar_.visible = false;
+					BoxX.visible = true;
+				}else{
+					DAY_.text = d;
+					listCalendar_.visible = true;
+					BoxX.visible = false;
+				}
+
+				pageLoading.visible = false;
+				TODAY_.visible = ( _dateFilter == _today ? true : false );
+			}
+
+			private function getEvent(e:*=null):*
+			{
+				if(e == null)
+					e = new Object();
+
+				if(!e.hasOwnProperty('data')){
+					var d:Object = new Object();
+					d.DATE_START = _dateFilter;
+					d.DATE_END   = _dateFilter;
+					var o:Object = new Object();
+					o['data'] = d;
+					return o;
+				}
+				return e;
+			}
+
+			private function __dispatcheRefresh(e:*=null):void{
+				e = getEvent(e);
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._refresh)); 
+			}
+			private function __dispatcheNew(e:*=null):void{
+				e = getEvent(e);
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._new,e.data)); 
+			}
+			private function __dispatcheEdit(e:*=null):void{
+				e = getEvent(e);
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._edit,e.data)); 
+			}
+			private function __dispatcheDelete(e:*=null):void{
+				e = getEvent(e);
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._delete,e.data)); 
+			}
+			private function __dispatcheView(e:*=null):void{
+				e = getEvent(e);
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._view,e.data)); 
+			}
+			private function __dispatcheZoom(e:*=null):void{
+				e = getEvent(e);
+				dispatchEvent(new gnncEventGeneral('zoom',e.data)); 
+			}
+			private function __dispatcheLoading(e:*=null):void{
+				e = getEvent(e);
+				Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._loading));
+				//loading(true);
+			}
+			public function __dispatcheFocusOut(e:gnncEventGeneral):void
+			{
+				var t:Object = e.currentTarget;
+				var o:Object = e.data;
+				var i:int = listCalendar_.dataProvider.getItemIndex(o);
+				//Object(owner).selectedIndex = itemIndex;
+				if(o['TITLE']=='')
+					listCalendar_.dataProvider.removeItemAt(i);
+			}			
+			
+			public function doubleClickFunction(e:MouseEvent):void
+			{
+				var o:Object = new Object();
+				
+				o.ID     = 0;
+				o.TITLE  = '';
+				o.ACTIVE = '';
+				
+				o.DATE          = '';
+				o.DATE_END      = '';
+				o.DATE_FINAL    = '';
+				o.DATE_CANCELED = '';
+				
+				o.COLOR = '';
+				o.TYPE = 'calendar';
+				
+				listCalendar_.dataProvider.addItemAt(o,0);
+				
+			}
+
+			public function set loading(show:Boolean):void
+			{
+				pageLoading.visible = show; 
+				pageLoadingLabel.visible = show;
+			}
+			
+			private function __mouse(hover_:Boolean):void
+			{
+				if(!DAY_.text)
+					return;
+				
+				SHOW_.visible = hover_;
+				this.focusEnabled = hover_;
+				this.setFocus();
+				
+				DAY_.setStyle('color',hover_?0x333333:0x999999);
+				listCalendar_.right = hover_ ? 25 : 1 ;
+				listCalendar_.setStyle('verticalScrollPolicy',hover_?'auto':'off');
+			}
+
+			private function menuRight():void
+			{
+				if(!DAY_.text)
+					return;
+				
+				var arr:Array = new Array();
+				var c:ContextMenuItem = null;
+
+				c = new ContextMenuItem("Novo", false, true);
+				c.addEventListener(Event.SELECT,__dispatcheNew);
+				arr.push(c);
+				c = new ContextMenuItem("Atualizar", true, true);
+				c.addEventListener(Event.SELECT,__dispatcheRefresh);
+				arr.push(c);
+				c = new ContextMenuItem("Colar", true, true);
+				c.addEventListener(Event.SELECT,paste);
+				arr.push(c);
+				
+				var cm:ContextMenu = new ContextMenu();
+				cm.hideBuiltInItems();
+				cm.customItems = arr;
+				this.contextMenu = cm;
+			}
+			
+			public function paste(e:*=null):void
+			{
+				if(!DAY_.text)
+					return;
+				
+				//loading(false);
+				var pastePermission:Boolean	 	= false;
+				var _TABLE:table_calendar 		= new table_calendar();
+				var OBJ:Object;
+
+
+				if(Clipboard.generalClipboard.hasFormat("object"))
+				{
+					pastePermission 			= true;
+
+					//var DAY:String			= String(_dateFilter).substr(8,10);
+					//var DAYWZERO:String		= (Number(DAY)<10)?'0'+DAY:DAY;
+					OBJ			 				= Clipboard.generalClipboard.getData("object"); //ClipboardTransferMode.ORIGINAL_ONLY
+					
+					_TABLE.ID_USER				= OBJ.ID_USER ? OBJ.ID_USER : gnncGlobalStatic._userId;
+					
+					_TABLE.TITLE				= OBJ.TITLE;
+					_TABLE.LOCATION				= OBJ.LOCATION;
+					_TABLE.COLOR				= OBJ.COLOR;
+
+					_TABLE.MIX					= OBJ.MIX;
+
+					_TABLE.DATE_START			= _dateFilter; //String(OBJ.DATE_START).substr(0,8)+DAYWZERO;
+					_TABLE.DATE_END				= _dateFilter; //String(OBJ.DATE_START).substr(0,8)+DAYWZERO;//OBJ.DATE_END;
+					
+					_TABLE.ID_GROUP				= OBJ.ID_GROUP;
+					_TABLE.ID_CATEGORY			= OBJ.ID_CATEGORY;
+					_TABLE.ID_DEPARTAMENT		= OBJ.ID_DEPARTAMENT;
+					
+					_TABLE.ACTIVE				= OBJ.ACTIVE;
+					
+				} 
+				else if(Clipboard.generalClipboard.hasFormat(ClipboardFormats.TEXT_FORMAT))
+				{
+					pastePermission 			= true;
+					
+					OBJ			 				= Clipboard.generalClipboard.getData(ClipboardFormats.TEXT_FORMAT); //ClipboardTransferMode.ORIGINAL_ONLY
+
+					_TABLE.ID_USER				= gnncGlobalStatic._userId;
+
+					_TABLE.TITLE				= String(OBJ);
+					_TABLE.COLOR				= 'FFFFFF';
+
+					_TABLE.MIX					= _MIX;
+
+					_TABLE.DATE_START			= _dateFilter;
+					_TABLE.DATE_END				= _dateFilter;				
+					
+				}
+				else
+				{
+					pastePermission 			= false;
+					//new DAYBYDAY_ALERT(parentApplication)._ERROR('');
+				}
+				
+				if(!pastePermission)
+					return;
+				
+				pageLoading.visible 			= true;
+				pageLoadingLabel.visible 			= true;
+				
+				var FR:Function					= function(e:ResultEvent):void
+				{
+					//__CALENDAR_LIST();
+				};
+				var FF:Function					= function(e:FaultEvent):void
+				{  
+					pageLoading.visible 		= false;
+					pageLoadingLabel.visible 		= false;
+				};
+				
+				var _sql:String = new gnncSql().__INSERT(_TABLE);
+				
+			}
+			
+			public function set _colorBg (color_:uint):void
+			{
+				colorBg_.color = color_;
+			}
+
+		]]>
+	</fx:Script>
+	
+	<fx:Declarations>
+		<mx:Fade id="_fade" duration="300"/>
+	</fx:Declarations>
+
+	<s:Rect top="0" right="0" bottom="0" left="0" visible="true">
+		<s:fill>
+			<s:SolidColor color="0xFFFFFF" id="colorBg_" />
+		</s:fill>
+		<s:stroke>
+			<s:SolidColorStroke color="0xeeeeee" weight="1"/>
+		</s:stroke>
+	</s:Rect>
+		
+	<s:List id="listCalendar_" left="1" right="1" top="1" bottom="1" borderVisible="false" minWidth="20" contentBackgroundAlpha="0" focusAlpha="0"
+			horizontalScrollPolicy="off" verticalScrollPolicy="off" rightMouseDown="{menuRight()}"
+			>
+		<s:layout>
+			<s:VerticalLayout rowHeight="20" gap="-1" paddingLeft="0" paddingBottom="0" />
+		</s:layout>
+		<s:itemRenderer>
+			<fx:Component>
+				<s:ItemRenderer width="100%" height="20" minWidth="20" autoDrawBackground="false" 
+								rightMouseDown="{menuRight()}" 
+								creationComplete="{__start()}"
+								>
+					<fx:Script>
+						<![CDATA[
+							import GNNC.data.conn.gnncAMFPhp;
+							import GNNC.data.data.gnncClipBoard;	
+							import GNNC.data.data.gnncData;
+							import GNNC.data.data.gnncDataRand;
+							import GNNC.data.date.gnncDate;
+							import GNNC.data.globals.gnncGlobalStatic;
+							import GNNC.data.sql.gnncSql;
+							import GNNC.event.gnncEventGeneral;
+							import GNNC.gnncEmbedBlackWhite;
+							import GNNC.gnncEmbedImage;
+							import GNNC.sqlTables.table_calendar;
+							
+							import mx.effects.Fade;
+							import mx.events.FlexEvent;
+							import mx.rpc.events.FaultEvent;
+							import mx.rpc.events.ResultEvent;
+							
+							private function __start():void
+							{
+							}
+							
+							private function __dispatcheRefresh(e:*=null):void{
+								Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._refresh,data)); 
+							}
+							private function __dispatcheNew(e:*=null):void{
+								Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._new,data)); 
+							}
+							private function __dispatcheEdit(e:*=null):void{
+								Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._edit,data)); 
+							}
+							private function __dispatcheDelete(e:*=null):void{
+								Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._delete,data)); 
+							}
+							private function __dispatcheLoading(e:*=null):void{
+								Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._loading,data));
+							}
+							public function __dispatcheFocus(e:FocusEvent):void{
+								var d:Object = data != null ? data : new Object() ;
+								d['ID']    = 0;
+								d['KEY']   = gnncDataRand.__key(30);
+								d['TITLE'] = e.currentTarget.text;
+								d['INDEX'] = itemIndex;
+								//Object(owner).dispatchEvent(new FocusEvent(FocusEvent.FOCUS_OUT,true,false,d as InteractiveObject));
+								Object(owner).dispatchEvent(new gnncEventGeneral('gnncFocusOut',data));
+							}
+							public function __dispatcheEnter(e:FlexEvent):void{
+								var d:Object = data != null ? data : new Object() ;
+								d['ID']    = 0;
+								d['KEY']   = gnncDataRand.__key(30);
+								d['TITLE'] = e.currentTarget.text;
+								d['INDEX'] = itemIndex;
+								Object(owner).dispatchEvent(new gnncEventGeneral('gnncFocusOut',data));
+							}
+							public function paste(e:*=null):void{
+								Object(owner).dispatchEvent(new gnncEventGeneral(gnncEventGeneral._paste,data));
+							}
+							public function copy(e:*=null):void
+							{
+								gnncClipBoard.__clear();
+								gnncClipBoard.__copyObject(data);
+							}
+
+							private function menuRight():void
+							{
+								var arr:Array = new Array();
+								var c:ContextMenuItem = null;
+								
+								c = new ContextMenuItem('Novo', false, true);
+								c.addEventListener(Event.SELECT,__dispatcheNew);
+								arr.push(c);
+								c = new ContextMenuItem("Editar", false, true);
+								c.addEventListener(Event.SELECT,__dispatcheEdit);
+								arr.push(c);
+								c = new ContextMenuItem("Excluir", false, true);
+								c.addEventListener(Event.SELECT,__dispatcheDelete);
+								arr.push(c);
+								c = new ContextMenuItem("Atualizar", true, true);
+								c.addEventListener(Event.SELECT,__dispatcheRefresh);
+								arr.push(c);
+								c = new ContextMenuItem("Mover para amanhã", true, false);
+								arr.push(c);
+								c = new ContextMenuItem("Mover para ontem", false, false);
+								arr.push(c);
+								c = new ContextMenuItem("Copiar", true, true);
+								c.addEventListener(Event.SELECT,copy);
+								arr.push(c);
+								c = new ContextMenuItem("Colar", false, true);
+								c.addEventListener(Event.SELECT,paste);
+								arr.push(c);
+
+								var cm:ContextMenu 	= new ContextMenu();
+								cm.hideBuiltInItems	();
+								cm.customItems 		= arr;
+								this.contextMenu 	= cm;
+
+								/*
+								var n:ContextMenuItem 			= new ContextMenuItem("Novo", false, true);
+								n.addEventListener				(Event.SELECT,__dispatcheNew);
+								var e:ContextMenuItem 		= new ContextMenuItem("Editar", false, true);
+								e.addEventListener			(Event.SELECT,__dispatcheEdit);
+								var d:ContextMenuItem = new ContextMenuItem("Excluir", false, true);
+								d.addEventListener	(Event.SELECT,__dispatcheDelete);
+								var r:ContextMenuItem 	= new ContextMenuItem("Atualizar", true, true);
+								r.addEventListener		(Event.SELECT,__dispatcheRefresh);
+								var moveTo1:ContextMenuItem 	= new ContextMenuItem("Mover para amanhã", true, false);
+								var moveTo2:ContextMenuItem 	= new ContextMenuItem("Mover para ontem", false, false);
+								var c:ContextMenuItem 			= new ContextMenuItem("Copiar", true, true);
+								c.addEventListener				(Event.SELECT,copy);
+								var paste:ContextMenuItem 		= new ContextMenuItem("Colar", false, true);
+								paste.addEventListener			(Event.SELECT,paste);
+								
+								var cm:ContextMenu 				= new ContextMenu();
+								cm.hideBuiltInItems				();
+								cm.customItems 					= [n,edit,deleteEvent,refresh,moveTo1,moveTo2,c,paste];
+								
+								this.contextMenu 				= cm;
+								*/
+							}
+						]]>
+					</fx:Script>
+
+					<s:states>
+						<s:State name="normal" />
+						<s:State name="hovered" />
+						<!--s:State name="selected" /-->
+						<s:State name="normalAndShowsCaret"/>
+						<s:State name="hoveredAndShowsCaret"/>
+						<!--s:State name="selectedAndShowsCaret"/-->
+					</s:states>
+
+					<s:Rect left="0" top="0" right="0" bottom="0"
+							radiusX="3" radiusY="3">
+						<s:fill>
+							<s:SolidColor color="{gnncDate.__isValid(data.DATE_FINAL)?0xa1d6a1:data.COLOR?uint('0x'+data.COLOR):0x648ec3}" alpha="0.1" />
+						</s:fill>
+						<!--s:stroke>
+							<s:SolidColorStroke color="0x3399ff" alpha="0.6" />
+						</s:stroke-->
+					</s:Rect>
+					
+					<s:Rect left="0" top="0" right="0" bottom="0" includeIn="hovered,hoveredAndShowsCaret" 
+							radiusX="3" radiusY="3">
+						<s:fill>
+							<s:LinearGradient rotation="90">
+								<s:GradientEntry color="0x3785e2"/>
+								<s:GradientEntry color="0x2170cf"/>
+							</s:LinearGradient>
+						</s:fill>
+					</s:Rect>
+					
+					<s:HGroup visible="{data.ID==0?false:true}" left="0" top="0" right="0" bottom="0" verticalAlign="middle" paddingLeft="2" paddingRight="2" gap="1" color.hovered="0xFFFFFF" color.hoveredAndShowsCaret="0xFFFFFF"
+							  >
+
+						<s:Image source="{data.TYPE=='financial'?gnncEmbedBlackWhite.bw_financial_16_safe:gnncDate.__isValid(data.DATE_FINAL)?gnncEmbedBlackWhite.check_16_green_ok:gnncEmbedBlackWhite.check_16_bw}" width="14" height="14"
+								 toolTip="{data.TYPE}" smooth="true"
+								 />
+						<s:Rect width="3"/>
+
+						<!-- s:Image id="iconBw" 	source="{gnncEmbedImage.ItemRenderIcons_check_11_bw}" 		width="11" height="11" includeIn="hoveredAndShowsCaret,hovered" mouseOver="{iconBw.source=gnncEmbedImage.ItemRenderIcons_check_11_bw_ok}" 			mouseOut="{iconBw.source=gnncEmbedImage.ItemRenderIcons_check_11_bw}" 		/>
+						<s:Image id="iconGreen" source="{gnncEmbedImage.ItemRenderIcons_check_11_green}" 	width="11" height="11" includeIn="hoveredAndShowsCaret,hovered" mouseOver="{iconGreen.source=gnncEmbedImage.ItemRenderIcons_check_11_green_ok}" 	mouseOut="{iconGreen.source=gnncEmbedImage.ItemRenderIcons_check_11_green}" />
+						<s:Image id="iconRed" 	source="{gnncEmbedImage.ItemRenderIcons_check_11_red}" 		width="11" height="11" includeIn="hoveredAndShowsCaret,hovered" mouseOver="{iconRed.source=gnncEmbedImage.ItemRenderIcons_check_11_red_ok}" 		mouseOut="{iconRed.source=gnncEmbedImage.ItemRenderIcons_check_11_red}" 	/>
+						<s:Rect width="3" includeIn="hoveredAndShowsCaret,hovered"/ -->
+
+						<s:Label text="{data.TITLE}" width="100%" showTruncationTip="true" maxDisplayedLines="1" paddingTop="1" fontSize="11"
+								 fontWeight="{data.TYPE=='financial'?'bold':'normal'}"
+								 />
+						
+						<s:Label text="{String(data.DATE_START).substr(11,5)}" fontSize="9" width="28" paddingTop="1" alpha="0.7" excludeFrom="hoveredAndShowsCaret,hovered"/>
+
+					</s:HGroup>
+					
+					<s:HGroup visible="{data.ID==0?true:false}" left="0" top="0" right="0" bottom="0" verticalAlign="middle" paddingLeft="2" paddingRight="2" gap="1" color.hovered="0xFFFFFF" color.hoveredAndShowsCaret="0xFFFFFF">
+						<s:TextInput id="title" width="100%" height="100%" borderVisible="false" creationComplete="{/*title.setFocus()*/}" paddingLeft="4" paddingRight="4"
+									 focusAlpha="0" focusOut="{__dispatcheFocus(event)}" enter="{__dispatcheEnter(event)}"
+									 />
+					</s:HGroup>
+
+				</s:ItemRenderer>				
+			</fx:Component>
+		</s:itemRenderer>
+	</s:List>
+
+	<s:Group id="dots_"
+		mouseOver="{dots_.visible=false}"
+		left="0" top="0" right="0" bottom="0"
+		>
+		<s:Rect width="100%" height="100%">
+			<s:fill>
+				<s:SolidColor color="0xffffff"/>
+			</s:fill>
+			<s:stroke>
+				<s:SolidColorStroke color="0xeeeeee"/>
+			</s:stroke>
+		</s:Rect>
+		<s:List id="listDots_" dataProvider="{listCalendar_.dataProvider}" left="1" right="1" top="1" bottom="1" 
+				borderVisible="false" minWidth="20" contentBackgroundAlpha="0" focusAlpha="0"
+				horizontalScrollPolicy="off" verticalScrollPolicy="off"
+				>
+			<s:layout>
+				<s:TileLayout horizontalGap="2" verticalGap="2" padding="20"/>
+			</s:layout>
+			<s:itemRenderer>
+				<fx:Component>
+					<s:ItemRenderer width="100%" height="7" minWidth="7" autoDrawBackground="false" >
+						<fx:Script>
+							<![CDATA[
+								
+								private function getTypeColor (d:Object):uint {
+									d = d.TYPE;
+									return d == 'financial' ? 0x00cc99 : d == 'job' ? getTypeColorJob(d) : d == 'coursecron' ? 0xcc0000 : 0xff3366;
+								}
+								
+								private function getTypeColorJob (d:Object):uint {
+									return 0xffcc00;// : 0x747ba3
+								
+								}
+								
+							]]>
+						</fx:Script>
+						
+						<s:states>
+							<s:State name="normal" />
+							<s:State name="hovered" />
+							<!--s:State name="selected" /-->
+							<s:State name="normalAndShowsCaret"/>
+							<s:State name="hoveredAndShowsCaret"/>
+							<!--s:State name="selectedAndShowsCaret"/-->
+						</s:states>
+						
+						<s:Rect left="0" top="0" right="0" bottom="0" radiusX="3" radiusY="3">
+							<s:fill>
+								<s:SolidColor color="{getTypeColor(data) as uint}"/>
+							</s:fill>
+						</s:Rect>
+						
+					</s:ItemRenderer>
+				</fx:Component>
+			</s:itemRenderer>
+		</s:List>
+	</s:Group>
+	
+	<s:Group width="24" height="24" right="1" bottom="1">
+		<s:Rect width="24" height="24">
+			<s:fill>
+				<s:SolidColor color="0xFFFFFF"/>
+			</s:fill>
+		</s:Rect>
+	</s:Group>
+
+	<s:Group id="SHOW_" width="25" top="1" bottom="1" right="1" visible="false" showEffect="{_fade}">
+		<s:Rect width="25" height="100%">
+			<s:fill>
+				<s:SolidColor color="0xFFFFFF"/>
+			</s:fill>
+		</s:Rect>
+		<s:VGroup width="25" height="100%" gap="1" horizontalAlign="center" paddingTop="3" paddingBottom="3" >
+			<s:Button id="btnNew" width="20" height="20" icon="{gnncEmbedBlackWhite.bw_new_16}" 			skinClass="GNNC.skin.button.skin_buttonLink" click="{__dispatcheNew()}" toolTip="Novo" />
+			<s:Button id="btnRefresh" width="20" height="20" icon="{gnncEmbedBlackWhite.bw_refresh_16}" 		skinClass="GNNC.skin.button.skin_buttonLink" click="{__dispatcheLoading()}" toolTip="Atualizar" />
+			<s:Button id="btnZoom" width="20" height="20" icon="{gnncEmbedBlackWhite.bw_calendar_16_today}" 	skinClass="GNNC.skin.button.skin_buttonLink" click="{__dispatcheZoom()}" toolTip="Ampliar" />
+		</s:VGroup>
+		<elements:elementVLine left="0" _COLOR="0xEEEEEE"/>
+	</s:Group>
+	
+	<s:Group width="24" height="24" right="1" bottom="1">
+		<elements:elementLabelFont id="DAY_" width="24" height="24" text="" textAlign="center" fontSize="12" color="0x999999" verticalAlign="middle" />
+	</s:Group>
+
+	<s:Group id="BoxX" visible="false" top="0" right="0" bottom="0" left="0" alpha=".8">
+		<s:Rect top="0" right="0" bottom="0" left="0">
+			<s:fill>
+				<s:SolidColor color="0xf9f9fb" />
+			</s:fill>
+		</s:Rect>
+		<s:Line top="0" right="0" bottom="0" left="0">
+			<s:stroke>
+				<s:SolidColorStroke weight="1" color="0xEEEEEE" />
+			</s:stroke>
+		</s:Line>
+	</s:Group>
+
+	<s:Rect id="TODAY_" top="0" right="0" bottom="0" left="0">
+		<s:stroke>
+			<s:SolidColorStroke color="0x777777" weight="1"/>
+		</s:stroke>
+	</s:Rect>
+
+	<s:Rect id="pageLoading" left="0" top="0" right="0" bottom="0" visible="false" fill="{new SolidColor(0xeeeeee,.5)}"/>
+	<s:Label id="pageLoadingLabel" fontSize="11" horizontalCenter="0" verticalCenter="0" text="carregando..." visible="false" color="0xaaaaaa" />
+		
+</s:Group>
