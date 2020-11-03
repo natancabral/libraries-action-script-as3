@@ -2,7 +2,7 @@
 
 # ActionScript 3 [![Awesome](https://raw.githubusercontent.com/natancabral/libraries-action-script-as3/main/badge-awesome.svg)](https://github.com/natancabral/libraries-action-script-as3)
 
-## Libraries NC
+## Libraries Natan Cabral 
 
 > en: 10 years of AS codes (pt: *10 anos de código ActionsScript*)
 
