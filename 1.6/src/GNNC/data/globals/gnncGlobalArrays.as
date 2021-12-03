@@ -780,7 +780,7 @@ package GNNC.data.globals
 				{label: 'Bradesco',				data: '036', 	image: 'bradesco'	,nickname: 'Bradesco'	,dataname: 'BRADE' },
 				{label: 'Caixa',				data: '104', 	image: 'caixa'		,nickname: 'Caixa'		,dataname: 'CAIXA' },
 				{label: 'Citibank',				data: '745', 	image: 'citibank'	,nickname: 'Citibank'	,dataname: 'CITIB' },
-				{label: 'Digio',				data: '998', 	image: 'digio'	    ,nickname: 'Digio'	    ,dataname: 'DIGIO' },
+				{label: 'Dig',				data: '998', 	image: 'dig'	    ,nickname: 'Dig'	    ,dataname: 'DIG' },
 				{label: 'HSBC',					data: '399', 	image: 'hsbc'		,nickname: 'HSBC'		,dataname: 'HSBCC' },
 				{label: 'Itaú',					data: '479', 	image: 'itau'		,nickname: 'Itaú'		,dataname: 'ITAUU' },
 				{label: 'NuBank',				data: '260', 	image: 'nubank'	    ,nickname: 'NuBank'	    ,dataname: 'NUBNK' },
@@ -928,7 +928,7 @@ package GNNC.data.globals
 				{label: 'Standard Chartered Bank (Brasil) S/A–Bco Invest.',		data: 'z06', website: 'www.standardchartered.com'},
 				{label: 'UNI- União de Bancos Brasileiros S.A.',				data: '409', website: 'www.unibanco.com.br'},
 				{label: 'Unicard Múltiplo S.A.',								data: '230', website: 'www.unicard.com.br'},
-				{label: 'Digio',												data: '998', website: 'www.digio.com.br'},
+				{label: 'Dig',												data: '998', website: ''},
 				{label: 'PagSeguro Uol',										data: '999', website: 'www.pagseguro.com.br'}
 			]);
 
